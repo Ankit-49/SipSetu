@@ -33,7 +33,7 @@ export default function RecruiterProfile() {
       setName(currentUser.name || '');
       setEmail(currentUser.email || '');
       setCompany(currentUser.company || '');
-      setPosition(currentUser.position || 'HR Manager');
+      setPosition(currentUser.position || '');
       setPhone(currentUser.phone || '');
       setLocation(currentUser.location || '');
       setBio(currentUser.bio || '');
