@@ -1,4 +1,4 @@
-import { Link } from "wouter";
+import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FileText, Target, TrendingUp, Award, ArrowRight, User, Briefcase } from "lucide-react";
@@ -16,10 +16,10 @@ export default function LandingPage() {
             <a href="#how-it-works" className="text-sm font-medium text-slate-600 hover:text-[#1E3A5F] transition-colors">How it Works</a>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/login">
+            <Link to="/login">
               <Button variant="ghost" className="font-medium">Sign In</Button>
             </Link>
-            <Link href="/register">
+            <Link to="/register">
               <Button className="bg-[#1E3A5F] hover:bg-[#1E3A5F]/90">Get Started</Button>
             </Link>
           </div>
@@ -70,12 +70,12 @@ export default function LandingPage() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Link href="/register?role=applicant">
+            <Link to="/register?role=applicant">
               <Button size="lg" className="w-full sm:w-auto h-14 px-8 text-lg bg-[#1E3A5F] hover:bg-[#1E3A5F]/90 shadow-lg shadow-blue-900/20 rounded-xl">
                 I'm a Job Seeker <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
-            <Link href="/register?role=recruiter">
+            <Link to="/register?role=recruiter">
               <Button size="lg" className="w-full sm:w-auto h-14 px-8 text-lg bg-[#F97316] hover:bg-[#F97316]/90 text-white shadow-lg shadow-orange-500/20 rounded-xl">
                 I'm a Recruiter <ArrowRight className="ml-2 h-5 w-5" />
               </Button>

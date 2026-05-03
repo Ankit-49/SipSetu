@@ -1,5 +1,5 @@
-import { useState } from "wouter";
-import { Link, useLocation } from "wouter";
+import { useState } from "react";
+import { Link, useLocation } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +25,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-xl border-slate-200">
         <CardHeader className="space-y-3 text-center pb-6">
           <div className="flex justify-center mb-2">
-            <Link href="/" className="text-3xl font-bold tracking-tight text-[#1E3A5F]">SipSetu</Link>
+            <Link to="/" className="text-3xl font-bold tracking-tight text-[#1E3A5F]">SipSetu</Link>
           </div>
           <CardTitle className="text-2xl">Welcome back</CardTitle>
           <CardDescription>Enter your details to sign in to your account</CardDescription>
@@ -75,7 +75,7 @@ export default function LoginPage() {
 
             <div className="text-center text-sm text-slate-600">
               Don't have an account?{" "}
-              <Link href={`/register?role=${role}`} className="font-medium text-[#1E3A5F] hover:underline">
+              <Link to={`/register?role=${role}`} className="font-medium text-[#1E3A5F] hover:underline">
                 Register
               </Link>
             </div>

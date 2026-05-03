@@ -1,31 +1,43 @@
-import { createBrowserRouter } from "react-router";
-import RoleSelection from "./pages/RoleSelection";
-import Login from "./pages/Login";
-import RecruiterDashboard from "./pages/RecruiterDashboard";
-import RecruiterHome from "./pages/RecruiterHome";
-import RecruiterProfile from "./pages/RecruiterProfile";
-import PostJob from "./pages/PostJob";
-import RankedCandidates from "./pages/RankedCandidates";
-import ApplicantDashboard from "./pages/ApplicantDashboard";
-import JobPostings from "./pages/JobPostings";
-import NotFound from "./pages/NotFound";
-import Root from "./pages/Root";
+import { createBrowserRouter, Navigate } from "react-router";
+import LandingPage from "../pages/LandingPage";
+import LoginPage from "../pages/LoginPage";
+import RegisterPage from "../pages/RegisterPage";
+import NotFound from "../pages/not-found";
+
+// Applicant
+import { ApplicantLayout } from "../components/ApplicantLayout";
+import ApplicantDashboardHome from "../pages/applicant/Dashboard";
+import ApplicantResume from "../pages/applicant/Resume";
+import ApplicantJobMatches from "../pages/applicant/JobMatches";
+import ApplicantSkillGap from "../pages/applicant/SkillGap";
+import ApplicantProfile from "../pages/applicant/Profile";
+
+// Recruiter
+import { RecruiterLayout } from "../components/RecruiterLayout";
+import RecruiterDashboardHome from "../pages/recruiter/Dashboard";
+import RecruiterPostJob from "../pages/recruiter/PostJob";
+import RecruiterCandidates from "../pages/recruiter/Candidates";
+import RecruiterProfile from "../pages/recruiter/Profile";
 
 export const router = createBrowserRouter([
-  {
-    path: "/",
-    Component: Root,
-    children: [
-      { index: true, Component: RoleSelection },
-      { path: "login/:role", Component: Login },
-      { path: "recruiter/dashboard", Component: RecruiterDashboard },
-      { path: "recruiter/home", Component: RecruiterHome },
-      { path: "recruiter/profile", Component: RecruiterProfile },
-      { path: "recruiter/post-job", Component: PostJob },
-      { path: "recruiter/candidates", Component: RankedCandidates },
-      { path: "recruiter/jobs", Component: JobPostings },
-      { path: "applicant/dashboard", Component: ApplicantDashboard },
-      { path: "*", Component: NotFound },
-    ],
-  },
+  { path: "/", Component: LandingPage },
+  { path: "/login", Component: LoginPage },
+  { path: "/register", Component: RegisterPage },
+
+  // Applicant Routes
+  { path: "/applicant", Component: () => <Navigate to="/applicant/dashboard" replace /> },
+  { path: "/applicant/dashboard", Component: () => <ApplicantLayout><ApplicantDashboardHome /></ApplicantLayout> },
+  { path: "/applicant/resume", Component: () => <ApplicantLayout><ApplicantResume /></ApplicantLayout> },
+  { path: "/applicant/matches", Component: () => <ApplicantLayout><ApplicantJobMatches /></ApplicantLayout> },
+  { path: "/applicant/skill-gap", Component: () => <ApplicantLayout><ApplicantSkillGap /></ApplicantLayout> },
+  { path: "/applicant/profile", Component: () => <ApplicantLayout><ApplicantProfile /></ApplicantLayout> },
+
+  // Recruiter Routes
+  { path: "/recruiter", Component: () => <Navigate to="/recruiter/dashboard" replace /> },
+  { path: "/recruiter/dashboard", Component: () => <RecruiterLayout><RecruiterDashboardHome /></RecruiterLayout> },
+  { path: "/recruiter/post-job", Component: () => <RecruiterLayout><RecruiterPostJob /></RecruiterLayout> },
+  { path: "/recruiter/candidates", Component: () => <RecruiterLayout><RecruiterCandidates /></RecruiterLayout> },
+  { path: "/recruiter/profile", Component: () => <RecruiterLayout><RecruiterProfile /></RecruiterLayout> },
+
+  { path: "*", Component: NotFound },
 ]);

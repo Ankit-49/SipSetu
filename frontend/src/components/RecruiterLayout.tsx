@@ -1,4 +1,4 @@
-import { Link, useLocation } from "wouter";
+import { Link, useLocation } from "react-router";
 import { LayoutDashboard, PlusSquare, Users, User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -18,7 +18,7 @@ export function RecruiterLayout({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside className="w-64 bg-[#1E3A5F] flex flex-col flex-shrink-0" data-testid="recruiter-sidebar">
         <div className="h-16 flex items-center px-6">
-          <Link href="/" className="text-white text-2xl font-bold tracking-tight">SipSetu</Link>
+          <Link to="/" className="text-white text-2xl font-bold tracking-tight">SipSetu</Link>
         </div>
         
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
@@ -27,7 +27,7 @@ export function RecruiterLayout({ children }: { children: React.ReactNode }) {
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                to={item.href}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
                   isActive 
                     ? "bg-white/10 text-white border-l-4 border-[#F97316]" 

@@ -18,6 +18,9 @@ def create_app():
     
     db.init_app(app)
     
+    from routes import api
+    app.register_blueprint(api, url_prefix='/api')
+    
     @app.route('/api/health', methods=['GET'])
     def health_check():
         return jsonify({"status": "healthy"}), 200
