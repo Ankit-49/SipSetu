@@ -33,6 +33,7 @@ export default function RegisterPage() {
       if (userId) {
         localStorage.setItem("user_id", userId);
         localStorage.setItem("user_role", role);
+        localStorage.setItem("user_name", name);
       }
       
       // Auto-login after registration could go here

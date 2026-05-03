@@ -46,7 +46,8 @@ def login():
     return jsonify({
         "message": "Login successful",
         "user_id": user.user_id,
-        "role": user.role
+        "role": user.role,
+        "name": user.name
     }), 200
 
 @api.route('/jobs', methods=['GET', 'POST'])

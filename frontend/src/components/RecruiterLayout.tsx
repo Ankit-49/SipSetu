@@ -11,7 +11,7 @@ const navItems = [
 ];
 
 export function RecruiterLayout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const location = useLocation();
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
@@ -23,7 +23,7 @@ export function RecruiterLayout({ children }: { children: React.ReactNode }) {
         
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
-            const isActive = location === item.href;
+            const isActive = location.pathname === item.href;
             return (
               <Link
                 key={item.href}
@@ -46,10 +46,14 @@ export function RecruiterLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-3">
             <Avatar>
               <AvatarImage src="" />
-              <AvatarFallback className="bg-[#F97316] text-white">RM</AvatarFallback>
+              <AvatarFallback className="bg-[#F97316] text-white">
+                {localStorage.getItem("user_name")?.split(' ').map(n => n[0]).join('') || "RC"}
+              </AvatarFallback>
             </Avatar>
             <div className="flex flex-col">
-              <span className="text-sm font-medium text-white">Rahul Mehta</span>
+              <span className="text-sm font-medium text-white truncate max-w-[150px]">
+                {localStorage.getItem("user_name") || "Recruiter"}
+              </span>
               <span className="text-xs text-slate-400">HR Manager</span>
             </div>
           </div>

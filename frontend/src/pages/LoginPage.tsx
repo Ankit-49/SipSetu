@@ -30,6 +30,9 @@ export default function LoginPage() {
       if (userId) {
         localStorage.setItem("user_id", userId);
         localStorage.setItem("user_role", userRole);
+        if (response.data.name) {
+          localStorage.setItem("user_name", response.data.name);
+        }
       }
       
       if (userRole === "applicant") {
