@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FileText, Target, TrendingUp, Award, ArrowRight, User, Briefcase } from "lucide-react";
 import { motion } from "framer-motion";
+import { VisualBackground } from "@/components/VisualBackground";
 
 export default function LandingPage() {
   return (
@@ -27,56 +28,51 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-6 overflow-hidden relative">
-        <div className="absolute inset-0 z-0">
-          <motion.div 
-            animate={{ 
-              y: [0, -20, 0],
-              opacity: [0.5, 0.8, 0.5]
-            }}
-            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-20 right-20 w-64 h-64 bg-orange-300 rounded-full mix-blend-multiply filter blur-3xl opacity-50"
-          />
-          <motion.div 
-            animate={{ 
-              y: [0, 20, 0],
-              opacity: [0.3, 0.6, 0.3]
-            }}
-            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-            className="absolute bottom-20 left-20 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30"
-          />
-        </div>
+      <section className="pt-48 pb-32 px-6 overflow-hidden relative">
+        <VisualBackground />
 
-        <div className="max-w-4xl mx-auto text-center relative z-10">
+        <div className="max-w-5xl mx-auto text-center relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="mb-6 inline-block px-4 py-1.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm"
+          >
+            <span className="text-blue-100 text-sm font-medium uppercase tracking-widest">Bridging Talent & Opportunity</span>
+          </motion.div>
+          
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-5xl md:text-7xl font-extrabold tracking-tight text-[#1E3A5F] mb-6"
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="text-6xl md:text-8xl font-black tracking-tighter text-white mb-8 leading-[0.9]"
           >
-            No Skill Left Behind
+            NO SKILL <br />
+            <span className="text-blue-200">LEFT BEHIND</span>
           </motion.h1>
+          
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-xl text-slate-600 mb-10 max-w-2xl mx-auto leading-relaxed"
+            transition={{ duration: 0.8, delay: 0.4 }}
+            className="text-xl md:text-2xl text-blue-50 mb-12 max-w-2xl mx-auto leading-relaxed font-light"
           >
             SipSetu is the AI-powered recruitment platform bridging job seekers and recruiters. Discover where you truly stand, or find the signal through the noise.
           </motion.p>
+          
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+            transition={{ duration: 0.8, delay: 0.6 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-6"
           >
             <Link to="/register?role=applicant">
-              <Button size="lg" className="w-full sm:w-auto h-14 px-8 text-lg bg-[#1E3A5F] hover:bg-[#1E3A5F]/90 shadow-lg shadow-blue-900/20 rounded-xl">
+              <Button size="lg" className="w-full sm:w-auto h-16 px-10 text-lg bg-white text-blue-700 hover:bg-blue-50 shadow-xl rounded-2xl font-bold transition-all hover:scale-105">
                 I'm a Job Seeker <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
             <Link to="/register?role=recruiter">
-              <Button size="lg" className="w-full sm:w-auto h-14 px-8 text-lg bg-[#F97316] hover:bg-[#F97316]/90 text-white shadow-lg shadow-orange-500/20 rounded-xl">
+              <Button size="lg" className="w-full sm:w-auto h-16 px-10 text-lg bg-[#F97316] hover:bg-[#F97316]/90 text-white shadow-xl shadow-orange-500/30 rounded-2xl font-bold transition-all hover:scale-105">
                 I'm a Recruiter <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>

@@ -7,6 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import React from "react";
+import { motion } from "framer-motion";
+import Lottie from "lottie-react";
+import loginAnimation from "@/imports/Login.json";
+import { VisualBackground } from "@/components/VisualBackground";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -51,16 +55,43 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 selection:bg-[#F97316] selection:text-white">
-      <Card className="w-full max-w-md shadow-xl border-slate-200">
-        <CardHeader className="space-y-3 text-center pb-6">
-          <div className="flex justify-center mb-2">
-            <Link to="/" className="text-3xl font-bold tracking-tight text-[#1E3A5F]">SipSetu</Link>
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden selection:bg-[#F97316] selection:text-white">
+      <VisualBackground />
+      
+      <div className="w-full max-w-5xl flex items-center justify-between gap-12 relative z-10">
+        {/* Animation Side (Hidden on small screens) */}
+        <motion.div 
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.8 }}
+          className="flex-1 hidden md:flex items-center justify-center"
+        >
+          <div className="w-full max-w-lg drop-shadow-2xl">
+            <Lottie
+              animationData={loginAnimation}
+              loop={true}
+              autoplay={true}
+              style={{ width: '100%', height: 'auto', transform: 'scaleX(-1)' }} // Mirror it for variety
+            />
           </div>
-          <CardTitle className="text-2xl">Create an account</CardTitle>
-          <CardDescription>Join SipSetu to start your journey</CardDescription>
-        </CardHeader>
-        <CardContent>
+        </motion.div>
+
+        {/* Card Side */}
+        <motion.div
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.8 }}
+          className="w-full max-w-md"
+        >
+          <Card className="shadow-2xl border-none bg-white/95 backdrop-blur-sm">
+            <CardHeader className="space-y-3 text-center pb-6">
+              <div className="flex justify-center mb-2">
+                <Link to="/" className="text-4xl font-black tracking-tighter text-[#1E3A5F]">SipSetu</Link>
+              </div>
+              <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
+              <CardDescription>Join SipSetu to start your journey</CardDescription>
+            </CardHeader>
+            <CardContent>
           <form onSubmit={handleRegister} className="space-y-6">
             <div className="space-y-2">
               <Label className="text-slate-600 text-xs uppercase tracking-wider font-semibold">I am a</Label>
