@@ -18,7 +18,7 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-4">
             <Link to="/login">
-              <Button variant="ghost" className="font-medium">Sign In</Button>
+              <Button variant="ghost" className="hover:text-[#6aacde]" >Sign In</Button>
             </Link>
             <Link to="/register">
               <Button className="bg-[#1E3A5F] hover:bg-[#1E3A5F]/90">Get Started</Button>
@@ -67,7 +67,7 @@ export default function LandingPage() {
             className="flex flex-col sm:flex-row items-center justify-center gap-6"
           >
             <Link to="/register?role=applicant">
-              <Button size="lg" className="w-full sm:w-auto h-16 px-10 text-lg bg-white text-blue-700 hover:bg-blue-50 shadow-xl rounded-2xl font-bold transition-all hover:scale-105">
+              <Button size="lg" className="w-full sm:w-auto h-16 px-10 text-lg bg-[#5be3b3] text-white hover:bg-[#78807d] shadow-xl shadow-orange-500/30 rounded-2xl font-bold transition-all hover:scale-105">
                 I'm a Job Seeker <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
