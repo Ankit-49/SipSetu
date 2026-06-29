@@ -6,42 +6,50 @@ import { Link } from "react-router";
 import { useState, useEffect } from "react";
 import axios from "axios";
 
-const stats = { activePostings: 5, totalApplicants: 143, shortlisted: 28, hiresThisMonth: 3 };
-const topCandidates = [
-  { id: 1, name: "Priya Sharma", role: "Frontend Developer", match: 92, skills: ["React", "TypeScript"], status: "Shortlisted" },
-  { id: 2, name: "Arjun Nair", role: "Full Stack Developer", match: 88, skills: ["Node.js", "React", "PostgreSQL"], status: "In Review" },
-  { id: 3, name: "Sneha Patel", role: "UI Developer", match: 84, skills: ["CSS", "Figma", "HTML"], status: "Applied" },
-];
-// const recentPostings = [
-//   { id: 1, title: "Frontend Developer", applicants: 47, posted: "3 days ago", status: "Active" },
-//   { id: 2, title: "Backend Engineer", applicants: 31, posted: "5 days ago", status: "Active" },
-//   { id: 3, title: "DevOps Engineer", applicants: 22, posted: "1 week ago", status: "Active" },
-// ];
+const API = "http://localhost:5000/api";
 
 export default function RecruiterDashboardHome() {
   const date = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-  const [activeJobs, setActiveJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<any>(null);
 
   useEffect(() => {
-    const fetchJobs = async () => {
+    const userId = localStorage.getItem("user_id");
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
+    const fetchDashboard = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/api/jobs");
-        const userId = localStorage.getItem("user_id");
-        // Filter jobs created by this recruiter
-        const myJobs = response.data.filter((job: any) => job.recruiter_id === userId);
-        setActiveJobs(myJobs);
+        const response = await axios.get(`${API}/recruiters/${userId}/dashboard`);
+        setData(response.data);
       } catch (err) {
-        console.error("Failed to fetch active jobs", err);
+        console.error("Failed to fetch recruiter dashboard", err);
+      } finally {
+        setLoading(false);
       }
     };
-    fetchJobs();
+    fetchDashboard();
   }, []);
+
+  const topCandidates = data?.top_candidates || [];
+  const activeJobs = data?.jobs || [];
+  const userName = data?.name || localStorage.getItem("user_name") || "Recruiter";
+
+  if (loading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#F97316] border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Good morning, Rahul 👋</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Good morning, {userName.split(' ')[0]} 👋</h1>
           <p className="text-slate-500 mt-1">{date}</p>
         </div>
         <Link to="/recruiter/post-job">
@@ -57,7 +65,7 @@ export default function RecruiterDashboardHome() {
           <CardContent className="p-6 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-sm font-medium text-slate-500">Active Postings</p>
-              <p className="text-3xl font-bold text-slate-900">{activeJobs.length}</p>
+              <p className="text-3xl font-bold text-slate-900">{data?.active_postings ?? 0}</p>
             </div>
             <div className="h-12 w-12 rounded-full bg-blue-50 flex items-center justify-center">
               <Briefcase className="h-6 w-6 text-[#1E3A5F]" />
@@ -67,8 +75,8 @@ export default function RecruiterDashboardHome() {
         <Card>
           <CardContent className="p-6 flex items-center justify-between">
             <div className="space-y-1">
-              <p className="text-sm font-medium text-slate-500">Total Applicants</p>
-              <p className="text-3xl font-bold text-slate-900">{stats.totalApplicants}</p>
+              <p className="text-sm font-medium text-slate-500">Total Candidates</p>
+              <p className="text-3xl font-bold text-slate-900">{data?.total_candidates ?? 0}</p>
             </div>
             <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center">
               <Users className="h-6 w-6 text-slate-600" />
@@ -78,8 +86,8 @@ export default function RecruiterDashboardHome() {
         <Card>
           <CardContent className="p-6 flex items-center justify-between">
             <div className="space-y-1">
-              <p className="text-sm font-medium text-slate-500">Shortlisted</p>
-              <p className="text-3xl font-bold text-[#F97316]">{stats.shortlisted}</p>
+              <p className="text-sm font-medium text-slate-500">Top Match</p>
+              <p className="text-3xl font-bold text-[#F97316]">{data?.top_match_score ?? 0}%</p>
             </div>
             <div className="h-12 w-12 rounded-full bg-orange-50 flex items-center justify-center">
               <UserCheck className="h-6 w-6 text-[#F97316]" />
@@ -89,9 +97,9 @@ export default function RecruiterDashboardHome() {
         <Card>
           <CardContent className="p-6 flex items-center justify-between">
             <div className="space-y-1">
-              <p className="text-sm font-medium text-slate-500">Hires This Month</p>
+              <p className="text-sm font-medium text-slate-500">Recent Jobs</p>
               <div className="flex items-center gap-2">
-                <p className="text-3xl font-bold text-slate-900">{stats.hiresThisMonth}</p>
+                <p className="text-3xl font-bold text-slate-900">{activeJobs.length}</p>
                 <TrendingUp className="h-4 w-4 text-green-500" />
               </div>
             </div>
@@ -115,33 +123,28 @@ export default function RecruiterDashboardHome() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-slate-100">
-              {topCandidates.map((candidate) => (
-                <div key={candidate.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+              {topCandidates.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">No ranked candidates yet. Upload resumes and create jobs to see matches.</div>
+              ) : topCandidates.map((candidate: any) => (
+                <div key={`${candidate.applicant_id}-${candidate.job_title}`} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 rounded-full bg-[#1E3A5F] text-white flex items-center justify-center font-semibold text-sm">
-                      {candidate.name.split(' ').map(n => n[0]).join('')}
+                      {candidate.applicant_name.split(' ').map((n: string) => n[0]).join('')}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-slate-900">{candidate.name}</h3>
+                        <h3 className="font-semibold text-slate-900">{candidate.applicant_name}</h3>
                         <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none h-5 text-[10px]">
-                          {candidate.match}% Match
+                          {candidate.matching_score}% Match
                         </Badge>
                       </div>
-                      <p className="text-sm text-slate-500">{candidate.role}</p>
+                      <p className="text-sm text-slate-500">{candidate.job_title}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="hidden md:flex gap-1">
-                      {candidate.skills.map(s => <Badge key={s} variant="outline" className="text-xs text-slate-500">{s}</Badge>)}
+                      {candidate.resume_skills.map((s: string) => <Badge key={s} variant="outline" className="text-xs text-slate-500">{s}</Badge>)}
                     </div>
-                    <Badge variant="secondary" className={
-                      candidate.status === 'Shortlisted' ? 'bg-green-50 text-green-700' :
-                      candidate.status === 'In Review' ? 'bg-blue-50 text-blue-700' :
-                      'bg-slate-100 text-slate-700'
-                    }>
-                      {candidate.status}
-                    </Badge>
                     <Button variant="outline" size="sm" className="gap-2">
                       <FileText className="h-3.5 w-3.5" /> Resume
                     </Button>
@@ -161,15 +164,15 @@ export default function RecruiterDashboardHome() {
             <div className="divide-y divide-slate-100">
               {activeJobs.length === 0 ? (
                 <div className="p-8 text-center text-slate-500">No active job postings yet.</div>
-              ) : activeJobs.map(post => (
+              ) : activeJobs.map((post: any) => (
                 <div key={post.job_id} className="p-4 hover:bg-slate-50 transition-colors">
                   <div className="flex justify-between items-start mb-2">
                     <h4 className="font-semibold text-slate-900">{post.title}</h4>
                     <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-200">Active</Badge>
                   </div>
                   <div className="flex justify-between items-center text-sm text-slate-500">
-                    <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> 0 Applicants</span>
-                    <span>Recent</span>
+                    <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {data?.total_candidates ?? 0} Candidates</span>
+                    <span>{post.created_at ? new Date(post.created_at).toLocaleDateString() : "Recent"}</span>
                   </div>
                 </div>
               ))}

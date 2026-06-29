@@ -743,6 +743,7 @@ def recruiter_dashboard(recruiter_id):
         "company": recruiter.company or "",
         "active_postings": len(jobs),
         "total_candidates": total_candidates,
+        "top_match_score": top_candidates[0]["matching_score"] if top_candidates else 0,
         "jobs": [format_job(j) for j in jobs[:5]],  # show latest 5 in panel
         "top_candidates": top_candidates
     }), 200
