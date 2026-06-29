@@ -2,6 +2,9 @@ import { Link, useLocation } from "react-router";
 import { LayoutDashboard, PlusSquare, Users, User, Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router";
+import { useAuth } from "@/app/context/AuthContext";
 
 const navItems = [
   { name: "Dashboard", href: "/recruiter/dashboard", icon: LayoutDashboard },
@@ -13,6 +16,13 @@ const navItems = [
 
 export function RecruiterLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+  };
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
@@ -63,6 +73,16 @@ export function RecruiterLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </Link>
+
+        <div className="p-4 border-t border-white/10">
+          <Button
+            onClick={handleLogout}
+            variant="outline"
+            className="w-full border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+          >
+            Logout
+          </Button>
+        </div>
       </aside>
 
       {/* Main Content */}

@@ -17,6 +17,9 @@ export default function LandingPage() {
             <a href="#how-it-works" className="text-sm font-medium text-slate-600 hover:text-[#1E3A5F] transition-colors">How it Works</a>
           </div>
           <div className="flex items-center gap-4">
+            <Link to="/preview">
+              <Button variant="ghost" className="hover:text-[#1E3A5F]">Preview</Button>
+            </Link>
             <Link to="/login">
               <Button variant="ghost" className="hover:text-[#6aacde]" >Sign In</Button>
             </Link>
@@ -66,6 +69,11 @@ export default function LandingPage() {
             transition={{ duration: 0.8, delay: 0.6 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-6"
           >
+            <Link to="/preview">
+              <Button size="lg" className="w-full sm:w-auto h-16 px-10 text-lg bg-white text-[#1E3A5F] hover:bg-slate-100 shadow-xl rounded-2xl font-bold transition-all hover:scale-105">
+                Preview the platform <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
             <Link to="/register?role=applicant">
               <Button size="lg" className="w-full sm:w-auto h-16 px-10 text-lg bg-[#5be3b3] text-white hover:bg-[#78807d] shadow-xl shadow-orange-500/30 rounded-2xl font-bold transition-all hover:scale-105">
                 I'm a Job Seeker <ArrowRight className="ml-2 h-5 w-5" />

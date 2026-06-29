@@ -10,6 +10,20 @@ import os
 
 api = Blueprint('api', __name__)
 
+
+def format_candidate_preview(ranking):
+    return {
+        "ranking_id": str(ranking.ranking_id),
+        "job_id": str(ranking.job.job_id),
+        "job_title": ranking.job.title,
+        "applicant_id": str(ranking.resume.applicant_id),
+        "applicant_name": ranking.resume.applicant.name or ranking.resume.applicant.email,
+        "applicant_email": ranking.resume.applicant.email,
+        "applicant_location": ranking.resume.applicant.location or "",
+        "matching_score": ranking.matching_score,
+        "resume_skills": [s.skill_name for s in ranking.resume.skills],
+    }
+
 # ============ UTILITY FUNCTIONS ============
 
 def extract_skills_from_text(text):
@@ -172,6 +186,12 @@ def login():
         "email": user.email
     }), 200
 
+
+@api.route('/auth/logout', methods=['POST'])
+def logout():
+    """Clear any server-side auth state for the current client."""
+    return jsonify({"message": "Logged out successfully"}), 200
+
 # ============ PROFILE ROUTES ============
 
 @api.route('/profile/<user_id>', methods=['GET', 'PUT'])
@@ -209,6 +229,29 @@ def profile(user_id):
             
         db.session.commit()
         return jsonify({"message": "Profile updated successfully"}), 200
+
+
+@api.route('/public/preview', methods=['GET'])
+def public_preview():
+    """Return a public, database-backed snapshot for guests."""
+    latest_jobs = Job.query.order_by(Job.created_at.desc()).limit(4).all()
+    latest_rankings = Ranking.query.order_by(Ranking.matching_score.desc()).limit(4).all()
+
+    total_jobs = Job.query.count()
+    total_recruiters = Recruiter.query.count()
+    total_applicants = Applicant.query.count()
+    total_resumes = Resume.query.count()
+
+    return jsonify({
+        "stats": {
+            "jobs": total_jobs,
+            "recruiters": total_recruiters,
+            "applicants": total_applicants,
+            "resumes": total_resumes,
+        },
+        "recent_jobs": [format_job(job) for job in latest_jobs],
+        "top_candidates": [format_candidate_preview(ranking) for ranking in latest_rankings],
+    }), 200
 
 # ============ JOB POSTING ROUTES ============
 

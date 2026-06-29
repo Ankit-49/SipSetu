@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
+import axios from 'axios';
 
 interface User {
   id: string;
@@ -10,7 +11,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string, role: 'applicant' | 'recruiter') => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -33,9 +34,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('user', JSON.stringify(mockUser));
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await axios.post('http://localhost:5000/api/auth/logout');
+    } catch {
+      // Logout should still complete locally even if the backend is unavailable.
+    }
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('user_name');
+    localStorage.removeItem('company');
   };
 
   return (

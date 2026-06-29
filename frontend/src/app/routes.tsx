@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import LandingPage from "../pages/LandingPage";
+import PreviewPage from "../pages/PreviewPage";
 import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
 import NotFound from "../pages/not-found";
@@ -22,6 +23,7 @@ import RecruiterBulkScreening from "../pages/recruiter/BulkScreening";
 
 export const router = createBrowserRouter([
   { path: "/", Component: LandingPage },
+  { path: "/preview", Component: PreviewPage },
   { path: "/login", Component: LoginPage },
   { path: "/register", Component: RegisterPage },
 
