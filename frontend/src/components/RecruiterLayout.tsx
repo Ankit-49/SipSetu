@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router";
-import { LayoutDashboard, PlusSquare, Users, User } from "lucide-react";
+import { LayoutDashboard, PlusSquare, Users, User, Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -7,6 +7,7 @@ const navItems = [
   { name: "Dashboard", href: "/recruiter/dashboard", icon: LayoutDashboard },
   { name: "Post Job", href: "/recruiter/post-job", icon: PlusSquare },
   { name: "Candidates", href: "/recruiter/candidates", icon: Users },
+  { name: "Bulk Screen", href: "/recruiter/bulk-screen", icon: Sparkles },
   { name: "Profile", href: "/recruiter/profile", icon: User },
 ];
 

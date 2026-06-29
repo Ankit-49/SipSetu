@@ -150,11 +150,11 @@ export default function RecruiterPostJob() {
 
               <div className="space-y-2">
                 <Label>Location</Label>
-                <Input placeholder="e.g. Bangalore, India" className="h-11" />
+                <Input placeholder="e.g. Kathmandu, Nepal" className="h-11" />
               </div>
 
               <div className="space-y-2">
-                <Label>Salary Range (LPA)</Label>
+                <Label>Salary Range </Label>
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">₹</span>
