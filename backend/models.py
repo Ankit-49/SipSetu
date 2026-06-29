@@ -61,6 +61,12 @@ class Job(db.Model):
     job_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     recruiter_id = db.Column(UUID(as_uuid=True), db.ForeignKey('recruiters.user_id', ondelete='CASCADE'), nullable=False)
     title = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    location = db.Column(db.String(255), nullable=True)
+    job_type = db.Column(db.String(50), nullable=True)  # full-time, part-time, contract
+    experience_level = db.Column(db.String(50), nullable=True)  # fresher, 1-3, 3-5, 5+
+    salary_min = db.Column(db.Float, nullable=True)
+    salary_max = db.Column(db.Float, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     skills = db.relationship('Skill', secondary=job_skills, backref=db.backref('jobs', lazy='dynamic'))
