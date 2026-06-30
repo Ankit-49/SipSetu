@@ -70,12 +70,12 @@ export default function LandingPage() {
             className="flex flex-col sm:flex-row items-center justify-center gap-6"
           >
             <Link to="/preview">
-              <Button size="lg" className="w-full sm:w-auto h-16 px-10 text-lg bg-white text-[#1E3A5F] hover:bg-slate-100 shadow-xl rounded-2xl font-bold transition-all hover:scale-105">
+              <Button size="lg" className="w-full sm:w-auto h-16 px-10 text-lg bg-[#F97316] hover:bg-[#F97316]/90 text-white shadow-xl shadow-orange-500/30 rounded-2xl font-bold transition-all hover:scale-105">
                 Preview the platform <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
             <Link to="/register?role=applicant">
-              <Button size="lg" className="w-full sm:w-auto h-16 px-10 text-lg bg-[#5be3b3] text-white hover:bg-[#78807d] shadow-xl shadow-orange-500/30 rounded-2xl font-bold transition-all hover:scale-105">
+              <Button size="lg" className="w-full sm:w-auto h-16 px-10 text-lg bg-[#F97316] hover:bg-[#F97316]/90 text-white shadow-xl shadow-orange-500/30 rounded-2xl font-bold transition-all hover:scale-105">
                 I'm a Job Seeker <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
