@@ -135,6 +135,46 @@ def calculate_experience_score(candidate_years, target_years):
 
     return round(max(0.0, (candidate_years / target_years) * 100.0), 2)
 
+
+def calculate_ranking_score(resume, job):
+    resume_skills = [s.skill_name for s in resume.skills]
+    job_skills = [s.skill_name for s in job.skills]
+    skills_score = calculate_match_score(resume_skills, job_skills)
+    experience_years = extract_experience_years(resume.raw_text or "")
+    target_experience_years = experience_level_to_years(job.experience_level)
+    experience_score = calculate_experience_score(experience_years, target_experience_years)
+
+    if skills_score == 100.0 and experience_score >= 100.0:
+        combined_score = 100.0
+    else:
+        combined_score = (skills_score * 0.88) + (experience_score * 0.10)
+        combined_score = min(round(combined_score, 2), 99.99)
+
+    return combined_score
+
+
+def create_rankings_for_job(job_id):
+    """
+    Create or update ranking entries for a new job against all stored resumes.
+    """
+    job = Job.query.get(job_id)
+    if not job:
+        return
+
+    all_resumes = Resume.query.all()
+
+    for resume in all_resumes:
+        score = calculate_ranking_score(resume, job)
+
+        existing_ranking = Ranking.query.filter_by(job_id=job_id, resume_id=resume.resume_id).first()
+        if existing_ranking:
+            existing_ranking.matching_score = score
+        else:
+            ranking = Ranking(job_id=job_id, resume_id=resume.resume_id, matching_score=score)
+            db.session.add(ranking)
+
+    db.session.commit()
+
 def create_rankings_for_resume(resume_id, applicant_id):
     """
     Create ranking entries for a new resume against all active jobs.
@@ -146,9 +186,7 @@ def create_rankings_for_resume(resume_id, applicant_id):
     all_jobs = Job.query.all()
     
     for job in all_jobs:
-        resume_skills = [s.skill_name for s in resume.skills]
-        job_skills = [s.skill_name for s in job.skills]
-        score = calculate_match_score(resume_skills, job_skills)
+        score = calculate_ranking_score(resume, job)
         
         existing_ranking = Ranking.query.filter_by(job_id=job.job_id, resume_id=resume_id).first()
         if existing_ranking:
@@ -355,6 +393,8 @@ def jobs():
             
         db.session.add(new_job)
         db.session.commit()
+
+        create_rankings_for_job(new_job.job_id)
         
         return jsonify({
             "message": "Job posted successfully",
