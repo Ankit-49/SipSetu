@@ -300,9 +300,9 @@ export default function RecruiterHome() {
                             {candidate.status}
                           </Badge>
                         </div>
-                        <div className="flex flex-wrap gap-2 mb-2">
+                        <div className="flex flex-wrap gap-2 mb-2 w-full max-w-full">
                           {candidate.skills.slice(0, 4).map((skill) => (
-                            <span key={skill} className="text-xs bg-gray-100 px-2 py-1 rounded">
+                            <span key={skill} className="inline-flex max-w-full whitespace-normal break-words text-xs bg-gray-100 px-2 py-1 rounded">
                               {skill}
                             </span>
                           ))}

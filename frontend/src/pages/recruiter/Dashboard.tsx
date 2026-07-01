@@ -126,24 +126,24 @@ export default function RecruiterDashboardHome() {
               {topCandidates.length === 0 ? (
                 <div className="p-8 text-center text-slate-500">No ranked candidates yet. Upload resumes and create jobs to see matches.</div>
               ) : topCandidates.map((candidate: any) => (
-                <div key={`${candidate.applicant_id}-${candidate.job_title}`} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
-                  <div className="flex items-center gap-4">
+                <div key={`${candidate.applicant_id}-${candidate.job_title}`} className="p-4 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors group min-w-0">
+                  <div className="flex items-center gap-4 min-w-0 flex-1">
                     <div className="h-10 w-10 rounded-full bg-[#1E3A5F] text-white flex items-center justify-center font-semibold text-sm">
                       {candidate.applicant_name.split(' ').map((n: string) => n[0]).join('')}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <h3 className="font-semibold text-slate-900">{candidate.applicant_name}</h3>
                         <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none h-5 text-[10px]">
                           {candidate.matching_score}% Match
                         </Badge>
                       </div>
-                      <p className="text-sm text-slate-500">{candidate.job_title}</p>
+                      <p className="text-sm text-slate-500 truncate">{candidate.job_title}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="hidden md:flex gap-1">
-                      {candidate.resume_skills.map((s: string) => <Badge key={s} variant="outline" className="text-xs text-slate-500">{s}</Badge>)}
+                  <div className="flex items-center gap-4 shrink-0">
+                    <div className="hidden md:flex flex-wrap gap-1.5 max-w-[320px] min-w-0">
+                      {candidate.resume_skills.map((s: string) => <Badge key={s} variant="outline" className="text-xs text-slate-500 whitespace-normal break-words">{s}</Badge>)}
                     </div>
                     <Button variant="outline" size="sm" className="gap-2">
                       <FileText className="h-3.5 w-3.5" /> Resume
