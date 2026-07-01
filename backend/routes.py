@@ -3,226 +3,24 @@ from models import db, User, Applicant, Recruiter, Job, Resume, Skill, Ranking
 from werkzeug.security import generate_password_hash, check_password_hash
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
 from sqlalchemy import func
 import fitz  # PyMuPDF
 import os
-import re
+
+from routes_common import (
+    calculate_experience_score,
+    calculate_match_score,
+    calculate_ranking_score,
+    create_rankings_for_job,
+    create_rankings_for_resume,
+    experience_level_to_years,
+    extract_experience_years,
+    extract_skills_from_text,
+    format_candidate_preview,
+    format_job,
+)
 
 api = Blueprint('api', __name__)
-
-
-def format_candidate_preview(ranking):
-    return {
-        "ranking_id": str(ranking.ranking_id),
-        "job_id": str(ranking.job.job_id),
-        "job_title": ranking.job.title,
-        "applicant_id": str(ranking.resume.applicant_id),
-        "applicant_name": ranking.resume.applicant.name or ranking.resume.applicant.email,
-        "applicant_email": ranking.resume.applicant.email,
-        "applicant_location": ranking.resume.applicant.location or "",
-        "matching_score": ranking.matching_score,
-        "resume_skills": [s.skill_name for s in ranking.resume.skills],
-    }
-
-# ============ UTILITY FUNCTIONS ============
-
-def extract_skills_from_text(text):
-    """
-    Extract skills from resume text using simple keyword matching.
-    Returns a list of skill names found in the text.
-    """
-    if not text:
-        return []
-    
-    text_lower = text.lower()
-    common_skills = [
-        'python', 'javascript', 'typescript', 'java', 'c++', 'c#', 'go', 'rust', 'php', 'ruby',
-        'react', 'angular', 'vue', 'svelte', 'node.js', 'express', 'django', 'flask', 'fastapi',
-        'sql', 'postgresql', 'mysql', 'mongodb', 'redis', 'elasticsearch', 'graphql', 'rest api',
-        'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'jenkins', 'git', 'github', 'gitlab',
-        'html', 'css', 'tailwind', 'bootstrap', 'sass', 'webpack', 'vite',
-        'machine learning', 'deep learning', 'nlp', 'computer vision', 'tensorflow', 'pytorch',
-        'design', 'figma', 'ui', 'ux', 'product', 'agile', 'scrum', 'jira',
-        'communication', 'leadership', 'teamwork', 'problem solving', 'critical thinking'
-    ]
-    
-    found_skills = []
-    for skill in common_skills:
-        if skill in text_lower:
-            found_skills.append(skill)
-    
-    return found_skills
-
-def calculate_match_score(resume_skills_list, job_skills_list):
-    """
-    Calculate similarity score between resume skills and job skills using TF-IDF.
-    Returns a score between 0 and 100.
-    """
-    if not job_skills_list:
-        return 0.0
-    
-    if not resume_skills_list:
-        return 0.0
-    
-    resume_set = set([s.lower() for s in resume_skills_list])
-    job_set = set([s.lower() for s in job_skills_list])
-    
-    if len(job_set) == 0:
-        return 0.0
-    
-    # Jaccard similarity
-    intersection = len(resume_set.intersection(job_set))
-    union = len(resume_set.union(job_set))
-    
-    if union == 0:
-        return 0.0
-    
-    score = (intersection / union) * 100
-    return round(score, 2)
-
-
-EXPERIENCE_LEVEL_TO_YEARS = {
-    "fresher": 0.0,
-    "1-3": 2.0,
-    "3-5": 4.0,
-    "5+": 5.0,
-}
-
-
-def extract_experience_years(text):
-    if not text:
-        return None
-
-    patterns = [
-        r"(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?|yr\.?)\s*(?:of\s*)?(?:experience|exp\.?)",
-        r"(?:experience|exp\.?)\s*(?:of\s*)?(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?|yr\.?)",
-        r"(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)",
-    ]
-
-    detected_years = []
-    for pattern in patterns:
-        for match in re.findall(pattern, text, flags=re.IGNORECASE):
-            try:
-                detected_years.append(float(match))
-            except ValueError:
-                continue
-
-    if not detected_years:
-        return None
-
-    return round(max(detected_years), 1)
-
-
-def experience_level_to_years(experience_level):
-    if not experience_level:
-        return None
-    return EXPERIENCE_LEVEL_TO_YEARS.get(str(experience_level).strip().lower())
-
-
-def calculate_experience_score(candidate_years, target_years):
-    if candidate_years is None:
-        return 0.0
-
-    if target_years is None:
-        return min(candidate_years * 12.0, 100.0)
-
-    if target_years <= 0:
-        return 100.0 if candidate_years <= 1 else max(0.0, 100.0 - ((candidate_years - 1) * 12.0))
-
-    if candidate_years >= target_years:
-        return 100.0
-
-    return round(max(0.0, (candidate_years / target_years) * 100.0), 2)
-
-
-def calculate_ranking_score(resume, job):
-    resume_skills = [s.skill_name for s in resume.skills]
-    job_skills = [s.skill_name for s in job.skills]
-    skills_score = calculate_match_score(resume_skills, job_skills)
-    experience_years = extract_experience_years(resume.raw_text or "")
-    target_experience_years = experience_level_to_years(job.experience_level)
-    experience_score = calculate_experience_score(experience_years, target_experience_years)
-
-    if skills_score == 100.0 and experience_score >= 100.0:
-        combined_score = 100.0
-    else:
-        combined_score = (skills_score * 0.88) + (experience_score * 0.10)
-        combined_score = min(round(combined_score, 2), 99.99)
-
-    return combined_score
-
-
-def create_rankings_for_job(job_id):
-    """
-    Create or update ranking entries for a new job against all stored resumes.
-    """
-    job = Job.query.get(job_id)
-    if not job:
-        return
-
-    all_resumes = Resume.query.all()
-
-    for resume in all_resumes:
-        score = calculate_ranking_score(resume, job)
-
-        existing_ranking = Ranking.query.filter_by(job_id=job_id, resume_id=resume.resume_id).first()
-        if existing_ranking:
-            existing_ranking.matching_score = score
-        else:
-            ranking = Ranking(job_id=job_id, resume_id=resume.resume_id, matching_score=score)
-            db.session.add(ranking)
-
-    db.session.commit()
-
-def create_rankings_for_resume(resume_id, applicant_id):
-    """
-    Create ranking entries for a new resume against all active jobs.
-    """
-    resume = Resume.query.get(resume_id)
-    if not resume:
-        return
-    
-    all_jobs = Job.query.all()
-    
-    for job in all_jobs:
-        score = calculate_ranking_score(resume, job)
-        
-        existing_ranking = Ranking.query.filter_by(job_id=job.job_id, resume_id=resume_id).first()
-        if existing_ranking:
-            existing_ranking.matching_score = score
-        else:
-            ranking = Ranking(job_id=job.job_id, resume_id=resume_id, matching_score=score)
-            db.session.add(ranking)
-    
-    db.session.commit()
-
-def format_job(job):
-    """Serialize a Job object to a dict."""
-    salary = None
-    if job.salary_min and job.salary_max:
-        salary = f"Rs.{int(job.salary_min)}-{int(job.salary_max)} LPA"
-    elif job.salary_min:
-        salary = f"Rs.{int(job.salary_min)}+ LPA"
-    
-    posted_at = job.created_at.isoformat() if job.created_at else None
-    
-    return {
-        "job_id": str(job.job_id),
-        "title": job.title,
-        "description": job.description or "",
-        "location": job.location or "",
-        "job_type": job.job_type or "",
-        "experience_level": job.experience_level or "",
-        "salary_min": job.salary_min,
-        "salary_max": job.salary_max,
-        "salary": salary,
-        "recruiter_id": str(job.recruiter_id),
-        "recruiter_name": job.recruiter.name or "",
-        "recruiter_company": job.recruiter.company or "",
-        "created_at": posted_at,
-        "skills": [s.skill_name for s in job.skills]
-    }
 
 # ============ AUTHENTICATION ROUTES ============
 
