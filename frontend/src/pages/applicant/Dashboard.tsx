@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Target, FileText, Briefcase, ChevronRight, Loader2, UploadCloud, Zap } from "lucide-react";
+import { Target, FileText, Briefcase, ChevronRight, Loader2, UploadCloud, Zap, Sparkles } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
 import axios from "axios";
@@ -33,6 +33,7 @@ export default function ApplicantDashboardHome() {
 
   const userName = data?.name || localStorage.getItem("user_name") || "there";
   const firstName = userName.split(" ")[0];
+  const recentJobs = data?.recent_jobs || [];
 
   if (loading) {
     return (
@@ -155,6 +156,41 @@ export default function ApplicantDashboardHome() {
 
         {/* Right Column */}
         <div className="space-y-8">
+          <Card>
+            <CardHeader className="pb-2 border-b border-slate-100">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-[#F97316]" /> Latest Openings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-slate-100">
+                {!recentJobs.length ? (
+                  <div className="p-6 text-sm text-slate-500">No jobs are available yet.</div>
+                ) : recentJobs.slice(0, 4).map((job: any) => (
+                  <div key={job.job_id} className="p-4 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-semibold text-slate-900">{job.title}</h3>
+                        <p className="text-xs text-slate-500">
+                          {job.recruiter_company || job.recruiter_name}
+                          {job.location ? ` • ${job.location}` : ""}
+                        </p>
+                      </div>
+                      <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-none">New</Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-3">
+                      {(job.skills || []).slice(0, 3).map((skill: string) => (
+                        <Badge key={skill} variant="secondary" className="bg-white text-slate-700 border border-slate-200">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Skill Gap */}
           <Card>
             <CardHeader className="pb-2 border-b border-slate-100">

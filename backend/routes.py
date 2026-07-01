@@ -629,6 +629,7 @@ def applicant_dashboard(applicant_id):
     # Compute average match score & top matched jobs
     avg_score = 0.0
     top_jobs = []
+    recent_jobs = [format_job(job) for job in Job.query.order_by(Job.created_at.desc()).limit(6).all()]
     skill_count = 0
     missing_skills = []
     
@@ -674,6 +675,7 @@ def applicant_dashboard(applicant_id):
         "resume_strength": resume_strength,
         "avg_match_score": avg_score,
         "top_jobs": top_jobs,
+        "recent_jobs": recent_jobs,
         "missing_skills": missing_skills
     }), 200
 
