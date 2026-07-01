@@ -100,13 +100,13 @@ export default function LoginPage() {
               >
                 <ToggleGroupItem 
                   value="applicant" 
-                  className={`flex-1 rounded-lg data-[state=on]:bg-[#1E3A5F] data-[state=on]:text-white ${role !== 'applicant' && 'hover:bg-slate-200 text-slate-600'}`}
+                  className={`flex-1 rounded-lg data-[state=on]:bg-[#1E3A5F] data-[state=on]:text-black ${role !== 'applicant' && 'hover:bg-slate-200 text-slate-600'}`}
                 >
                   Job Seeker
                 </ToggleGroupItem>
                 <ToggleGroupItem 
                   value="recruiter" 
-                  className={`flex-1 rounded-lg data-[state=on]:bg-[#1E3A5F] data-[state=on]:text-white ${role !== 'recruiter' && 'hover:bg-slate-200 text-slate-600'}`}
+                  className={`flex-1 rounded-lg data-[state=on]:bg-[#1E3A5F] data-[state=on]:text-black ${role !== 'recruiter' && 'hover:bg-slate-200 text-slate-600'}`}
                 >
                   Recruiter
                 </ToggleGroupItem>

@@ -7,6 +7,7 @@ import numpy as np
 from sqlalchemy import func
 import fitz  # PyMuPDF
 import os
+import re
 
 api = Blueprint('api', __name__)
 
@@ -79,6 +80,60 @@ def calculate_match_score(resume_skills_list, job_skills_list):
     
     score = (intersection / union) * 100
     return round(score, 2)
+
+
+EXPERIENCE_LEVEL_TO_YEARS = {
+    "fresher": 0.0,
+    "1-3": 2.0,
+    "3-5": 4.0,
+    "5+": 5.0,
+}
+
+
+def extract_experience_years(text):
+    if not text:
+        return None
+
+    patterns = [
+        r"(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?|yr\.?)\s*(?:of\s*)?(?:experience|exp\.?)",
+        r"(?:experience|exp\.?)\s*(?:of\s*)?(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?|yr\.?)",
+        r"(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)",
+    ]
+
+    detected_years = []
+    for pattern in patterns:
+        for match in re.findall(pattern, text, flags=re.IGNORECASE):
+            try:
+                detected_years.append(float(match))
+            except ValueError:
+                continue
+
+    if not detected_years:
+        return None
+
+    return round(max(detected_years), 1)
+
+
+def experience_level_to_years(experience_level):
+    if not experience_level:
+        return None
+    return EXPERIENCE_LEVEL_TO_YEARS.get(str(experience_level).strip().lower())
+
+
+def calculate_experience_score(candidate_years, target_years):
+    if candidate_years is None:
+        return 0.0
+
+    if target_years is None:
+        return min(candidate_years * 12.0, 100.0)
+
+    if target_years <= 0:
+        return 100.0 if candidate_years <= 1 else max(0.0, 100.0 - ((candidate_years - 1) * 12.0))
+
+    if candidate_years >= target_years:
+        return 100.0
+
+    return round(max(0.0, (candidate_years / target_years) * 100.0), 2)
 
 def create_rankings_for_resume(resume_id, applicant_id):
     """
@@ -811,6 +866,7 @@ def bulk_screen():
     job_skills_list = []
     job_title = custom_title
     job_desc = custom_description
+    target_experience_years = None
     
     if job_id:
         job = Job.query.get(job_id)
@@ -819,6 +875,7 @@ def bulk_screen():
         job_skills_list = [s.skill_name.lower() for s in job.skills]
         job_title = job.title
         job_desc = f"{job.title} " + " ".join(job_skills_list)
+        target_experience_years = experience_level_to_years(job.experience_level)
     else:
         if custom_skills_raw:
             job_skills_list = [s.strip().lower() for s in custom_skills_raw.split(',') if s.strip()]
@@ -828,6 +885,7 @@ def bulk_screen():
             
         if not job_desc:
             job_desc = f"{custom_title} " + " ".join(job_skills_list)
+        target_experience_years = extract_experience_years(custom_description)
 
     if not job_skills_list and not job_desc:
         return jsonify({"error": "Please select a job or provide a job description/skills"}), 400
@@ -871,6 +929,8 @@ def bulk_screen():
             
             resume_skills = extract_skills_from_text(text)
             skills_score = calculate_match_score(resume_skills, job_skills_list)
+            experience_years = extract_experience_years(text)
+            experience_score = calculate_experience_score(experience_years, target_experience_years)
             
             content_score = 0.0
             if job_desc and text:
@@ -881,8 +941,11 @@ def bulk_screen():
                 except Exception:
                     pass
             
-            combined_score = (skills_score * 0.6) + (content_score * 0.4)
-            combined_score = round(combined_score, 2)
+            if skills_score == 100.0 and experience_score >= 100.0:
+                combined_score = 100.0
+            else:
+                combined_score = (skills_score * 0.88) + (experience_score * 0.10) + (content_score * 0.02)
+                combined_score = min(round(combined_score, 2), 99.99)
             
             matched_skills = list(set(resume_skills).intersection(set(job_skills_list)))
             missing_skills = list(set(job_skills_list) - set(resume_skills))
@@ -892,6 +955,8 @@ def bulk_screen():
                 "candidate_name": candidate_name,
                 "match_score": combined_score,
                 "skills_score": round(skills_score, 2),
+                "experience_years": experience_years,
+                "experience_score": round(experience_score, 2),
                 "content_score": round(content_score, 2),
                 "extracted_skills": resume_skills,
                 "matched_skills": matched_skills,
@@ -908,7 +973,16 @@ def bulk_screen():
                 "error": f"Error parsing PDF: {str(e)}"
             })
             
-    results.sort(key=lambda x: x.get('match_score', 0), reverse=True)
+    results.sort(
+        key=lambda x: (
+            x.get('skills_score', 0),
+            x.get('experience_years') if x.get('experience_years') is not None else -1,
+            x.get('experience_score', 0),
+            x.get('content_score', 0),
+            x.get('match_score', 0),
+        ),
+        reverse=True,
+    )
     
     return jsonify({
         "job_title": job_title,

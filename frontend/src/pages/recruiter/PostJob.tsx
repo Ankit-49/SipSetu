@@ -14,6 +14,11 @@ export default function RecruiterPostJob() {
   const [description, setDescription] = useState("");
   const [skills, setSkills] = useState<string[]>(["React", "TypeScript", "Git"]);
   const [skillInput, setSkillInput] = useState("");
+  const [experienceLevel, setExperienceLevel] = useState("");
+  const [jobType, setJobType] = useState("");
+  const [location, setLocation] = useState("");
+  const [salaryMin, setSalaryMin] = useState("");
+  const [salaryMax, setSalaryMax] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const addSkill = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -43,12 +48,23 @@ export default function RecruiterPostJob() {
       await axios.post("http://localhost:5000/api/jobs", {
         recruiter_id,
         title,
-        skills
+        description,
+        skills,
+        experience_level: experienceLevel,
+        job_type: jobType,
+        location,
+        salary_min: salaryMin,
+        salary_max: salaryMax
       });
       alert("Job posted successfully!");
       setTitle("");
       setDescription("");
       setSkills([]);
+      setExperienceLevel("");
+      setJobType("");
+      setLocation("");
+      setSalaryMin("");
+      setSalaryMax("");
     } catch (err) {
       console.error(err);
       alert("Failed to post job");
@@ -121,7 +137,7 @@ export default function RecruiterPostJob() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
               <div className="space-y-2">
                 <Label>Experience Level</Label>
-                <Select>
+                <Select value={experienceLevel} onValueChange={setExperienceLevel}>
                   <SelectTrigger className="h-11 bg-white">
                     <SelectValue placeholder="Select experience" />
                   </SelectTrigger>
@@ -136,7 +152,7 @@ export default function RecruiterPostJob() {
 
               <div className="space-y-2">
                 <Label>Job Type</Label>
-                <Select>
+                <Select value={jobType} onValueChange={setJobType}>
                   <SelectTrigger className="h-11 bg-white">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
@@ -150,7 +166,12 @@ export default function RecruiterPostJob() {
 
               <div className="space-y-2">
                 <Label>Location</Label>
-                <Input placeholder="e.g. Kathmandu, Nepal" className="h-11" />
+                <Input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="e.g. Kathmandu, Nepal"
+                  className="h-11"
+                />
               </div>
 
               <div className="space-y-2">
@@ -158,12 +179,24 @@ export default function RecruiterPostJob() {
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">₹</span>
-                    <Input type="number" placeholder="Min" className="h-11 pl-7" />
+                    <Input
+                      type="number"
+                      value={salaryMin}
+                      onChange={(e) => setSalaryMin(e.target.value)}
+                      placeholder="Min"
+                      className="h-11 pl-7"
+                    />
                   </div>
                   <span className="text-slate-400">-</span>
                   <div className="relative flex-1">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">₹</span>
-                    <Input type="number" placeholder="Max" className="h-11 pl-7" />
+                    <Input
+                      type="number"
+                      value={salaryMax}
+                      onChange={(e) => setSalaryMax(e.target.value)}
+                      placeholder="Max"
+                      className="h-11 pl-7"
+                    />
                   </div>
                 </div>
               </div>

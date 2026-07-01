@@ -45,6 +45,7 @@ interface JobPosting {
   job_id: string;
   title: string;
   skills: string[];
+  experience_level?: string;
 }
 
 export default function RecruiterBulkScreening() {
@@ -83,13 +84,17 @@ export default function RecruiterBulkScreening() {
   useEffect(() => {
     const fetchJobs = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/api/jobs");
         const userId = localStorage.getItem("user_id");
-        // Filter jobs by current recruiter
-        const myJobs = response.data.filter((job: any) => job.recruiter_id === userId);
+        const response = await axios.get("http://localhost:5000/api/jobs", {
+          params: {
+            recruiter_id: userId,
+            per_page: 100
+          }
+        });
+        const myJobs = response.data.jobs || [];
         setActiveJobs(myJobs);
         if (myJobs.length > 0) {
-          setSelectedJobId(myJobs[0].job_id);
+          setSelectedJobId((current) => current || myJobs[0].job_id);
         }
       } catch (err) {
         console.error("Failed to load active jobs", err);
@@ -177,6 +182,10 @@ export default function RecruiterBulkScreening() {
     }
     if (jobMode === "custom" && !customDescription.trim() && !customSkills.trim()) {
       setError("Please provide either custom skills or a job description to match against.");
+      return;
+    }
+    if (jobMode === "posted" && !selectedJobId) {
+      setError("Please select one of your posted jobs before screening resumes.");
       return;
     }
 
@@ -364,7 +373,7 @@ export default function RecruiterBulkScreening() {
                           <SelectContent>
                             {activeJobs.map(job => (
                               <SelectItem key={job.job_id} value={job.job_id}>
-                                {job.title}
+                                {job.title}{job.experience_level ? ` • ${job.experience_level}` : ""}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -381,6 +390,11 @@ export default function RecruiterBulkScreening() {
                                 </Badge>
                               )) || <span className="text-xs text-slate-500">No skills defined</span>}
                             </div>
+                            {activeJobs.find(j => j.job_id === selectedJobId)?.experience_level && (
+                              <div className="text-[11px] text-slate-500">
+                                Experience target: {activeJobs.find(j => j.job_id === selectedJobId)?.experience_level}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -732,7 +746,7 @@ export default function RecruiterBulkScreening() {
                             </div>
                             {/* Small metric tags */}
                             <span className="hidden md:inline text-[9px] text-slate-400 font-semibold">
-                              (Skills: {candidate.skills_score}% • Context: {candidate.content_score}%)
+                              (Skills: {candidate.skills_score}% • Experience: {candidate.experience_score}% • Context: {candidate.content_score}%)
                             </span>
                           </div>
                         )}
@@ -782,7 +796,7 @@ export default function RecruiterBulkScreening() {
                     {selectedCandidate.match_score}% Match Score
                   </Badge>
                   <div className="text-[10px] text-slate-400 font-semibold mt-1">
-                    Skills: {selectedCandidate.skills_score}% • Cosine: {selectedCandidate.content_score}%
+                    Skills: {selectedCandidate.skills_score}% • Experience: {selectedCandidate.experience_score}% • Cosine: {selectedCandidate.content_score}%
                   </div>
                 </div>
               </div>
