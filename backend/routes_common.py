@@ -32,7 +32,7 @@ def extract_skills_from_text(text):
 
     text_lower = text.lower()
     common_skills = [
-        'python', 'javascript', 'typescript', 'java', 'c++', 'c#', 'go', 'rust', 'php', 'ruby',
+        'python', 'javascript', 'typescript', 'java', 'c++', 'c#', 'rust', 'php', 'ruby',
         'react', 'angular', 'vue', 'svelte', 'node.js', 'express', 'django', 'flask', 'fastapi',
         'sql', 'postgresql', 'mysql', 'mongodb', 'redis', 'elasticsearch', 'graphql', 'rest api',
         'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'jenkins', 'git', 'github', 'gitlab',
@@ -112,18 +112,23 @@ def calculate_experience_score(candidate_years, target_years):
 
 
 def calculate_ranking_score(resume, job):
-    resume_skills = [s.skill_name for s in resume.skills]
-    job_skills = [s.skill_name for s in job.skills]
-    skills_score = calculate_match_score(resume_skills, job_skills)
-    experience_years = extract_experience_years(resume.raw_text or "")
-    target_experience_years = experience_level_to_years(job.experience_level)
-    experience_score = calculate_experience_score(experience_years, target_experience_years)
+    try:
+        from ranking_ml import predict_ranking_score
 
-    if skills_score == 100.0 and experience_score >= 100.0:
-        return 100.0
+        return predict_ranking_score(resume, job)
+    except Exception:
+        resume_skills = [s.skill_name for s in resume.skills]
+        job_skills = [s.skill_name for s in job.skills]
+        skills_score = calculate_match_score(resume_skills, job_skills)
+        experience_years = extract_experience_years(resume.raw_text or "")
+        target_experience_years = experience_level_to_years(job.experience_level)
+        experience_score = calculate_experience_score(experience_years, target_experience_years)
 
-    combined_score = (skills_score * 0.88) + (experience_score * 0.10)
-    return min(round(combined_score, 2), 99.99)
+        if skills_score == 100.0 and experience_score >= 100.0:
+            return 100.0
+
+        combined_score = (skills_score * 0.88) + (experience_score * 0.10)
+        return min(round(combined_score, 2), 99.99)
 
 
 def create_rankings_for_job(job_id):

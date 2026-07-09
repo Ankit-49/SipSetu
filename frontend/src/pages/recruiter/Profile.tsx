@@ -167,8 +167,8 @@ export default function RecruiterProfile() {
                         id="email" 
                         type="email" 
                         value={profile.email} 
-                        onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                        className="pl-9" 
+                        readOnly
+                        className="pl-9 cursor-not-allowed bg-slate-50" 
                       />
                     </div>
                   </div>

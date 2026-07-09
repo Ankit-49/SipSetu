@@ -6,7 +6,7 @@
 
 - **Role-based portals** — Dedicated dashboards for applicants and recruiters
 - **Resume upload** — Upload your resume for AI-powered skill extraction
-- **Intelligent job matching** — Jobs ranked by actual skill overlap with match scores
+- **Intelligent job matching** — Jobs ranked by an ML-backed scoring pipeline with heuristic fallback
 - **Skill gap analysis** — Identify missing skills for your target roles with learning resources
 - **Candidate ranking** — Recruiters see applicants auto-scored against job requirements
 - **Profile management** — Manage personal info, company details, and preferences
@@ -138,12 +138,14 @@ SipSetu/
 | POST | `/api/resumes` | Upload resume text for an applicant |
 | GET | `/api/profile/<user_id>` | Get user profile details |
 | PUT | `/api/profile/<user_id>` | Update user profile |
+| GET | `/api/ml/ranking/status` | Inspect the trained ranking model and its metrics |
+| POST | `/api/ml/ranking/train` | Train the ranking model from stored resume/job pairs |
 
 ## Known Limitations
 
 This is an early-stage build (approx. 30-35% toward production readiness). Key limitations:
 
-- **AI matching is placeholder** — The core TF-IDF / cosine similarity matching engine is marked as TODO. Match scores, skill gap analysis, and candidate rankings currently use hardcoded demo data.
+- **ML is bootstrapped from existing ranking scores** — The first training run learns from historical `matching_score` values stored in the database. Replace those with recruiter feedback or hire/shortlist labels for a production-grade model.
 - **No JWT authentication** — Auth state is stored in `localStorage` (user_id, user_role) with no server-side token validation. This is not secure for production.
 - **Hardcoded demo data** — Many pages (candidates, stats, skill gaps) use static mock arrays instead of live API data.
 - **Resume file upload** — Resumes accept raw text only; multipart file upload is not implemented.

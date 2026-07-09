@@ -77,7 +77,7 @@ export default function ApplicantDashboardHome() {
             <div className="space-y-1">
               <p className="text-sm font-medium text-slate-500">Avg. Match Score</p>
               <p className="text-3xl font-bold text-[#F97316]">
-                {data?.avg_match_score ?? 0}%
+                {Number(data?.avg_match_score ?? 0).toFixed(2)}%
               </p>
             </div>
             <div className="h-12 w-12 rounded-full bg-orange-50 flex items-center justify-center">
@@ -142,7 +142,7 @@ export default function ApplicantDashboardHome() {
                   </div>
                   <div className="flex items-center gap-4">
                     <Badge className={job.matching_score >= 85 ? 'bg-green-100 text-green-700 hover:bg-green-100' : 'bg-orange-100 text-orange-700 hover:bg-orange-100'}>
-                      {job.matching_score}% Match
+                      {Number(job.matching_score).toFixed(2)}% Match
                     </Badge>
                     <Link to="/applicant/matches">
                       <Button variant="outline" size="sm">View</Button>

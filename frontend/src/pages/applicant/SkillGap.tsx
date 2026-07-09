@@ -239,11 +239,11 @@ export default function ApplicantSkillGap() {
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center flex-col">
-                    <span className="text-4xl font-bold">{gapData.readiness_score || 0}<span className="text-xl">%</span></span>
+                    <span className="text-black text-4xl font-bold">{gapData.readiness_score || 0}<span className="text-xl">%</span></span>
                   </div>
                 </div>
-                <h3 className="text-xl font-bold mb-2">Role Readiness</h3>
-                <p className="text-blue-100 text-sm mb-6">
+                <h3 className="text-xl text-black font-bold mb-2">Role Readiness</h3>
+                <p className="text-black text-sm mb-6">
                   {gapData.readiness_score >= 80
                     ? "You're highly ready for this role! Just a few gaps to fill."
                     : gapData.readiness_score >= 50

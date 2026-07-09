@@ -120,7 +120,13 @@ export default function RecruiterCandidates() {
 
       {/* Candidate List */}
       <div className="space-y-4">
-        {filteredCandidates.length === 0 ? (
+        {selectedJob === "all-jobs" ? (
+          <Card className="p-8 text-center text-slate-500 flex flex-col items-center justify-center min-h-[200px]">
+            <Briefcase className="h-8 w-8 text-slate-400 mb-2" />
+            <p className="font-medium text-slate-700">No Job Selected</p>
+            <p className="text-sm mt-1">Please select a job posting from the dropdown menu to view ranked candidates.</p>
+          </Card>
+        ) : filteredCandidates.length === 0 ? (
           <Card className="p-8 text-center text-slate-500">No candidates found for the selected filters.</Card>
         ) : filteredCandidates.map((candidate, i) => (
           <Card key={candidate.ranking_id} className="overflow-hidden hover:shadow-md transition-all duration-300 animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: `${i * 50}ms` }}>
@@ -128,9 +134,11 @@ export default function RecruiterCandidates() {
               <div className="flex flex-col md:flex-row items-stretch">
                 {/* Rank & Score (Left Sidebar) */}
                 <div className="flex md:flex-col items-center justify-between md:justify-center md:w-32 p-4 md:p-6 bg-slate-50 border-b md:border-b-0 md:border-r border-slate-100 shrink-0">
-                  <div className="text-sm font-bold text-slate-400 mb-1">RANK #{i + 1}</div>
+                  {selectedJob !== "all-jobs" && (
+                    <div className="text-sm font-bold text-slate-400 mb-1">RANK #{i + 1}</div>
+                  )}
                   <div className={`text-3xl font-extrabold ${candidate.matching_score >= 85 ? 'text-green-600' : candidate.matching_score >= 75 ? 'text-orange-500' : 'text-slate-600'}`}>
-                    {candidate.matching_score}<span className="text-base">%</span>
+                    {Number(candidate.matching_score).toFixed(2)}<span className="text-base">%</span>
                   </div>
                   <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mt-1">Match</div>
                 </div>
@@ -154,7 +162,7 @@ export default function RecruiterCandidates() {
                       </div>
                     </div>
                     <Badge className={candidate.matching_score >= 85 ? 'bg-green-100 text-green-700 hover:bg-green-100 border-none' : candidate.matching_score >= 75 ? 'bg-orange-100 text-orange-700 hover:bg-orange-100 border-none' : 'bg-slate-100 text-slate-700 hover:bg-slate-100 border-none'}>
-                      {candidate.matching_score}% Match
+                      {Number(candidate.matching_score).toFixed(2)}% Match
                     </Badge>
                   </div>
 

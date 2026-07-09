@@ -152,7 +152,7 @@ export default function ApplicantJobMatches() {
                     job.matching_score >= 70 ? "bg-orange-100 text-orange-700 hover:bg-orange-100 border-none px-3 py-1 text-sm font-bold" :
                     "bg-slate-100 text-slate-700 hover:bg-slate-100 border-none px-3 py-1 text-sm font-bold"
                   }>
-                    {job.matching_score}% Match
+                    {Number(job.matching_score).toFixed(2)}% Match
                   </Badge>
                 </div>
 

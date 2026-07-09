@@ -87,7 +87,7 @@ export default function RecruiterDashboardHome() {
           <CardContent className="p-6 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-sm font-medium text-slate-500">Top Match</p>
-              <p className="text-3xl font-bold text-[#F97316]">{data?.top_match_score ?? 0}%</p>
+              <p className="text-3xl font-bold text-[#F97316]">{Number(data?.top_match_score ?? 0).toFixed(2)}%</p>
             </div>
             <div className="h-12 w-12 rounded-full bg-orange-50 flex items-center justify-center">
               <UserCheck className="h-6 w-6 text-[#F97316]" />
@@ -127,24 +127,28 @@ export default function RecruiterDashboardHome() {
                 <div className="p-8 text-center text-slate-500">No ranked candidates yet. Upload resumes and create jobs to see matches.</div>
               ) : topCandidates.map((candidate: any) => (
                 <div key={`${candidate.applicant_id}-${candidate.job_title}`} className="p-4 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors group min-w-0">
-                  <div className="flex items-center gap-4 min-w-0 flex-1">
-                    <div className="h-10 w-10 rounded-full bg-[#1E3A5F] text-white flex items-center justify-center font-semibold text-sm">
+                  <div className="flex items-start gap-4 min-w-0 flex-1">
+                    <div className="h-10 w-10 rounded-full bg-[#1E3A5F] text-white flex items-center justify-center font-semibold text-sm shrink-0 mt-0.5">
                       {candidate.applicant_name.split(' ').map((n: string) => n[0]).join('')}
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold text-slate-900">{candidate.applicant_name}</h3>
-                        <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none h-5 text-[10px]">
-                          {candidate.matching_score}% Match
+                        <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none h-5 text-[10px] shrink-0">
+                          {Number(candidate.matching_score).toFixed(2)}% Match
                         </Badge>
                       </div>
                       <p className="text-sm text-slate-500 truncate">{candidate.job_title}</p>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {candidate.resume_skills.map((s: string) => (
+                          <Badge key={s} variant="outline" className="text-[11px] px-2 py-0.5 text-slate-500 bg-white">
+                            {s}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-4 shrink-0">
-                    <div className="hidden md:flex flex-wrap gap-1.5 max-w-[320px] min-w-0">
-                      {candidate.resume_skills.map((s: string) => <Badge key={s} variant="outline" className="text-xs text-slate-500 whitespace-normal break-words">{s}</Badge>)}
-                    </div>
                     <Button variant="outline" size="sm" className="gap-2">
                       <FileText className="h-3.5 w-3.5" /> Resume
                     </Button>

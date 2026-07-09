@@ -19,6 +19,7 @@ from routes_common import (
     format_candidate_preview,
     format_job,
 )
+from ranking_ml import get_ranking_model_status, train_ranking_model
 
 api = Blueprint('api', __name__)
 
@@ -35,6 +36,9 @@ def register():
     
     if not email or not password or not role:
         return jsonify({"error": "Missing required fields"}), 400
+        
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters long"}), 400
         
     if User.query.filter_by(email=email).first():
         return jsonify({"error": "User already exists"}), 409
@@ -63,6 +67,9 @@ def login():
     
     if not email or not password:
         return jsonify({"error": "Missing email or password"}), 400
+        
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters long"}), 400
     
     user = User.query.filter_by(email=email).first()
     
@@ -538,6 +545,20 @@ def applicant_skill_gap(applicant_id):
         "missing_skills": missing_with_priority,
         "readiness_score": readiness
     }), 200
+
+
+@api.route('/ml/ranking/status', methods=['GET'])
+def ranking_model_status():
+    """Report whether the trained ranking model is available and what it scored."""
+    return jsonify(get_ranking_model_status()), 200
+
+
+@api.route('/ml/ranking/train', methods=['POST'])
+def ranking_model_train():
+    """Train the ranking model from stored resume/job pairs and report evaluation metrics."""
+    result = train_ranking_model()
+    status_code = 200 if result.get("trained") else 400
+    return jsonify(result), status_code
 
 # ============ RECRUITER CANDIDATE ROUTES ============
 

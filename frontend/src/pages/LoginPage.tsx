@@ -22,6 +22,10 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      return;
+    }
     try {
       const response = await axios.post("http://127.0.0.1:5000/api/auth/login", {
         email,
@@ -123,7 +127,7 @@ export default function LoginPage() {
                   <Label htmlFor="password">Password</Label>
                   <a href="#" className="text-sm font-medium text-[#F97316] hover:underline">Forgot password?</a>
                 </div>
-                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="h-11" />
+                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="h-11" />
               </div>
             </div>
             
