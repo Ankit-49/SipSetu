@@ -1,54 +1,157 @@
-# SipSetu 🚀
+# SipSetu
 
-**SipSetu** is an intelligent, web-based recruitment platform designed to bridge the gap between job seekers and recruiters[cite: 1]. By integrating advanced **Natural Language Processing (NLP)**, SipSetu automates the resume screening process and provides candidates with data-driven insights to improve their career prospects[cite: 1].
+**No skill left behind.** AI-powered recruitment platform bridging job seekers and recruiters. Uses skill-based matching, resume analysis, and candidate ranking to connect talent with opportunity.
 
----
+## Features
 
-## 🌟 Overview
+- **Role-based portals** — Dedicated dashboards for applicants and recruiters
+- **Resume upload** — Upload your resume for AI-powered skill extraction
+- **Intelligent job matching** — Jobs ranked by an ML-backed scoring pipeline with heuristic fallback
+- **Skill gap analysis** — Identify missing skills for your target roles with learning resources
+- **Candidate ranking** — Recruiters see applicants auto-scored against job requirements
+- **Profile management** — Manage personal info, company details, and preferences
 
-In traditional recruitment, HR professionals spend countless hours manually filtering resumes, while candidates often struggle to understand how well their profiles align with job requirements[cite: 1]. 
+## Tech Stack
 
-**SipSetu** addresses these challenges by:
-* **Analyzing Resumes:** Extracting key information and providing feedback to applicants[cite: 1].
-* **Job Matching:** Using mathematical models to find the perfect fit between a candidate's skills and a recruiter's needs[cite: 1].
-* **Ranking:** Automatically ranking applicants for recruiters based on relevance[cite: 1].
+| Layer | Technology |
+|-------|------------|
+| Backend | Python 3, Flask, SQLAlchemy, PostgreSQL |
+| Frontend | React 18, TypeScript, Vite 6, Tailwind CSS v4 |
+| UI | shadcn/ui, Radix UI, Lucide Icons, Framer Motion |
+| Tooling | Axios, React Router v7, Recharts, Lottie |
 
----
+## Prerequisites
 
-## ✨ Key Features
+- Python 3.10+
+- Node.js 18+
+- PostgreSQL 15+
+- npm or pnpm
 
-### 👨‍💼 For Job Seekers
-* **Resume Enhancement:** Upload or build resumes and receive improvement suggestions[cite: 1].
-* **Smart Discovery:** View job listings filtered by compatibility with your specific skill set[cite: 1].
-* **Instant Feedback:** Understand how your resume matches against specific job descriptions[cite: 1].
+## Setup
 
-### 🏢 For Recruiters
-* **Automated Screening:** Reduce manual effort by automatically evaluating large volumes of resumes[cite: 1].
-* **Relevance Ranking:** Rank candidates using **TF-IDF** and **Cosine Similarity** to identify top talent instantly[cite: 1].
-* **Efficient Workflow:** Streamlined dashboard for posting jobs and managing applicant pools[cite: 1].
+### 1. Clone the repository
 
----
+```bash
+git clone <repo-url>
+cd SipSetu
+```
 
-## 🛠️ Tech Stack
+### 2. Backend setup
 
-- **Frontend:** React.js[cite: 1]
-- **Backend:** Flask (Python)[cite: 1]
-- **Database:** PostgreSQL[cite: 1]
-- **AI/NLP:** Scikit-learn, NLTK (TF-IDF, Cosine Similarity)[cite: 1]
+```bash
+cd backend
 
----
+# Create and activate virtual environment
+python -m venv venv
+# Windows:
+.\venv\Scripts\activate
+# macOS / Linux:
+# source venv/bin/activate
 
-## 🧠 How it Works
+# Install Python dependencies
+pip install -r requirements.txt
 
-1.  **Text Processing:** The system cleans and tokenizes resume and job description text[cite: 1].
-2.  **Vectorization:** It employs **TF-IDF** (Term Frequency-Inverse Document Frequency) to convert text into numerical vectors[cite: 1].
-3.  **Similarity Scoring:** **Cosine Similarity** is calculated between the resume vector and the job description vector to determine the match percentage[cite: 1].
-4.  **Actionable Results:** Candidates see matching scores, and recruiters see a ranked list of the most qualified applicants[cite: 1].
+# Configure environment variables
+cp .env.example .env
+```
 
----
+> **Important:** Edit `.env` and replace the placeholder values with your own PostgreSQL credentials (password, host, port). The example file uses `YOUR_PASSWORD_HERE` — do not commit real credentials.
 
-## 🚀 Getting Started
+```bash
+# Create the database in PostgreSQL
+# psql -U postgres -c "CREATE DATABASE sipsetu;"
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Luzza-bmp/SipSetu.git
+# Initialize database tables
+python -c "from app import create_app; from models import db; app = create_app(); app.app_context().push(); db.create_all()"
+
+# Apply additional schema migrations
+python update_db.py
+
+# Start the backend server
+python app.py
+```
+
+The backend starts at **http://127.0.0.1:5000**. Verify with a health check:
+
+```bash
+curl http://127.0.0.1:5000/api/health
+# {"status": "healthy"}
+```
+
+### 3. Frontend setup
+
+Open a new terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend starts at **http://localhost:5173**.
+
+### 4. Open the app
+
+Navigate to **http://localhost:5173** in your browser. Register as a Job Seeker or Recruiter to explore the platform.
+
+## Project Structure
+
+```
+SipSetu/
+├── backend/
+│   ├── app.py                # Flask app factory & configuration
+│   ├── models.py             # SQLAlchemy models (User, Applicant, Recruiter,
+│   │                         #   Job, Resume, Skill, Ranking)
+│   ├── routes.py             # API endpoints (auth, jobs, resumes, profiles)
+│   ├── requirements.txt      # Python dependencies
+│   ├── update_db.py          # Schema migration helper script
+│   ├── test_login.py         # Manual login test script
+│   ├── .env                  # Environment variables (gitignored)
+│   └── .env.example          # Environment variable template
+├── frontend/
+│   ├── src/
+│   │   ├── app/              # App entry point, router, shared components
+│   │   ├── components/       # shadcn/ui components & layout wrappers
+│   │   ├── pages/            # Route pages
+│   │   │   ├── applicant/    # Dashboard, Resume, JobMatches, SkillGap, Profile
+│   │   │   └── recruiter/    # Dashboard, PostJob, Candidates, Profile
+│   │   ├── styles/           # Global CSS, Tailwind, theme, fonts
+│   │   └── imports/          # Lottie animation assets
+│   ├── index.html
+│   ├── vite.config.ts
+│   └── package.json
+├── migrations/
+│   └── 001_tables.sql        # PostgreSQL schema dump
+├── tsconfig.json
+└── README.md
+```
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/health` | Health check |
+| POST | `/api/auth/register` | Register a new user |
+| POST | `/api/auth/login` | Log in and retrieve user info |
+| GET | `/api/jobs` | List all job postings |
+| POST | `/api/jobs` | Create a new job posting |
+| POST | `/api/resumes` | Upload resume text for an applicant |
+| GET | `/api/profile/<user_id>` | Get user profile details |
+| PUT | `/api/profile/<user_id>` | Update user profile |
+| GET | `/api/ml/ranking/status` | Inspect the trained ranking model and its metrics |
+| POST | `/api/ml/ranking/train` | Train the ranking model from stored resume/job pairs |
+
+## Known Limitations
+
+This is an early-stage build (approx. 30-35% toward production readiness). Key limitations:
+
+- **ML is bootstrapped from existing ranking scores** — The first training run learns from historical `matching_score` values stored in the database. Replace those with recruiter feedback or hire/shortlist labels for a production-grade model.
+- **No JWT authentication** — Auth state is stored in `localStorage` (user_id, user_role) with no server-side token validation. This is not secure for production.
+- **Hardcoded demo data** — Many pages (candidates, stats, skill gaps) use static mock arrays instead of live API data.
+- **Resume file upload** — Resumes accept raw text only; multipart file upload is not implemented.
+- **No pagination** — List endpoints return all records without pagination.
+- **No test suite** — Only one manual test script exists (`test_login.py`).
+
+## License
+
+© 2026 SipSetu Inc.
