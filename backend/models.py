@@ -71,6 +71,7 @@ class Job(db.Model):
     
     skills = db.relationship('Skill', secondary=job_skills, backref=db.backref('jobs', lazy='dynamic'))
     rankings = db.relationship('Ranking', backref='job', lazy=True, cascade='all, delete-orphan')
+    applications = db.relationship('JobApplication', backref='job', lazy=True, cascade='all, delete-orphan')
 
 class Resume(db.Model):
     __tablename__ = 'resumes'
@@ -82,6 +83,20 @@ class Resume(db.Model):
 
     skills = db.relationship('Skill', secondary=resume_skills, backref=db.backref('resumes', lazy='dynamic'))
     rankings = db.relationship('Ranking', backref='resume', lazy=True, cascade='all, delete-orphan')
+
+
+class JobApplication(db.Model):
+    __tablename__ = 'job_applications'
+    application_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_id = db.Column(UUID(as_uuid=True), db.ForeignKey('jobs.job_id', ondelete='CASCADE'), nullable=False)
+    applicant_id = db.Column(UUID(as_uuid=True), db.ForeignKey('applicants.user_id', ondelete='CASCADE'), nullable=False)
+    applied_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('job_id', 'applicant_id', name='uq_job_applicant_application'),
+    )
+
+    applicant = db.relationship('Applicant', backref='job_applications')
 
 class Ranking(db.Model):
     __tablename__ = 'rankings'

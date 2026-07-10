@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import db, User, Applicant, Recruiter, Job, Resume, Skill, Ranking
+from models import db, User, Applicant, Recruiter, Job, JobApplication, Resume, Skill, Ranking
 from werkzeug.security import generate_password_hash, check_password_hash
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -230,6 +230,58 @@ def jobs():
         
         return jsonify(result), 200
 
+
+@api.route('/jobs/<job_id>/apply', methods=['POST'])
+def apply_for_job(job_id):
+    """Record an applicant's interest in a job and create rankings only for applied candidates."""
+    job = Job.query.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    applicant_id = data.get('applicant_id')
+    if not applicant_id:
+        return jsonify({"error": "Missing applicant_id"}), 400
+
+    applicant = Applicant.query.get(applicant_id)
+    if not applicant:
+        return jsonify({"error": "Applicant not found"}), 404
+
+    application = JobApplication.query.filter_by(job_id=job_id, applicant_id=applicant_id).first()
+    created = False
+    if not application:
+        application = JobApplication(job_id=job_id, applicant_id=applicant_id)
+        db.session.add(application)
+        created = True
+        db.session.flush()
+
+    create_rankings_for_job(job_id)
+    db.session.commit()
+
+    latest_resume = Resume.query.filter_by(applicant_id=applicant_id).order_by(Resume.uploaded_at.desc()).first()
+
+    return jsonify({
+        "message": "Job application saved successfully" if created else "Job application already exists",
+        "job_id": str(job.job_id),
+        "applicant_id": str(applicant.user_id),
+        "application_id": str(application.application_id),
+        "has_resume": latest_resume is not None,
+    }), 200 if not created else 201
+
+
+@api.route('/applicants/<applicant_id>/applications', methods=['GET'])
+def get_applicant_applications(applicant_id):
+    """Get the job ids that an applicant has already applied to."""
+    applicant = Applicant.query.get(applicant_id)
+    if not applicant:
+        return jsonify({"error": "Applicant not found"}), 404
+
+    applications = JobApplication.query.filter_by(applicant_id=applicant_id).all()
+    return jsonify({
+        "applicant_id": str(applicant.user_id),
+        "job_ids": [str(application.job_id) for application in applications],
+    }), 200
+
 @api.route('/jobs/<job_id>', methods=['GET'])
 def get_job(job_id):
     """Get details of a specific job"""
@@ -368,59 +420,99 @@ def upload_resume_pdf():
         db.session.rollback()
         return jsonify({"error": f"Error parsing PDF: {str(e)}"}), 500
 
+def _compute_job_match_score(resume, job):
+    """Compute match score on the fly from a resume + job (skills + experience)."""
+    if not resume or not job:
+        return 0.0
+    resume_skills = [s.skill_name for s in resume.skills]
+    job_skills = [s.skill_name for s in job.skills]
+    return calculate_ranking_score(resume, job)
+
+
 @api.route('/applicants/<applicant_id>/matched-jobs', methods=['GET'])
 def get_matched_jobs(applicant_id):
-    """Get all jobs matched to an applicant's resume with scores"""
+    """Return ALL job postings ranked by match score against the applicant's resume.
+
+    Computes the match score on the fly so applicants can browse jobs even
+    before they have applied to any. Each job also carries an ``applied`` flag
+    indicating whether the applicant has already submitted an application.
+    """
     applicant = Applicant.query.get(applicant_id)
     if not applicant:
         return jsonify({"error": "Applicant not found"}), 404
-    
-    latest_resume = Resume.query.filter_by(applicant_id=applicant_id).order_by(Resume.uploaded_at.desc()).first()
-    
+
+    latest_resume = (
+        Resume.query.filter_by(applicant_id=applicant_id)
+        .order_by(Resume.uploaded_at.desc())
+        .first()
+    )
+
     if not latest_resume:
+        # No resume yet — return empty list but keep resume_id=None so the UI
+        # can prompt the user to upload a resume.
         return jsonify({
             "total": 0,
             "page": 1,
-            "per_page": 10,
+            "per_page": 20,
             "pages": 0,
             "resume_id": None,
             "matched_jobs": []
         }), 200
-    
+
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
     min_score = request.args.get('min_score', 0, type=float)
-    
-    query = Ranking.query.filter(
-        Ranking.resume_id == latest_resume.resume_id,
-        Ranking.matching_score >= min_score
-    ).order_by(Ranking.matching_score.desc())
-    
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    rankings = pagination.items
-    
-    result = {
-        "total": pagination.total,
+    search = (request.args.get('search') or '').strip().lower()
+    location = (request.args.get('location') or '').strip().lower()
+
+    # Pull every job (lightweight list) and compute match score in Python so
+    # we never miss a posting just because the applicant hasn't applied yet.
+    all_jobs = Job.query.order_by(Job.created_at.desc()).all()
+    applied_job_ids = {
+        str(a.job_id)
+        for a in JobApplication.query.filter_by(applicant_id=applicant_id).all()
+    }
+
+    enriched = []
+    for job in all_jobs:
+        score = _compute_job_match_score(latest_resume, job)
+        if score < min_score:
+            continue
+        job_data = format_job(job)
+        job_data["matching_score"] = round(float(score or 0.0), 2)
+        job_data["applied"] = str(job.job_id) in applied_job_ids
+        enriched.append(job_data)
+
+    # Client-side search/location filters (cheap, in-memory).
+    if search:
+        enriched = [
+            j for j in enriched
+            if search in (j.get("title") or "").lower()
+            or search in (j.get("recruiter_company") or "").lower()
+            or search in (j.get("recruiter_name") or "").lower()
+        ]
+    if location and location != "all":
+        enriched = [j for j in enriched if location in (j.get("location") or "").lower()]
+
+    # Rank by match score (highest first); stable tiebreak by recency.
+    enriched.sort(
+        key=lambda j: (j.get("matching_score", 0.0), j.get("created_at") or ""),
+        reverse=True,
+    )
+
+    total = len(enriched)
+    pages = max(1, (total + per_page - 1) // per_page) if total else 0
+    start = (page - 1) * per_page
+    page_items = enriched[start:start + per_page]
+
+    return jsonify({
+        "total": total,
         "page": page,
         "per_page": per_page,
-        "pages": pagination.pages,
+        "pages": pages,
         "resume_id": str(latest_resume.resume_id),
-        "matched_jobs": [{
-            "job_id": str(r.job.job_id),
-            "title": r.job.title,
-            "recruiter_name": r.job.recruiter.name or "",
-            "recruiter_company": r.job.recruiter.company or "",
-            "location": r.job.location or "",
-            "job_type": r.job.job_type or "",
-            "salary_min": r.job.salary_min,
-            "salary_max": r.job.salary_max,
-            "matching_score": r.matching_score,
-            "created_at": r.job.created_at.isoformat(),
-            "skills": [s.skill_name for s in r.job.skills]
-        } for r in rankings]
-    }
-    
-    return jsonify(result), 200
+        "matched_jobs": page_items,
+    }), 200
 
 @api.route('/applicants/<applicant_id>/dashboard', methods=['GET'])
 def applicant_dashboard(applicant_id):
@@ -440,30 +532,36 @@ def applicant_dashboard(applicant_id):
     
     if latest_resume:
         skill_count = len(latest_resume.skills)
-        
-        rankings = Ranking.query.filter_by(resume_id=latest_resume.resume_id)\
-            .order_by(Ranking.matching_score.desc()).limit(10).all()
-        
-        if rankings:
-            scores = [r.matching_score for r in rankings if r.matching_score]
+
+        # Score every job on the fly so the dashboard surfaces jobs the
+        # applicant could apply to (not just ones they already applied for).
+        all_jobs_for_scoring = Job.query.order_by(Job.created_at.desc()).all()
+        scored_jobs = []
+        for job in all_jobs_for_scoring:
+            score = _compute_job_match_score(latest_resume, job)
+            scored_jobs.append((score, job))
+        scored_jobs.sort(key=lambda pair: pair[0], reverse=True)
+
+        top4 = scored_jobs[:4]
+        if top4:
+            scores = [s for s, _ in top4 if s]
             avg_score = round(sum(scores) / len(scores), 1) if scores else 0.0
-            
-            # Top 4 for display
-            for r in rankings[:4]:
+
+            for score, job in top4:
                 top_jobs.append({
-                    "job_id": str(r.job.job_id),
-                    "title": r.job.title,
-                    "recruiter_name": r.job.recruiter.name or "",
-                    "recruiter_company": r.job.recruiter.company or "",
-                    "location": r.job.location or "",
-                    "matching_score": r.matching_score,
-                    "skills": [s.skill_name for s in r.job.skills]
+                    "job_id": str(job.job_id),
+                    "title": job.title,
+                    "recruiter_name": job.recruiter.name or "",
+                    "recruiter_company": job.recruiter.company or "",
+                    "location": job.location or "",
+                    "matching_score": round(float(score or 0.0), 2),
+                    "skills": [s.skill_name for s in job.skills]
                 })
-            
-            # Compute missing skills across top 4 jobs
+
+            # Compute missing skills across the top matches
             resume_skill_set = set(s.skill_name for s in latest_resume.skills)
-            for r in rankings[:4]:
-                job_skill_set = set(s.skill_name for s in r.job.skills)
+            for _, job in top4:
+                job_skill_set = set(s.skill_name for s in job.skills)
                 missing_skills.extend(job_skill_set - resume_skill_set)
             missing_skills = list(set(missing_skills))[:6]  # unique, max 6
     
@@ -573,13 +671,29 @@ def get_job_candidates(job_id):
     per_page = request.args.get('per_page', 10, type=int)
     min_score = request.args.get('min_score', 0, type=float)
     
-    query = Ranking.query.filter(
+    # An applicant can only appear in a job's candidate list if they applied
+    # to that specific job. The join+filter pair enforces this on both axes:
+    #   - JobApplication.applicant_id must equal the resume's applicant
+    #   - JobApplication.job_id must equal the ranking's job_id
+    query = Ranking.query.join(Resume).join(
+        JobApplication,
+        (JobApplication.applicant_id == Resume.applicant_id)
+        & (JobApplication.job_id == Ranking.job_id),
+    ).filter(
         Ranking.job_id == job_id,
-        Ranking.matching_score >= min_score
+        Ranking.matching_score >= min_score,
     ).order_by(Ranking.matching_score.desc())
-    
+
+    # Deduplicate by ranking_id: a resume re-uploaded via the text /resumes
+    # path keeps the prior rows in the DB until the cleanup pass prunes them.
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    rankings = pagination.items
+    seen: set[str] = set()
+    rankings: list = []
+    for r in pagination.items:
+        if str(r.ranking_id) in seen:
+            continue
+        seen.add(str(r.ranking_id))
+        rankings.append(r)
     
     result = {
         "total": pagination.total,
@@ -625,18 +739,30 @@ def get_recruiter_candidates(recruiter_id):
     min_score = request.args.get('min_score', 0, type=float)
     job_filter = request.args.get('job_id')
     
-    query = Ranking.query.filter(
+    # Pair the ranking with the application for the SAME job, so an applicant
+    # can only appear in the candidate list of jobs they actually applied to.
+    query = Ranking.query.join(Resume).join(
+        JobApplication,
+        (JobApplication.applicant_id == Resume.applicant_id)
+        & (JobApplication.job_id == Ranking.job_id),
+    ).filter(
         Ranking.job_id.in_(job_ids),
-        Ranking.matching_score >= min_score
+        Ranking.matching_score >= min_score,
     )
-    
+
     if job_filter and job_filter in [str(j) for j in job_ids]:
         query = query.filter(Ranking.job_id == job_filter)
-    
+
     query = query.order_by(Ranking.matching_score.desc())
-    
+
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    rankings = pagination.items
+    seen: set[str] = set()
+    rankings: list = []
+    for r in pagination.items:
+        if str(r.ranking_id) in seen:
+            continue
+        seen.add(str(r.ranking_id))
+        rankings.append(r)
     
     result = {
         "total": pagination.total,
@@ -675,17 +801,32 @@ def recruiter_dashboard(recruiter_id):
     top_candidates = []
     
     if job_ids:
-        # Count unique applicants across all jobs
+        # Count unique applicants across all jobs. An applicant only counts
+        # for a job if they applied to that specific job.
         total_candidates = db.session.query(func.count(func.distinct(Ranking.resume_id)))\
+            .join(Resume, Resume.resume_id == Ranking.resume_id)\
+            .join(
+                JobApplication,
+                (JobApplication.applicant_id == Resume.applicant_id)
+                & (JobApplication.job_id == Ranking.job_id),
+            )\
             .filter(Ranking.job_id.in_(job_ids)).scalar() or 0
-        
-        # Top 3 candidates by match score
-        top_rankings = Ranking.query.filter(
+
+        # Top 3 candidates by match score (deduplicated by ranking_id).
+        top_query = Ranking.query.join(Resume).join(
+            JobApplication,
+            (JobApplication.applicant_id == Resume.applicant_id)
+            & (JobApplication.job_id == Ranking.job_id),
+        ).filter(
             Ranking.job_id.in_(job_ids),
             Ranking.matching_score > 0
-        ).order_by(Ranking.matching_score.desc()).limit(3).all()
-        
-        for r in top_rankings:
+        ).order_by(Ranking.matching_score.desc())
+
+        seen: set[str] = set()
+        for r in top_query.all():
+            if str(r.ranking_id) in seen:
+                continue
+            seen.add(str(r.ranking_id))
             top_candidates.append({
                 "applicant_id": str(r.resume.applicant_id),
                 "applicant_name": r.resume.applicant.name or r.resume.applicant.email,
@@ -695,6 +836,8 @@ def recruiter_dashboard(recruiter_id):
                 "matching_score": r.matching_score,
                 "resume_skills": [s.skill_name for s in r.resume.skills]
             })
+            if len(top_candidates) >= 3:
+                break
     
     return jsonify({
         "name": recruiter.name or recruiter.email,

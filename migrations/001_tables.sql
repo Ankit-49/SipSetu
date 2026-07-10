@@ -96,6 +96,19 @@ CREATE TABLE public.rankings (
 );
 
 
+--
+-- Name: job_applications; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.job_applications (
+    application_id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    job_id uuid NOT NULL,
+    applicant_id uuid NOT NULL,
+    applied_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_job_applicant_application UNIQUE (job_id, applicant_id)
+);
+
+
 ALTER TABLE public.rankings OWNER TO postgres;
 
 --

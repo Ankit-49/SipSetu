@@ -20,6 +20,9 @@ def create_app():
     
     from routes import api
     app.register_blueprint(api, url_prefix='/api')
+
+    with app.app_context():
+        db.create_all()
     
     @app.route('/api/health', methods=['GET'])
     def health_check():

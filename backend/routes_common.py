@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from models import db, Job, Ranking, Resume, Skill
+from models import db, Job, JobApplication, Ranking, Resume, Skill
 
 EXPERIENCE_LEVEL_TO_YEARS = {
     "fresher": 0.0,
@@ -132,11 +132,31 @@ def calculate_ranking_score(resume, job):
 
 
 def create_rankings_for_job(job_id):
+    """Create/refresh ranking rows for a job based only on applicants who applied.
+
+    A candidate is included for a job if and only if they have a JobApplication
+    for that job. Rankings for any other applicant are removed so candidates
+    who did not apply are never surfaced for this job.
+    """
     job = Job.query.get(job_id)
     if not job:
         return
 
-    for resume in Resume.query.all():
+    applications = JobApplication.query.filter_by(job_id=job_id).all()
+
+    # Build the set of (resume_id, applicant_id) tuples that legitimately belong
+    # to this job. Use the applicant's most recent resume so a re-upload doesn't
+    # leave stale rows behind.
+    legitimate: set[tuple[str, str]] = set()
+    for application in applications:
+        resume = (
+            Resume.query.filter_by(applicant_id=application.applicant_id)
+            .order_by(Resume.uploaded_at.desc())
+            .first()
+        )
+        if not resume:
+            continue
+        legitimate.add((str(resume.resume_id), str(application.applicant_id)))
         score = calculate_ranking_score(resume, job)
         existing_ranking = Ranking.query.filter_by(job_id=job_id, resume_id=resume.resume_id).first()
         if existing_ranking:
@@ -144,21 +164,60 @@ def create_rankings_for_job(job_id):
         else:
             db.session.add(Ranking(job_id=job_id, resume_id=resume.resume_id, matching_score=score))
 
+    # Wipe stale rankings for this job. An applicant can only appear for a job
+    # they applied to, so any (resume, job) row that isn't in the legitimate
+    # set must be removed (covers: un-applied applicants, deleted applications,
+    # orphans from old resume_ids).
+    Ranking.query.filter(Ranking.job_id == job_id).all()
+    all_rankings = Ranking.query.filter(Ranking.job_id == job_id).all()
+    for r in all_rankings:
+        if (str(r.resume_id), str(r.resume.applicant_id)) not in legitimate:
+            db.session.delete(r)
+
     db.session.commit()
 
 
 def create_rankings_for_resume(resume_id, applicant_id):
+    """Create/refresh ranking rows for a resume across only the jobs the applicant applied to.
+
+    Old rankings for prior resume_ids belonging to this applicant are removed
+    so a candidate never appears in a recruiter's candidate list for a job
+    they did not apply to.
+    """
     resume = Resume.query.get(resume_id)
     if not resume:
         return
 
-    for job in Job.query.all():
+    applications = JobApplication.query.filter_by(applicant_id=applicant_id).all()
+    applied_job_ids: set[str] = set()
+    for application in applications:
+        job = Job.query.get(application.job_id)
+        if not job:
+            continue
+        applied_job_ids.add(str(job.job_id))
         score = calculate_ranking_score(resume, job)
         existing_ranking = Ranking.query.filter_by(job_id=job.job_id, resume_id=resume_id).first()
         if existing_ranking:
             existing_ranking.matching_score = score
         else:
             db.session.add(Ranking(job_id=job.job_id, resume_id=resume_id, matching_score=score))
+
+    # Remove rankings for jobs this applicant did NOT apply to, but only when
+    # the ranking uses one of THIS applicant's resume_ids. This keeps other
+    # applicants' rankings intact while pruning our own stale ones.
+    applicant_resume_ids = [
+        str(r.resume_id)
+        for r in Resume.query.filter_by(applicant_id=applicant_id).all()
+    ]
+    if applicant_resume_ids:
+        stale = (
+            Ranking.query
+            .filter(Ranking.resume_id.in_(applicant_resume_ids))
+            .filter(~Ranking.job_id.in_(applied_job_ids))
+            .all()
+        )
+        for r in stale:
+            db.session.delete(r)
 
     db.session.commit()
 

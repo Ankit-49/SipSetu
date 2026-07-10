@@ -14,8 +14,10 @@ export default function ApplicantJobMatches() {
   const [search, setSearch] = useState("");
   const [locationFilter, setLocationFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
   const [jobs, setJobs] = useState<any[]>([]);
   const [hasResume, setHasResume] = useState(true);
+  const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
 
   useEffect(() => {
     const userId = localStorage.getItem("user_id");
@@ -23,9 +25,17 @@ export default function ApplicantJobMatches() {
 
     const fetchMatches = async () => {
       try {
-        const res = await axios.get(`${API}/applicants/${userId}/matched-jobs?per_page=50`);
-        setJobs(res.data.matched_jobs || []);
-        if (res.data.resume_id === null) setHasResume(false);
+        const matchesRes = await axios.get(`${API}/applicants/${userId}/matched-jobs?per_page=100`);
+
+        const jobsData = matchesRes.data.matched_jobs || [];
+        setJobs(jobsData.map((job: any) => ({
+          ...job,
+          applied: Boolean(job.applied),
+        })));
+        // Keep this in sync so the disabled "Apply" button + the "Applied" label
+        // are correct without a second network call.
+        setAppliedJobIds(jobsData.filter((j: any) => j.applied).map((j: any) => String(j.job_id)));
+        if (matchesRes.data.resume_id === null) setHasResume(false);
       } catch (err) {
         console.error("Failed to load job matches", err);
         setHasResume(false);
@@ -61,6 +71,23 @@ export default function ApplicantJobMatches() {
     if (days < 7) return `${days} days ago`;
     if (days < 14) return "1 week ago";
     return `${Math.floor(days / 7)} weeks ago`;
+  };
+
+  const handleApply = async (jobId: string) => {
+    const userId = localStorage.getItem("user_id");
+    if (!userId || applyingJobId === jobId || appliedJobIds.includes(jobId)) {
+      return;
+    }
+
+    setApplyingJobId(jobId);
+    try {
+      await axios.post(`${API}/jobs/${jobId}/apply`, { applicant_id: userId });
+      setAppliedJobIds((prev) => [...prev, jobId]);
+    } catch (err) {
+      console.error("Failed to apply for job", err);
+    } finally {
+      setApplyingJobId(null);
+    }
   };
 
   if (loading) {
@@ -187,8 +214,22 @@ export default function ApplicantJobMatches() {
 
                 <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                   <span className="text-xs text-slate-400">{formatPosted(job.created_at)}</span>
-                  <Button className="bg-[#F97316] hover:bg-[#F97316]/90 text-white gap-2">
-                    <Send className="h-4 w-4" /> Apply Now
+                  <Button
+                    className="bg-[#F97316] hover:bg-[#F97316]/90 text-white gap-2"
+                    onClick={() => handleApply(job.job_id)}
+                    disabled={applyingJobId === job.job_id || appliedJobIds.includes(job.job_id)}
+                  >
+                    {appliedJobIds.includes(job.job_id) ? (
+                      "Applied"
+                    ) : applyingJobId === job.job_id ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Applying...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4" /> Apply Now
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>
