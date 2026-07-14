@@ -7,10 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, MapPin, Clock, Briefcase, Send, Loader2, UploadCloud } from "lucide-react";
 import { Link } from "react-router";
 import axios from "axios";
+import { useToast } from "@/hooks/use-toast";
 
 const API = "http://localhost:5000/api";
 
 export default function ApplicantJobMatches() {
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [locationFilter, setLocationFilter] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -83,8 +85,18 @@ export default function ApplicantJobMatches() {
     try {
       await axios.post(`${API}/jobs/${jobId}/apply`, { applicant_id: userId });
       setAppliedJobIds((prev) => [...prev, jobId]);
+      const job = jobs.find(j => String(j.job_id) === String(jobId));
+      toast({
+        title: "Application sent!",
+        description: `You applied to "${job?.title || "the job"}".`,
+      });
     } catch (err) {
       console.error("Failed to apply for job", err);
+      toast({
+        title: "Could not apply",
+        description: "Please try again in a moment.",
+        variant: "destructive",
+      });
     } finally {
       setApplyingJobId(null);
     }

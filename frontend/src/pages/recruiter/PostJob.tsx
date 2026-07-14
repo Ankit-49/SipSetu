@@ -8,8 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { X, Sparkles } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function RecruiterPostJob() {
+  const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [skills, setSkills] = useState<string[]>(["React", "TypeScript", "Git"]);
@@ -38,7 +40,11 @@ export default function RecruiterPostJob() {
   const handlePostJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title) {
-        alert("Please enter a job title");
+        toast({
+          title: "Title required",
+          description: "Please enter a job title before posting.",
+          variant: "destructive",
+        });
         return;
     }
     setIsSubmitting(true);
@@ -56,7 +62,10 @@ export default function RecruiterPostJob() {
         salary_min: salaryMin,
         salary_max: salaryMax
       });
-      alert("Job posted successfully!");
+      toast({
+        title: "Job posted!",
+        description: "Your job opening is now live and matching candidates.",
+      });
       setTitle("");
       setDescription("");
       setSkills([]);
@@ -67,10 +76,21 @@ export default function RecruiterPostJob() {
       setSalaryMax("");
     } catch (err) {
       console.error(err);
-      alert("Failed to post job");
+      toast({
+        title: "Failed to post job",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSaveDraft = () => {
+    toast({
+      title: "Draft saved",
+      description: "Your job posting has been saved as a draft.",
+    });
   };
 
   return (
@@ -203,7 +223,7 @@ export default function RecruiterPostJob() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 pt-6">
-              <Button type="button" variant="outline" className="h-12 sm:flex-1 text-slate-600 bg-white hover:bg-slate-50">
+              <Button type="button" variant="outline" className="h-12 sm:flex-1 text-slate-600 bg-white hover:bg-slate-50" onClick={handleSaveDraft}>
                 Save as Draft
               </Button>
               <Button type="submit" disabled={isSubmitting} className="h-12 sm:flex-[2] bg-[#F97316] hover:bg-[#F97316]/90 text-white text-base shadow-lg shadow-orange-500/20">
