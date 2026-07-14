@@ -11,6 +11,7 @@ import { motion } from "framer-motion";
 import Lottie from "lottie-react";
 import loginAnimation from "@/imports/Login.json";
 import { VisualBackground } from "@/components/VisualBackground";
+import { SipSetuLogo } from "@/components/SipSetuLogo";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -90,7 +91,7 @@ export default function RegisterPage() {
           <Card className="shadow-2xl border-none bg-white/95 backdrop-blur-sm">
             <CardHeader className="space-y-3 text-center pb-6">
               <div className="flex justify-center mb-2">
-                <Link to="/" className="text-4xl font-black tracking-tighter text-[#1E3A5F]">SipSetu</Link>
+                <SipSetuLogo className="text-4xl font-black tracking-tighter text-[#1E3A5F]" />
               </div>
               <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
               <CardDescription>Join SipSetu to start your journey</CardDescription>

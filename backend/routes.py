@@ -13,6 +13,7 @@ from routes_common import (
     calculate_ranking_score,
     create_rankings_for_job,
     create_rankings_for_resume,
+    create_rankings_for_resume_after_delete,
     experience_level_to_years,
     extract_experience_years,
     extract_skills_from_text,
@@ -292,6 +293,73 @@ def get_job(job_id):
     return jsonify(format_job(job)), 200
 
 # ============ RESUME & MATCHING ROUTES ============
+
+@api.route('/resumes/<resume_id>', methods=['GET', 'PUT', 'DELETE'])
+def resume_detail(resume_id):
+    """Fetch, update, or delete a single resume by id.
+
+    PUT replaces the resume's raw_text and re-extracts its skill associations.
+    It is the edit path for applicants who want to refine their profile after
+    initial upload. DELETE removes the resume (cascade removes its rankings).
+    """
+    resume = Resume.query.get(resume_id)
+    if not resume:
+        return jsonify({"error": "Resume not found"}), 404
+
+    if request.method == 'GET':
+        return jsonify({
+            "resume_id": str(resume.resume_id),
+            "applicant_id": str(resume.applicant_id),
+            "raw_text": resume.raw_text or "",
+            "file_path": resume.file_path or "",
+            "uploaded_at": resume.uploaded_at.isoformat() if resume.uploaded_at else None,
+            "skills": [s.skill_name for s in resume.skills],
+        }), 200
+
+    if request.method == 'DELETE':
+        applicant_id = str(resume.applicant_id)
+        db.session.delete(resume)
+        db.session.commit()
+        # Refresh rankings for this applicant so any prior job applications
+        # no longer surface a deleted resume.
+        create_rankings_for_resume_after_delete(applicant_id)
+        return jsonify({"message": "Resume deleted successfully"}), 200
+
+    # PUT
+    data = request.get_json(silent=True) or {}
+    new_text = data.get('raw_text')
+    new_file_path = data.get('file_path')
+
+    if new_text is None or not isinstance(new_text, str):
+        return jsonify({"error": "Missing or invalid 'raw_text'"}), 400
+
+    resume.raw_text = new_text
+    if new_file_path is not None:
+        resume.file_path = new_file_path
+
+    # Replace skill associations with a fresh extract so stale skills drop off.
+    extracted_skills = extract_skills_from_text(new_text)
+    resume.skills.clear()
+    db.session.flush()
+    for skill_name in extracted_skills:
+        skill = Skill.query.filter_by(skill_name=skill_name.lower()).first()
+        if not skill:
+            skill = Skill(skill_name=skill_name.lower())
+            db.session.add(skill)
+        if skill not in resume.skills:
+            resume.skills.append(skill)
+
+    db.session.flush()
+    create_rankings_for_resume(resume.resume_id, str(resume.applicant_id))
+    db.session.commit()
+
+    return jsonify({
+        "message": "Resume updated successfully",
+        "resume_id": str(resume.resume_id),
+        "skills_extracted": extracted_skills,
+        "skill_count": len(extracted_skills),
+    }), 200
+
 
 @api.route('/resumes', methods=['POST', 'GET'])
 def resumes():

@@ -177,6 +177,25 @@ def create_rankings_for_job(job_id):
     db.session.commit()
 
 
+def create_rankings_for_resume_after_delete(applicant_id):
+    """Remove all rankings for an applicant whose resume was just deleted.
+
+    A deleted resume means there is no resume to score against the applicant's
+    job applications anymore, so any leftover rankings for this applicant must
+    go. Other applicants' rankings are not touched.
+    """
+    applicant_resume_ids = [
+        str(r.resume_id)
+        for r in Resume.query.filter_by(applicant_id=applicant_id).all()
+    ]
+    if not applicant_resume_ids:
+        return
+    stale = Ranking.query.filter(Ranking.resume_id.in_(applicant_resume_ids)).all()
+    for r in stale:
+        db.session.delete(r)
+    db.session.commit()
+
+
 def create_rankings_for_resume(resume_id, applicant_id):
     """Create/refresh ranking rows for a resume across only the jobs the applicant applied to.
 
