@@ -75,7 +75,7 @@ def extract_experience_years(text):
     patterns = [
         r"(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?|yr\.?)\s*(?:of\s*)?(?:experience|exp\.?)",
         r"(?:experience|exp\.?)\s*(?:of\s*)?(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?|yr\.?)",
-        r"(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)",
+        
     ]
 
     detected_years = []

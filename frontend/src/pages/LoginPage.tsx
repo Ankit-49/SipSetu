@@ -94,28 +94,7 @@ export default function LoginPage() {
             </CardHeader>
             <CardContent>
           <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <Label className="text-slate-600 text-xs uppercase tracking-wider font-semibold">I am a</Label>
-              <ToggleGroup 
-                type="single" 
-                value={role} 
-                onValueChange={(v) => v && setRole(v)}
-                className="justify-start w-full bg-slate-100 p-1 rounded-xl"
-              >
-                <ToggleGroupItem 
-                  value="applicant" 
-                  className={`flex-1 rounded-lg data-[state=on]:bg-[#1E3A5F] data-[state=on]:text-black ${role !== 'applicant' && 'hover:bg-slate-200 text-slate-600'}`}
-                >
-                  Job Seeker
-                </ToggleGroupItem>
-                <ToggleGroupItem 
-                  value="recruiter" 
-                  className={`flex-1 rounded-lg data-[state=on]:bg-[#1E3A5F] data-[state=on]:text-black ${role !== 'recruiter' && 'hover:bg-slate-200 text-slate-600'}`}
-                >
-                  Recruiter
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
+           
 
             <div className="space-y-4">
               <div className="space-y-2">
