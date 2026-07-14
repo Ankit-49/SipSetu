@@ -158,7 +158,7 @@ export default function PreviewPage() {
                       <p className="text-sm text-slate-500">{candidate.job_title}</p>
                     </div>
                     <Badge className="bg-[#F97316]/10 text-[#F97316] hover:bg-[#F97316]/10 border-none">
-                      {candidate.matching_score}% Match
+                      {candidate.matching_score.toFixed(2)}% Match
                     </Badge>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-3">
