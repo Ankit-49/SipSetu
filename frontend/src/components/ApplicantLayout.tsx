@@ -70,7 +70,9 @@ export function ApplicantLayout({ children }: { children: React.ReactNode }) {
               <span className="text-sm font-medium text-white truncate max-w-[150px]">
                 {localStorage.getItem("user_name") || "Applicant"}
               </span>
-              <span className="text-xs text-slate-400">Job Seeker</span>
+              <span className="text-xs text-slate-400">
+                {localStorage.getItem("user_role")?.toUpperCase() || "Applicant"}
+              </span>
             </div>
           </div>
         </Link>

@@ -329,6 +329,10 @@ def resume_detail(resume_id):
     data = request.get_json(silent=True) or {}
     new_text = data.get('raw_text')
     new_file_path = data.get('file_path')
+    # The client (builder) sends the edited skills list as the source of
+    # truth. If it isn't provided, fall back to re-extracting from raw_text
+    # (covers programmatic edits that don't go through the builder).
+    client_skills = data.get('skills')
 
     if new_text is None or not isinstance(new_text, str):
         return jsonify({"error": "Missing or invalid 'raw_text'"}), 400
@@ -338,7 +342,10 @@ def resume_detail(resume_id):
         resume.file_path = new_file_path
 
     # Replace skill associations with a fresh extract so stale skills drop off.
-    extracted_skills = extract_skills_from_text(new_text)
+    if isinstance(client_skills, list) and all(isinstance(s, str) for s in client_skills):
+        extracted_skills = [s.strip().lower() for s in client_skills if s.strip()]
+    else:
+        extracted_skills = extract_skills_from_text(new_text)
     resume.skills.clear()
     db.session.flush()
     for skill_name in extracted_skills:
@@ -368,16 +375,24 @@ def resumes():
         data = request.get_json()
         applicant_id = data.get('applicant_id')
         raw_text = data.get('raw_text', '')
-        
+        # The client (builder) sends the edited skills list as the source
+        # of truth. If it isn't provided, fall back to re-extracting from
+        # raw_text (covers programmatic edits that don't go through the
+        # builder).
+        client_skills = data.get('skills')
+
         if not applicant_id:
             return jsonify({"error": "Missing applicant_id"}), 400
-        
+
         applicant = Applicant.query.get(applicant_id)
         if not applicant:
             return jsonify({"error": "Applicant not found"}), 404
-        
-        extracted_skills = extract_skills_from_text(raw_text)
-        
+
+        if isinstance(client_skills, list) and all(isinstance(s, str) for s in client_skills):
+            extracted_skills = [s.strip().lower() for s in client_skills if s.strip()]
+        else:
+            extracted_skills = extract_skills_from_text(raw_text)
+
         new_resume = Resume(applicant_id=applicant_id, raw_text=raw_text)
         
         for skill_name in extracted_skills:

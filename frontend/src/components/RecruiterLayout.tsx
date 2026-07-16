@@ -20,6 +20,7 @@ export function RecruiterLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { logout } = useAuth();
 
+
   const handleLogout = async () => {
     await logout();
     navigate('/');
@@ -70,7 +71,9 @@ export function RecruiterLayout({ children }: { children: React.ReactNode }) {
               <span className="text-sm font-medium text-white truncate max-w-[150px]">
                 {localStorage.getItem("user_name") || "Recruiter"}
               </span>
-              <span className="text-xs text-slate-400">HR Manager</span>
+              <span className="text-xs text-slate-400">
+                {localStorage.getItem("user_role")?.toUpperCase() || "HR Manager"}
+              </span>
             </div>
           </div>
         </Link>

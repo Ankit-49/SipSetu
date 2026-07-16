@@ -91,18 +91,36 @@ const uid = () =>
 
 /**
  * Heuristic parser: if the existing raw_text doesn't look like a structured
- * builder document (i.e. it's a free-form PDF extract), we surface it as the
- * summary so the user can copy/paste into the builder instead of losing it.
- * If it does look builder-generated, we parse sections back into the form.
+ * builder document (i.e. it's a free-form PDF extract), we surface the
+ * already-stored skills as the form's skill chips (so the user can refine
+ * them in the builder) and leave the summary empty with a placeholder. The
+ * raw_text is kept on the form as `rawTextOriginal` only for reference; we
+ * do NOT dump the full PDF text into the summary because the user can't
+ * sensibly edit a 800-character wall of text.
+ *
+ * If the raw_text does look builder-generated, we parse sections back into
+ * the form. Stored skills still win as the chip list so we never lose a
+ * skill the user previously had.
  */
-function parseRawTextIntoForm(rawText: string, profileName?: string | null): ResumeForm {
-  const form: ResumeForm = { ...EMPTY_FORM, fullName: profileName || "" };
+function parseRawTextIntoForm(
+  rawText: string,
+  profileName?: string | null,
+  storedSkills: string[] = []
+): ResumeForm {
+  const form: ResumeForm = {
+    ...EMPTY_FORM,
+    fullName: profileName || "",
+    skills: storedSkills.slice(),
+  };
   if (!rawText) return form;
 
   // Builder-generated docs start with "Name: ..." and "Headline: ...".
   const isStructured = /^Name:\s*/m.test(rawText) && /^Headline:\s*/m.test(rawText);
   if (!isStructured) {
-    return { ...form, summary: rawText };
+    // Free-form PDF text — skills come from the stored associations on the
+    // resume row (already extracted server-side). We leave the summary blank
+    // so the user can write their own pitch instead of editing a giant blob.
+    return form;
   }
 
   const grab = (label: string): string => {
@@ -123,10 +141,15 @@ function parseRawTextIntoForm(rawText: string, profileName?: string | null): Res
   if (summary) form.summary = summary;
 
   if (skillsBlock) {
-    form.skills = skillsBlock
+    const parsed = skillsBlock
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
+    // Merge with stored skills so we don't drop anything that the server
+    // extracted but the builder save lost (e.g. a custom skill the user
+    // added through the form and was re-extracted on save).
+    const merged = Array.from(new Set([...form.skills, ...parsed]));
+    form.skills = merged;
   }
 
   if (educationBlock) {
@@ -256,11 +279,21 @@ export default function ApplicantResume() {
         const latest = res.data[0];
         setResume(latest);
         // Fetch the full raw_text (list endpoint does not return it) so we
-        // can pre-populate the builder for edits.
+        // can pre-populate the builder for edits. We also pass the stored
+        // skills so PDF-extracted skills show up as chips in the builder
+        // (the raw_text alone is unstructured for a PDF, so the parser
+        // would otherwise leave the skill list empty).
         try {
           const detail = await axios.get(`${API}/resumes/${latest.resume_id}`);
           const profileName = localStorage.getItem("user_name");
-          setForm(parseRawTextIntoForm(detail.data.raw_text || "", profileName));
+          const storedSkills: string[] = (detail.data.skills as string[]) || latest.skills || [];
+          setForm(
+            parseRawTextIntoForm(
+              detail.data.raw_text || "",
+              profileName,
+              storedSkills
+            )
+          );
         } catch {
           // Fall back to whatever skills we have so the user can still edit.
           setForm((prev) => ({ ...prev, skills: latest.skills || [] }));
@@ -370,6 +403,13 @@ export default function ApplicantResume() {
 
     setSaving(true);
     const rawText = buildRawText(form);
+    // The form's skills list is the source of truth for what the user
+    // has approved. Send it to the backend so edits (additions and
+    // removals) survive a re-save even when the underlying raw_text
+    // doesn't contain those exact words.
+    const skillsPayload = form.skills
+      .map((s) => s.trim())
+      .filter(Boolean);
 
     try {
       if (resume?.resume_id) {
@@ -377,6 +417,7 @@ export default function ApplicantResume() {
         const res = await axios.put(`${API}/resumes/${resume.resume_id}`, {
           raw_text: rawText,
           file_path: resume.file_path || null,
+          skills: skillsPayload,
         });
         toast({
           title: "Resume updated",
@@ -387,6 +428,7 @@ export default function ApplicantResume() {
         const res = await axios.post(`${API}/resumes`, {
           applicant_id: userId,
           raw_text: rawText,
+          skills: skillsPayload,
         });
         toast({
           title: "Resume created",
