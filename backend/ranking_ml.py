@@ -122,11 +122,6 @@ def build_feature_dict(resume: Resume, job: Job, vectorizer: TfidfVectorizer | N
     experience_score = calculate_experience_score(candidate_years, target_years)
     resume_text, job_text = _pair_text(resume, job)
 
-    location_match = 0.0
-    applicant_location = getattr(getattr(resume, "applicant", None), "location", None)
-    if applicant_location and job.location:
-        location_match = float(applicant_location.strip().lower() == job.location.strip().lower())
-
     return {
         "skills_overlap_count": float(len(intersection)),
         "skills_jaccard": float(len(intersection) / len(union)) if union else 0.0,
@@ -138,7 +133,6 @@ def build_feature_dict(resume: Resume, job: Job, vectorizer: TfidfVectorizer | N
         "experience_score": float(experience_score),
         "resume_text_length": float(len(resume_text.split())),
         "job_text_length": float(len(job_text.split())),
-        "location_match": location_match,
         "content_similarity": _content_similarity(resume_text, job_text, vectorizer),
     }
 
@@ -155,7 +149,6 @@ def _feature_order() -> list[str]:
         "experience_score",
         "resume_text_length",
         "job_text_length",
-        "location_match",
         "content_similarity",
     ]
 
@@ -178,15 +171,24 @@ def _heuristic_score(resume: Resume, job: Job) -> float:
 
     intersection = len(resume_set.intersection(job_set))
     union = len(resume_set.union(job_set))
-    skills_score = round((intersection / union) * 100, 2) if union else 0.0
+    skills_score = round((intersection / len(job_set)) * 100, 2) if job_set else 0.0
     experience_years = extract_experience_years(resume.raw_text or "")
     target_experience_years = experience_level_to_years(job.experience_level)
     experience_score = calculate_experience_score(experience_years, target_experience_years)
 
-    if skills_score == 100.0 and experience_score >= 100.0:
+    resume_text, job_text = _pair_text(resume, job)
+    content_sim = 0.0
+    if resume_text and job_text:
+        try:
+            matrix = TfidfVectorizer().fit_transform([resume_text, job_text]).toarray()
+            content_sim = float(cosine_similarity(matrix[0:1], matrix[1:2])[0, 0]) * 100
+        except ValueError:
+            pass
+
+    if skills_score == 100.0 and experience_score >= 100.0 and content_sim >= 99.0:
         return 100.0
 
-    combined_score = (skills_score * 0.88) + (experience_score * 0.10)
+    combined_score = (skills_score * 0.70) + (experience_score * 0.15) + (content_sim * 0.15)
     return min(round(combined_score, 2), 99.99)
 
 
