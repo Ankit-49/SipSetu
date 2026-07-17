@@ -1,16 +1,19 @@
 import { Link, useLocation } from "react-router";
-import { LayoutDashboard, PlusSquare, Users, User, Sparkles, Bell } from "lucide-react";
+import { LayoutDashboard, Users, User, Sparkles, Bell } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/app/context/AuthContext";
 import { SipSetuLogo } from "@/components/SipSetuLogo";
-import { NotificationBell } from "@/components/NotificationBell";
+import { useState, useEffect } from "react";
+import axios from "axios";
+
+const API = "http://localhost:5000/api";
 
 const navItems = [
   { name: "Dashboard", href: "/recruiter/dashboard", icon: LayoutDashboard },
-  { name: "Post Job", href: "/recruiter/post-job", icon: PlusSquare },
+  { name: "Notifications", href: "/recruiter/notifications", icon: Bell },
   { name: "Candidates", href: "/recruiter/candidates", icon: Users },
   { name: "Bulk Screen", href: "/recruiter/bulk-screen", icon: Sparkles },
   { name: "Profile", href: "/recruiter/profile", icon: User },
@@ -20,7 +23,23 @@ export function RecruiterLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
 
+  const fetchUnread = async () => {
+    const userId = localStorage.getItem("user_id");
+    if (!userId) return;
+    try {
+      const res = await axios.get(`${API}/notifications/${userId}`);
+      const count = res.data.filter((n: any) => !n.is_read).length;
+      setUnreadCount(count);
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -31,27 +50,34 @@ export function RecruiterLayout({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       {/* Sidebar */}
       <aside className="w-64 bg-[#1E3A5F] flex flex-col flex-shrink-0" data-testid="recruiter-sidebar">
-        <div className="h-16 flex items-center justify-between px-6">
+        <div className="h-16 flex items-center px-6">
           <SipSetuLogo className="text-white text-2xl font-bold tracking-tight" />
-          <NotificationBell />
         </div>
         
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = location.pathname === item.href;
+            const isNotif = item.name === "Notifications";
             return (
               <Link
                 key={item.href}
                 to={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                className={`flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors ${
                   isActive 
                     ? "bg-white/10 text-white border-l-4 border-[#F97316]" 
                     : "text-slate-300 hover:text-white hover:bg-white/5 border-l-4 border-transparent"
                 }`}
                 data-testid={`nav-link-${item.name.toLowerCase().replace(' ', '-')}`}
               >
-                <item.icon className="h-5 w-5" />
-                <span className="font-medium">{item.name}</span>
+                <div className="flex items-center gap-3">
+                  <item.icon className="h-5 w-5" />
+                  <span className="font-medium">{item.name}</span>
+                </div>
+                {isNotif && unreadCount > 0 && (
+                  <span className="h-5 min-w-[20px] px-1 rounded-full bg-[#F97316] text-[10px] font-bold text-white flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
               </Link>
             );
           })}

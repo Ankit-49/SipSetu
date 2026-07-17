@@ -20,6 +20,8 @@ import RecruiterPostJob from "../pages/recruiter/PostJob";
 import RecruiterCandidates from "../pages/recruiter/Candidates";
 import RecruiterProfile from "../pages/recruiter/Profile";
 import RecruiterBulkScreening from "../pages/recruiter/BulkScreening";
+import RecruiterNotifications from "../pages/recruiter/Notifications";
+import ApplicantNotifications from "../pages/applicant/Notifications";
 
 export const router = createBrowserRouter([
   { path: "/", Component: LandingPage },
@@ -30,6 +32,7 @@ export const router = createBrowserRouter([
   // Applicant Routes
   { path: "/applicant", Component: () => <Navigate to="/applicant/dashboard" replace /> },
   { path: "/applicant/dashboard", Component: () => <ApplicantLayout><ApplicantDashboardHome /></ApplicantLayout> },
+  { path: "/applicant/notifications", Component: () => <ApplicantLayout><ApplicantNotifications /></ApplicantLayout> },
   { path: "/applicant/resume", Component: () => <ApplicantLayout><ApplicantResume /></ApplicantLayout> },
   { path: "/applicant/matches", Component: () => <ApplicantLayout><ApplicantJobMatches /></ApplicantLayout> },
   { path: "/applicant/skill-gap", Component: () => <ApplicantLayout><ApplicantSkillGap /></ApplicantLayout> },
@@ -38,6 +41,7 @@ export const router = createBrowserRouter([
   // Recruiter Routes
   { path: "/recruiter", Component: () => <Navigate to="/recruiter/dashboard" replace /> },
   { path: "/recruiter/dashboard", Component: () => <RecruiterLayout><RecruiterDashboardHome /></RecruiterLayout> },
+  { path: "/recruiter/notifications", Component: () => <RecruiterLayout><RecruiterNotifications /></RecruiterLayout> },
   { path: "/recruiter/post-job", Component: () => <RecruiterLayout><RecruiterPostJob /></RecruiterLayout> },
   { path: "/recruiter/candidates", Component: () => <RecruiterLayout><RecruiterCandidates /></RecruiterLayout> },
   { path: "/recruiter/bulk-screen", Component: () => <RecruiterLayout><RecruiterBulkScreening /></RecruiterLayout> },

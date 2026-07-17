@@ -23,6 +23,13 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+        # Safe migration check: add status column to job_applications if not exists
+        try:
+            db.session.execute(db.text("ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'pending' NOT NULL"))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print("Migration warning (status column):", e)
     
     @app.route('/api/health', methods=['GET'])
     def health_check():

@@ -259,6 +259,17 @@ export default function ApplicantResume() {
 
   // The latest resume row for this applicant, or null if none exists.
   const [resume, setResume] = useState<any>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (pendingFile) {
+      const url = URL.createObjectURL(pendingFile);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setPreviewUrl(null);
+    }
+  }, [pendingFile]);
 
   // The active tab — when no resume exists, force the builder tab so users
   // can start creating one immediately.
@@ -487,6 +498,7 @@ export default function ApplicantResume() {
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
@@ -952,31 +964,48 @@ export default function ApplicantResume() {
 
                   {/* File preview before upload */}
                   {pendingFile && !uploading && (
-                    <div className="p-4 border-2 border-[#1E3A5F]/40 rounded-xl bg-blue-50/60 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                      <div className="h-12 w-12 rounded-lg bg-[#1E3A5F]/10 flex items-center justify-center flex-shrink-0">
-                        <FileText className="h-6 w-6 text-[#1E3A5F]" />
+                    <div className="space-y-4">
+                      <div className="p-4 border-2 border-[#1E3A5F]/40 rounded-xl bg-blue-50/60 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <div className="h-12 w-12 rounded-lg bg-[#1E3A5F]/10 flex items-center justify-center flex-shrink-0">
+                          <FileText className="h-6 w-6 text-[#1E3A5F]" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-slate-900 truncate">{pendingFile.name}</p>
+                          <p className="text-sm text-slate-500">{(pendingFile.size / 1024).toFixed(1)} KB • PDF</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-slate-500 hover:text-red-600"
+                            onClick={() => setPendingFile(null)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="bg-[#1E3A5F] hover:bg-[#1E3A5F]/90 text-white"
+                            onClick={handleUploadConfirm}
+                          >
+                            <UploadCloud className="h-3.5 w-3.5 mr-1.5" /> Upload
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-900 truncate">{pendingFile.name}</p>
-                        <p className="text-sm text-slate-500">{(pendingFile.size / 1024).toFixed(1)} KB • PDF</p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-slate-500 hover:text-red-600"
-                          onClick={() => setPendingFile(null)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="bg-[#1E3A5F] hover:bg-[#1E3A5F]/90 text-white"
-                          onClick={handleUploadConfirm}
-                        >
-                          <UploadCloud className="h-3.5 w-3.5 mr-1.5" /> Upload
-                        </Button>
-                      </div>
+                      
+                      {/* PDF Live Preview Iframe */}
+                      {previewUrl && (
+                        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-slate-100 p-1 animate-in fade-in zoom-in-95 duration-300">
+                          <div className="bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 flex justify-between items-center">
+                            <span>Document Preview</span>
+                            <span className="text-[10px] bg-slate-300 text-slate-700 px-2 py-0.5 rounded-full">PDF Viewer</span>
+                          </div>
+                          <iframe
+                            src={previewUrl}
+                            className="w-full h-[380px] bg-white rounded-b-lg border-0"
+                            title="PDF Resume Preview"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -989,9 +1018,9 @@ export default function ApplicantResume() {
                         : "border-slate-300 bg-slate-50/50 hover:border-[#1E3A5F]/50 hover:bg-slate-50 hover:shadow-[0_0_0_3px_rgba(30,58,95,0.08)]"
                     }`}
                     onClick={() => !uploading && fileInputRef.current?.click()}
-                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                    onDragEnter={(e) => { e.preventDefault(); setIsDragging(true); }}
-                    onDragLeave={(e) => { e.preventDefault(); if (!dropZoneRef.current?.contains(e.relatedTarget as Node)) setIsDragging(false); }}
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+                    onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+                    onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); if (!dropZoneRef.current?.contains(e.relatedTarget as Node)) setIsDragging(false); }}
                     onDrop={handleDrop}
                   >
                     <div className={`h-14 w-14 rounded-full flex items-center justify-center mb-4 transition-all duration-300 ${

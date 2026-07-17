@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Briefcase, Users, UserCheck, TrendingUp, ChevronRight, FileText } from "lucide-react";
+import { Briefcase, Users, UserCheck, TrendingUp, ChevronRight, FileText, Bell } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
 import axios from "axios";
@@ -12,6 +12,7 @@ export default function RecruiterDashboardHome() {
   const date = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
     const userId = localStorage.getItem("user_id");
@@ -20,17 +21,21 @@ export default function RecruiterDashboardHome() {
       return;
     }
 
-    const fetchDashboard = async () => {
+    const fetchDashboardAndNotifs = async () => {
       try {
-        const response = await axios.get(`${API}/recruiters/${userId}/dashboard`);
-        setData(response.data);
+        const [dashRes, notifRes] = await Promise.all([
+          axios.get(`${API}/recruiters/${userId}/dashboard`),
+          axios.get(`${API}/notifications/${userId}`)
+        ]);
+        setData(dashRes.data);
+        setNotifications(notifRes.data);
       } catch (err) {
-        console.error("Failed to fetch recruiter dashboard", err);
+        console.error("Failed to fetch dashboard data", err);
       } finally {
         setLoading(false);
       }
     };
-    fetchDashboard();
+    fetchDashboardAndNotifs();
   }, []);
 
   const topCandidates = data?.top_candidates || [];
@@ -159,35 +164,72 @@ export default function RecruiterDashboardHome() {
           </CardContent>
         </Card>
 
-        {/* Recent Postings */}
-        <Card>
-          <CardHeader className="pb-2 border-b border-slate-100">
-            <CardTitle className="text-lg font-bold">Active Job Postings</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="divide-y divide-slate-100">
-              {activeJobs.length === 0 ? (
-                <div className="p-8 text-center text-slate-500">No active job postings yet.</div>
-              ) : activeJobs.map((post: any) => (
-                <div key={post.job_id} className="p-4 hover:bg-slate-50 transition-colors">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-semibold text-slate-900">{post.title}</h4>
-                    <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-200">Active</Badge>
+        {/* Right Column: Active Jobs + Notifications */}
+        <div className="space-y-6">
+          {/* Active Postings */}
+          <Card>
+            <CardHeader className="pb-2 border-b border-slate-100">
+              <CardTitle className="text-lg font-bold">Active Job Postings</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-slate-100">
+                {activeJobs.length === 0 ? (
+                  <div className="p-8 text-center text-slate-500">No active job postings yet.</div>
+                ) : activeJobs.map((post: any) => (
+                  <div key={post.job_id} className="p-4 hover:bg-slate-50 transition-colors">
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-semibold text-slate-900">{post.title}</h4>
+                      <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-200">Active</Badge>
+                    </div>
+                    <div className="flex justify-between items-center text-sm text-slate-500">
+                      <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {data?.total_candidates ?? 0} Candidates</span>
+                      <span>{post.created_at ? new Date(post.created_at).toLocaleDateString() : "Recent"}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center text-sm text-slate-500">
-                    <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {data?.total_candidates ?? 0} Candidates</span>
-                    <span>{post.created_at ? new Date(post.created_at).toLocaleDateString() : "Recent"}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="p-3 bg-slate-50 border-t border-slate-100 text-center rounded-b-xl">
-              <Link to="/recruiter/candidates" className="text-sm font-medium text-[#1E3A5F] hover:underline">
-                View all postings
+                ))}
+              </div>
+              <div className="p-3 bg-slate-50 border-t border-slate-100 text-center rounded-b-xl">
+                <Link to="/recruiter/candidates" className="text-sm font-medium text-[#1E3A5F] hover:underline">
+                  View all postings
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Notifications Card */}
+          <Card>
+            <CardHeader className="pb-2 border-b border-slate-100 flex flex-row items-center justify-between">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <Bell className="h-4.5 w-4.5 text-[#1E3A5F]" /> Notifications
+              </CardTitle>
+              <Link to="/recruiter/notifications" className="text-xs text-[#1E3A5F] hover:underline font-semibold">
+                View All
               </Link>
-            </div>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-slate-100 max-h-[320px] overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <div className="p-6 text-center text-slate-400 text-sm">No notifications yet.</div>
+                ) : (
+                  notifications.slice(0, 5).map((n: any) => (
+                    <div key={n.notification_id} className={`p-4 transition-colors hover:bg-slate-50/50 ${!n.is_read ? 'bg-blue-50/20' : ''}`}>
+                      <div className="flex items-start gap-2.5">
+                        <div className="h-2 w-2 rounded-full bg-[#F97316] mt-1.5 shrink-0" style={{ opacity: n.is_read ? 0 : 1 }} />
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-xs font-semibold text-slate-900 ${!n.is_read ? 'font-bold' : ''}`}>{n.title}</p>
+                          <p className="text-[11px] text-slate-500 mt-0.5 leading-snug line-clamp-2">{n.message}</p>
+                          <span className="text-[9px] text-slate-400 block mt-1">
+                            {new Date(n.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

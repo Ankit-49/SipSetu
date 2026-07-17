@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Target, FileText, Briefcase, ChevronRight, Loader2, UploadCloud, Zap, Sparkles } from "lucide-react";
+import { Target, FileText, Briefcase, ChevronRight, Loader2, UploadCloud, Zap, Sparkles, Bell } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
 import axios from "axios";
@@ -13,22 +13,27 @@ export default function ApplicantDashboardHome() {
   const date = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
     const userId = localStorage.getItem("user_id");
     if (!userId) { setLoading(false); return; }
 
-    const fetchDashboard = async () => {
+    const fetchDashboardAndNotifs = async () => {
       try {
-        const res = await axios.get(`${API}/applicants/${userId}/dashboard`);
-        setData(res.data);
+        const [dashRes, notifRes] = await Promise.all([
+          axios.get(`${API}/applicants/${userId}/dashboard`),
+          axios.get(`${API}/notifications/${userId}`)
+        ]);
+        setData(dashRes.data);
+        setNotifications(notifRes.data);
       } catch (err) {
         console.error("Failed to fetch dashboard data", err);
       } finally {
         setLoading(false);
       }
     };
-    fetchDashboard();
+    fetchDashboardAndNotifs();
   }, []);
 
   const userName = data?.name || localStorage.getItem("user_name") || "there";
