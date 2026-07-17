@@ -1,10 +1,26 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Target, FileText, Briefcase, ChevronRight, Loader2, UploadCloud, Zap, Sparkles, Bell } from "lucide-react";
+import { 
+  Briefcase, 
+  TrendingUp, 
+  FileText, 
+  CheckCircle2, 
+  UploadCloud,
+  ChevronRight,
+  Clock,
+  Building,
+  MapPin,
+  Star,
+  Target,
+  Zap,
+  Sparkles,
+  Loader2
+} from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
+import { NotificationBell } from "@/components/NotificationBell";
 import axios from "axios";
 
 const API = "http://localhost:5000/api";
@@ -13,30 +29,28 @@ export default function ApplicantDashboardHome() {
   const date = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
-  const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
     const userId = localStorage.getItem("user_id");
-    if (!userId) { setLoading(false); return; }
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
 
-    const fetchDashboardAndNotifs = async () => {
+    const fetchDashboard = async () => {
       try {
-        const [dashRes, notifRes] = await Promise.all([
-          axios.get(`${API}/applicants/${userId}/dashboard`),
-          axios.get(`${API}/notifications/${userId}`)
-        ]);
-        setData(dashRes.data);
-        setNotifications(notifRes.data);
+        const response = await axios.get(`${API}/applicants/${userId}/dashboard`);
+        setData(response.data);
       } catch (err) {
-        console.error("Failed to fetch dashboard data", err);
+        console.error("Failed to fetch applicant dashboard", err);
       } finally {
         setLoading(false);
       }
     };
-    fetchDashboardAndNotifs();
+    fetchDashboard();
   }, []);
 
-  const userName = data?.name || localStorage.getItem("user_name") || "there";
+  const userName = data?.name || localStorage.getItem("user_name") || "Applicant";
   const firstName = userName.split(" ")[0];
   const recentJobs = data?.recent_jobs || [];
 
@@ -50,9 +64,14 @@ export default function ApplicantDashboardHome() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Welcome back, {firstName} 👋</h1>
-        <p className="text-slate-500 mt-1">{date}</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Welcome back, {firstName} 👋</h1>
+          <p className="text-slate-500 mt-1">{date}</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <NotificationBell />
+        </div>
       </div>
 
       {/* No resume prompt */}
