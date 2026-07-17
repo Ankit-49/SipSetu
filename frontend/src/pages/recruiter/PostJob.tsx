@@ -117,7 +117,7 @@ export default function RecruiterPostJob() {
                 <div className="flex justify-between items-center">
                   <Label htmlFor="description">Job Description</Label>
                   <Button type="button" variant="ghost" size="sm" className="h-8 text-indigo-600 gap-1.5 px-2">
-                    <Sparkles className="h-3.5 w-3.5" /> Improve with AI
+                    
                   </Button>
                 </div>
                 <Textarea 

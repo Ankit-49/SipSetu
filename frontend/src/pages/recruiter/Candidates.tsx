@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, MapPin, Briefcase, Mail, Loader2 } from "lucide-react";
+import { MapPin, Briefcase, Mail, Loader2, Star, X, RotateCcw } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 import axios from "axios";
 
 const API = "http://localhost:5000/api";
@@ -20,6 +20,8 @@ type Candidate = {
   applicant_location: string;
   matching_score: number;
   resume_skills: string[];
+  application_id: string | null;
+  application_status: "pending" | "shortlisted" | "rejected";
 };
 
 export default function RecruiterCandidates() {
@@ -29,6 +31,7 @@ export default function RecruiterCandidates() {
   const [selectedScore, setSelectedScore] = useState("all-scores");
   const [jobs, setJobs] = useState<{ job_id: string; title: string }[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [shortlisting, setShortlisting] = useState<string | null>(null);
 
   useEffect(() => {
     const userId = localStorage.getItem("user_id");
@@ -59,12 +62,27 @@ export default function RecruiterCandidates() {
     fetchCandidates();
   }, [selectedJob, selectedScore]);
 
-  const filteredCandidates = candidates.filter((c) =>
-    c.applicant_name.toLowerCase().includes(search.toLowerCase()) ||
-    c.applicant_email.toLowerCase().includes(search.toLowerCase()) ||
-    c.job_title.toLowerCase().includes(search.toLowerCase()) ||
-    c.resume_skills.some((s) => s.toLowerCase().includes(search.toLowerCase()))
-  );
+  const updateStatus = async (candidate: Candidate, newStatus: "shortlisted" | "rejected" | "pending") => {
+    if (!candidate.application_id) {
+      toast({ title: "No application found", description: "This candidate hasn't formally applied.", variant: "destructive" });
+      return;
+    }
+    setShortlisting(candidate.application_id);
+    try {
+      await axios.patch(`${API}/applications/${candidate.application_id}/status`, { status: newStatus });
+      setCandidates((prev) =>
+        prev.map((c) =>
+          c.application_id === candidate.application_id ? { ...c, application_status: newStatus } : c
+        )
+      );
+      const labels = { shortlisted: "Shortlisted ⭐", rejected: "Rejected", pending: "Reset to Pending" };
+      toast({ title: labels[newStatus], description: `${candidate.applicant_name}'s application has been updated.` });
+    } catch {
+      toast({ title: "Failed to update", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setShortlisting(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -133,9 +151,9 @@ export default function RecruiterCandidates() {
               <p className="font-medium text-slate-700">No Job Selected</p>
               <p className="text-sm mt-1">Please select a job posting from the sidebar to view ranked candidates.</p>
             </Card>
-          ) : filteredCandidates.length === 0 ? (
+          ) : candidates.length === 0 ? (
             <Card className="p-8 text-center text-slate-500">No candidates found for the selected filters.</Card>
-          ) : filteredCandidates.map((candidate, i) => {
+          ) : candidates.map((candidate, i) => {
             const score = candidate.matching_score;
             
             const radius = 30;

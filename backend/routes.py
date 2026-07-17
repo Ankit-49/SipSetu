@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import db, User, Applicant, Recruiter, Job, JobApplication, Resume, Skill, Ranking
+from models import db, User, Applicant, Recruiter, Job, JobApplication, Resume, Skill, Ranking, Notification
 from werkzeug.security import generate_password_hash, check_password_hash
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -864,7 +864,10 @@ def get_recruiter_candidates(recruiter_id):
             "applicant_location": r.resume.applicant.location or "",
             "matching_score": r.matching_score,
             "candidate_rank": r.candidate_rank,
-            "resume_skills": [s.skill_name for s in r.resume.skills]
+            "resume_skills": [s.skill_name for s in r.resume.skills],
+            "application_id": str(app.application_id) if (app := JobApplication.query.filter_by(
+                job_id=r.job.job_id, applicant_id=r.resume.applicant_id).first()) else None,
+            "application_status": app.status if app else "pending",
         } for r in rankings]
     }
     
@@ -1096,4 +1099,115 @@ def update_ranking(ranking_id):
         "message": "Ranking updated successfully",
         "ranking_id": str(ranking.ranking_id),
         "candidate_rank": ranking.candidate_rank
+    }), 200
+
+
+# ============ NOTIFICATION ROUTES ============
+
+@api.route('/notifications/<user_id>', methods=['GET'])
+def get_notifications(user_id):
+    """Get notifications for a user"""
+    notifications = Notification.query.filter_by(user_id=user_id).order_by(
+        Notification.created_at.desc()
+    ).limit(50).all()
+    return jsonify([{
+        "notification_id": str(n.notification_id),
+        "title": n.title,
+        "message": n.message,
+        "type": n.type,
+        "is_read": n.is_read,
+        "related_job_id": str(n.related_job_id) if n.related_job_id else None,
+        "related_job_title": n.related_job.title if n.related_job else None,
+        "created_at": n.created_at.isoformat(),
+    } for n in notifications]), 200
+
+
+@api.route('/notifications/<notification_id>/read', methods=['PATCH'])
+def mark_notification_read(notification_id):
+    """Mark a notification as read"""
+    n = Notification.query.get(notification_id)
+    if not n:
+        return jsonify({"error": "Not found"}), 404
+    n.is_read = True
+    db.session.commit()
+    return jsonify({"success": True}), 200
+
+
+@api.route('/notifications/read-all/<user_id>', methods=['PATCH'])
+def mark_all_notifications_read(user_id):
+    """Mark all notifications as read for a user"""
+    Notification.query.filter_by(user_id=user_id, is_read=False).update({"is_read": True})
+    db.session.commit()
+    return jsonify({"success": True}), 200
+
+
+# ============ APPLICATION STATUS / SHORTLIST ROUTES ============
+
+@api.route('/applications/<application_id>/status', methods=['PATCH'])
+def update_application_status(application_id):
+    """Update status of a job application (shortlist / reject / pending)"""
+    application = JobApplication.query.get(application_id)
+    if not application:
+        return jsonify({"error": "Application not found"}), 404
+
+    data = request.get_json()
+    new_status = data.get('status')
+    if new_status not in ('pending', 'shortlisted', 'rejected'):
+        return jsonify({"error": "Invalid status. Must be pending, shortlisted, or rejected."}), 400
+
+    old_status = application.status
+    application.status = new_status
+
+    # Create notification for the applicant if status changed
+    if new_status != old_status:
+        job = Job.query.get(application.job_id)
+        job_title = job.title if job else "a position"
+        recruiter = Recruiter.query.get(job.recruiter_id) if job else None
+        company = getattr(recruiter, 'company', None) or (recruiter.name if recruiter else None) or "the recruiter"
+
+        if new_status == 'shortlisted':
+            notif = Notification(
+                user_id=application.applicant_id,
+                title="🎉 You've been shortlisted!",
+                message=f"Congratulations! You have been shortlisted for {job_title} by {company}.",
+                type='shortlisted',
+                related_job_id=application.job_id,
+            )
+        elif new_status == 'rejected':
+            notif = Notification(
+                user_id=application.applicant_id,
+                title="Application Update",
+                message=f"Your application for {job_title} was not selected at this time. Keep applying!",
+                type='rejected',
+                related_job_id=application.job_id,
+            )
+        else:
+            notif = Notification(
+                user_id=application.applicant_id,
+                title="Application Status Update",
+                message=f"Your application for {job_title} status changed to: {new_status}.",
+                type='info',
+                related_job_id=application.job_id,
+            )
+        db.session.add(notif)
+
+    db.session.commit()
+    return jsonify({
+        "success": True,
+        "application_id": str(application.application_id),
+        "status": application.status,
+    }), 200
+
+
+@api.route('/jobs/<job_id>/application-status/<applicant_id>', methods=['GET'])
+def get_application_status(job_id, applicant_id):
+    """Get the status and application_id for a specific application"""
+    application = JobApplication.query.filter_by(
+        job_id=job_id, applicant_id=applicant_id
+    ).first()
+    if not application:
+        return jsonify({"error": "Application not found"}), 404
+    return jsonify({
+        "application_id": str(application.application_id),
+        "status": application.status,
     }), 200

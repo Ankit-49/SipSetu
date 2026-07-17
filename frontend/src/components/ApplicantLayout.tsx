@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/app/context/AuthContext";
 import { SipSetuLogo } from "@/components/SipSetuLogo";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const navItems = [
   { name: "Dashboard", href: "/applicant/dashboard", icon: LayoutDashboard },
@@ -29,8 +30,9 @@ export function ApplicantLayout({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       {/* Sidebar */}
       <aside className="w-64 bg-[#1E3A5F] flex flex-col flex-shrink-0" data-testid="applicant-sidebar">
-        <div className="h-16 flex items-center px-6">
+        <div className="h-16 flex items-center justify-between px-6">
           <SipSetuLogo className="text-white text-2xl font-bold tracking-tight" />
+          <NotificationBell />
         </div>
         
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">

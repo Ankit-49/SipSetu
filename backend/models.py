@@ -91,6 +91,7 @@ class JobApplication(db.Model):
     job_id = db.Column(UUID(as_uuid=True), db.ForeignKey('jobs.job_id', ondelete='CASCADE'), nullable=False)
     applicant_id = db.Column(UUID(as_uuid=True), db.ForeignKey('applicants.user_id', ondelete='CASCADE'), nullable=False)
     applied_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='pending', nullable=False)  # 'pending', 'shortlisted', 'rejected'
 
     __table_args__ = (
         db.UniqueConstraint('job_id', 'applicant_id', name='uq_job_applicant_application'),
@@ -105,3 +106,18 @@ class Ranking(db.Model):
     resume_id = db.Column(UUID(as_uuid=True), db.ForeignKey('resumes.resume_id', ondelete='CASCADE'), nullable=False)
     matching_score = db.Column(db.Float)
     candidate_rank = db.Column(db.Integer)
+
+class Notification(db.Model):
+    __tablename__ = 'notifications'
+    notification_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    title = db.Column(db.String(255), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    type = db.Column(db.String(50), default='info')  # 'info', 'success', 'warning', 'shortlisted', 'rejected'
+    is_read = db.Column(db.Boolean, default=False)
+    related_job_id = db.Column(UUID(as_uuid=True), db.ForeignKey('jobs.job_id', ondelete='SET NULL'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='notifications')
+    related_job = db.relationship('Job', foreign_keys=[related_job_id])
+
