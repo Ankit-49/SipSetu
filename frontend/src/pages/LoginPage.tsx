@@ -41,6 +41,9 @@ export default function LoginPage() {
         if (response.data.name) {
           localStorage.setItem("user_name", response.data.name);
         }
+        if (response.data.profile_image) {
+          localStorage.setItem("profile_image", response.data.profile_image);
+        }
       }
       
       if (userRole === "applicant") {

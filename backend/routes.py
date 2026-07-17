@@ -82,7 +82,8 @@ def login():
         "user_id": str(user.user_id),
         "role": user.role,
         "name": user.name,
-        "email": user.email
+        "email": user.email,
+        "profile_image": user.profile_image
     }), 200
 
 
@@ -107,7 +108,8 @@ def profile(user_id):
             "name": user.name,
             "role": user.role,
             "phone": user.phone,
-            "location": user.location
+            "location": user.location,
+            "profile_image": user.profile_image
         }
         if user.role == 'recruiter':
             result.update({
@@ -121,6 +123,8 @@ def profile(user_id):
         user.name = data.get('name', user.name)
         user.phone = data.get('phone', user.phone)
         user.location = data.get('location', user.location)
+        if 'profile_image' in data:
+            user.profile_image = data.get('profile_image')
         
         if user.role == 'recruiter':
             user.company = data.get('company', user.company)
@@ -883,6 +887,7 @@ def get_recruiter_candidates(recruiter_id):
             "applicant_name": r.resume.applicant.name or r.resume.applicant.email,
             "applicant_email": r.resume.applicant.email,
             "applicant_location": r.resume.applicant.location or "",
+            "applicant_profile_image": r.resume.applicant.profile_image,
             "matching_score": r.matching_score,
             "candidate_rank": r.candidate_rank,
             "resume_skills": [s.skill_name for s in r.resume.skills],

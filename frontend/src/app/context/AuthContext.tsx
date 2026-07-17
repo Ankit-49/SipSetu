@@ -45,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('user_id');
     localStorage.removeItem('user_role');
     localStorage.removeItem('user_name');
+    localStorage.removeItem('profile_image');
     localStorage.removeItem('company');
   };
 

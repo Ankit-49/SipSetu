@@ -26,6 +26,7 @@ def create_app():
         # Safe migration check: add status column to job_applications if not exists
         try:
             db.session.execute(db.text("ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'pending' NOT NULL"))
+            db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image TEXT"))
             db.session.commit()
         except Exception as e:
             db.session.rollback()

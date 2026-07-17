@@ -25,6 +25,7 @@ class User(db.Model):
     role = db.Column(db.String(20), nullable=False) # 'applicant' or 'recruiter'
     phone = db.Column(db.String(20), nullable=True)
     location = db.Column(db.String(255), nullable=True)
+    profile_image = db.Column(db.Text, nullable=True)
     
     __mapper_args__ = {
         'polymorphic_on': role,

@@ -21,6 +21,7 @@ export default function RecruiterProfile() {
     location: "",
     company: "",
     role: "", // This is the job title in the UI
+    profileImage: "",
   });
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export default function RecruiterProfile() {
           location: response.data.location || "",
           company: response.data.company || "",
           role: response.data.job_title || "",
+          profileImage: response.data.profile_image || "",
         });
       } catch (error) {
         console.error("Error fetching profile:", error);
@@ -60,6 +62,21 @@ export default function RecruiterProfile() {
     fetchProfile();
   }, []);
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast({ title: "Error", description: "Image must be less than 2MB", variant: "destructive" });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfile(prev => ({ ...prev, profileImage: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSave = async () => {
     const userId = localStorage.getItem("user_id");
     if (!userId) return;
@@ -73,9 +90,14 @@ export default function RecruiterProfile() {
         location: profile.location,
         company: profile.company,
         job_title: profile.role,
+        profile_image: profile.profileImage,
       });
       
       localStorage.setItem("user_name", `${profile.firstName} ${profile.lastName}`.trim());
+      if (profile.profileImage) {
+        localStorage.setItem("profile_image", profile.profileImage);
+        window.dispatchEvent(new Event("storage")); // Trigger layout update
+      }
       
       toast({
         title: "Success",
@@ -113,15 +135,24 @@ export default function RecruiterProfile() {
           <div className="flex flex-col md:flex-row gap-8 items-start">
             <div className="flex flex-col items-center space-y-4">
               <div className="relative group">
-                <Avatar className="h-32 w-32 border-4 border-white shadow-md">
-                  <AvatarImage src="" />
-                  <AvatarFallback className="bg-[#F97316] text-white text-3xl font-bold">
-                    {profile.firstName[0]}{profile.lastName[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <button className="absolute bottom-2 right-2 h-8 w-8 bg-[#1E3A5F] text-white rounded-full flex items-center justify-center shadow-lg hover:bg-[#1E3A5F]/90 transition-colors">
-                  <Camera className="h-4 w-4" />
-                </button>
+                <input 
+                  type="file" 
+                  id="profile-upload" 
+                  className="hidden" 
+                  accept="image/*"
+                  onChange={handleImageChange}
+                />
+                <label htmlFor="profile-upload" className="cursor-pointer block">
+                  <Avatar className="h-32 w-32 border-4 border-white shadow-md">
+                    <AvatarImage src={profile.profileImage} className="object-cover" />
+                    <AvatarFallback className="bg-[#F97316] text-white text-3xl font-bold">
+                      {profile.firstName[0]}{profile.lastName[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute bottom-2 right-2 h-8 w-8 bg-[#1E3A5F] text-white rounded-full flex items-center justify-center shadow-lg hover:bg-[#1E3A5F]/90 transition-colors pointer-events-none">
+                    <Camera className="h-4 w-4" />
+                  </div>
+                </label>
               </div>
               <p className="text-sm font-medium text-slate-500">JPG, GIF or PNG. Max size of 2MB.</p>
             </div>
