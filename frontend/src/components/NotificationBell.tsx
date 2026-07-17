@@ -109,7 +109,22 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-11 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200/80 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+        <>
+          {/* Mobile overlay backdrop */}
+          <div
+            className="fixed inset-0 bg-black/30 z-40 sm:hidden"
+            onClick={() => setOpen(false)}
+          />
+          <div className="
+            fixed bottom-0 left-0 right-0 z-50
+            sm:absolute sm:bottom-auto sm:left-auto sm:right-0 sm:top-11 sm:w-80
+            w-full bg-white
+            rounded-t-2xl sm:rounded-2xl
+            shadow-2xl border border-slate-200/80
+            overflow-hidden
+            animate-in fade-in slide-in-from-bottom-2 sm:slide-in-from-top-2
+            duration-200
+          ">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/80">
             <div className="flex items-center gap-2">
@@ -140,7 +155,7 @@ export function NotificationBell() {
           </div>
 
           {/* Notification list */}
-          <div className="max-h-[400px] overflow-y-auto divide-y divide-slate-100">
+          <div className="max-h-[60vh] sm:max-h-[400px] overflow-y-auto divide-y divide-slate-100">
             {notifications.length === 0 ? (
               <div className="py-10 px-4 text-center">
                 <Bell className="h-8 w-8 text-slate-200 mx-auto mb-2" />
@@ -175,6 +190,7 @@ export function NotificationBell() {
             )}
           </div>
         </div>
+        </>
       )}
     </div>
   );
