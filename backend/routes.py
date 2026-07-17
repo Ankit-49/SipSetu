@@ -254,6 +254,27 @@ def apply_for_job(job_id):
         application = JobApplication(job_id=job_id, applicant_id=applicant_id)
         db.session.add(application)
         created = True
+        
+        # Create notification for applicant
+        applicant_notif = Notification(
+            user_id=applicant_id,
+            title="Application Submitted",
+            message=f"You have successfully applied for '{job.title}'.",
+            type="success",
+            related_job_id=job_id
+        )
+        db.session.add(applicant_notif)
+        
+        # Create notification for recruiter
+        recruiter_notif = Notification(
+            user_id=job.recruiter_id,
+            title="New Job Application",
+            message=f"{applicant.name} has applied for your job '{job.title}'.",
+            type="info",
+            related_job_id=job_id
+        )
+        db.session.add(recruiter_notif)
+        
         db.session.flush()
 
     create_rankings_for_job(job_id)
