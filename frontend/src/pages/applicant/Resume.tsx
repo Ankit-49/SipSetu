@@ -250,9 +250,12 @@ function buildRawText(form: ResumeForm): string {
 export default function ApplicantResume() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   // The latest resume row for this applicant, or null if none exists.
   const [resume, setResume] = useState<any>(null);
@@ -264,6 +267,8 @@ export default function ApplicantResume() {
   // Builder form state
   const [form, setForm] = useState<ResumeForm>(EMPTY_FORM);
   const [skillDraft, setSkillDraft] = useState("");
+  // Track whether the user has made unsaved changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // ---------- data loading ----------
 
@@ -345,6 +350,7 @@ export default function ApplicantResume() {
 
   const removeSkill = (skill: string) => {
     setForm({ ...form, skills: form.skills.filter((s) => s !== skill) });
+    setHasUnsavedChanges(true);
   };
 
   const addEducation = () => {
@@ -352,6 +358,7 @@ export default function ApplicantResume() {
       ...form,
       education: [...form.education, { ...EMPTY_EDUCATION, id: uid() }],
     });
+    setHasUnsavedChanges(true);
   };
 
   const updateEducation = (id: string, patch: Partial<EducationEntry>) => {
@@ -359,10 +366,13 @@ export default function ApplicantResume() {
       ...form,
       education: form.education.map((e) => (e.id === id ? { ...e, ...patch } : e)),
     });
+    setHasUnsavedChanges(true);
   };
 
   const removeEducation = (id: string) => {
-    setForm({ ...form, education: form.education.filter((e) => e.id !== id) });
+    // Immediately remove from local state — do NOT re-fetch from server until user saves
+    setForm((prev) => ({ ...prev, education: prev.education.filter((e) => e.id !== id) }));
+    setHasUnsavedChanges(true);
   };
 
   const addExperience = () => {
@@ -370,6 +380,7 @@ export default function ApplicantResume() {
       ...form,
       experience: [...form.experience, { ...EMPTY_EXPERIENCE, id: uid() }],
     });
+    setHasUnsavedChanges(true);
   };
 
   const updateExperience = (id: string, patch: Partial<ExperienceEntry>) => {
@@ -377,10 +388,13 @@ export default function ApplicantResume() {
       ...form,
       experience: form.experience.map((e) => (e.id === id ? { ...e, ...patch } : e)),
     });
+    setHasUnsavedChanges(true);
   };
 
   const removeExperience = (id: string) => {
-    setForm({ ...form, experience: form.experience.filter((e) => e.id !== id) });
+    // Immediately remove from local state — do NOT re-fetch from server until user saves
+    setForm((prev) => ({ ...prev, experience: prev.experience.filter((e) => e.id !== id) }));
+    setHasUnsavedChanges(true);
   };
 
   // ---------- actions ----------
@@ -410,6 +424,9 @@ export default function ApplicantResume() {
     const skillsPayload = form.skills
       .map((s) => s.trim())
       .filter(Boolean);
+    // Capture current form state before save so we can restore it
+    // after fetchResume (prevents server-merged skills from overriding deletions).
+    const formSnapshot = { ...form };
 
     try {
       if (resume?.resume_id) {
@@ -420,8 +437,8 @@ export default function ApplicantResume() {
           skills: skillsPayload,
         });
         toast({
-          title: "Resume updated",
-          description: `${res.data.skill_count} skill${res.data.skill_count === 1 ? "" : "s"} detected. Your matches will refresh.`,
+          title: "Resume updated ✓",
+          description: `${res.data.skill_count} skill${res.data.skill_count === 1 ? "" : "s"} saved. Your matches will refresh.`,
         });
       } else {
         // First-time create
@@ -431,11 +448,21 @@ export default function ApplicantResume() {
           skills: skillsPayload,
         });
         toast({
-          title: "Resume created",
+          title: "Resume created ✓",
           description: `${res.data.skills_extracted.length} skill${res.data.skills_extracted.length === 1 ? "" : "s"} detected. Start applying to jobs!`,
         });
       }
-      await fetchResume();
+      // Only refresh the resume metadata (id, uploaded_at etc.) — do NOT
+      // re-parse raw_text from the server, which would merge back deleted
+      // entries from storedSkills. Keep the user's current form state.
+      const userId2 = localStorage.getItem("user_id");
+      if (userId2) {
+        const metaRes = await axios.get(`${API}/resumes?applicant_id=${userId2}`);
+        if (metaRes.data?.length > 0) setResume(metaRes.data[0]);
+      }
+      // Restore form snapshot so deletions remain visible without a full refetch
+      setForm(formSnapshot);
+      setHasUnsavedChanges(false);
     } catch (err: any) {
       toast({
         title: "Save failed",
@@ -447,41 +474,51 @@ export default function ApplicantResume() {
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      toast({ title: "Invalid file", description: "Please upload a PDF file.", variant: "destructive" });
+      return;
+    }
+    setPendingFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      toast({ title: "Invalid file", description: "Please drop a PDF file.", variant: "destructive" });
+      return;
+    }
+    setPendingFile(file);
+  };
+
+  const handleUploadConfirm = async () => {
+    if (!pendingFile) return;
     const userId = localStorage.getItem("user_id");
     if (!userId) {
       toast({ title: "Not logged in", variant: "destructive" });
       return;
     }
-
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      toast({
-        title: "Invalid file",
-        description: "Please upload a PDF file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setUploading(true);
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", pendingFile);
       formData.append("applicant_id", userId);
-
       const res = await axios.post(`${API}/resumes/upload-pdf`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-
       toast({
-        title: "Resume uploaded",
-        description: `${res.data.skill_count} skills extracted. You can now switch to the Build tab to fine-tune it.`,
+        title: "Resume uploaded ✓",
+        description: `${res.data.skill_count} skills extracted. Switching to Build tab to fine-tune.`,
       });
       await fetchResume();
       setActiveTab("builder");
+      setPendingFile(null);
     } catch (err: any) {
       toast({
         title: "Upload failed",
@@ -490,7 +527,6 @@ export default function ApplicantResume() {
       });
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -528,6 +564,11 @@ export default function ApplicantResume() {
           {resume && (
             <Badge variant="secondary" className="bg-green-50 text-green-700 border-green-200">
               <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Active
+            </Badge>
+          )}
+          {hasUnsavedChanges && (
+            <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200 animate-pulse">
+              Unsaved changes
             </Badge>
           )}
           <Button
@@ -874,13 +915,15 @@ export default function ApplicantResume() {
             <TabsContent value="upload" className="mt-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Replace with a PDF</CardTitle>
+                  <CardTitle>{resume ? "Replace Resume PDF" : "Upload Your Resume"}</CardTitle>
                   <CardDescription>
-                    Uploading a PDF will overwrite your current resume. After upload, switch to the
-                    Build tab to refine the extracted details.
+                    {resume
+                      ? "Drop a new PDF to replace your current resume. Skills are auto-extracted and matched."
+                      : "Upload your PDF resume and we'll extract your skills and experience automatically."}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  {/* Current resume info */}
                   {resume && (
                     <div className="p-4 border border-slate-200 rounded-xl bg-slate-50 flex items-start gap-4">
                       <div className="h-12 w-12 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
@@ -907,28 +950,76 @@ export default function ApplicantResume() {
                     </div>
                   )}
 
+                  {/* File preview before upload */}
+                  {pendingFile && !uploading && (
+                    <div className="p-4 border-2 border-[#1E3A5F]/40 rounded-xl bg-blue-50/60 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <div className="h-12 w-12 rounded-lg bg-[#1E3A5F]/10 flex items-center justify-center flex-shrink-0">
+                        <FileText className="h-6 w-6 text-[#1E3A5F]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-slate-900 truncate">{pendingFile.name}</p>
+                        <p className="text-sm text-slate-500">{(pendingFile.size / 1024).toFixed(1)} KB • PDF</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-slate-500 hover:text-red-600"
+                          onClick={() => setPendingFile(null)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="bg-[#1E3A5F] hover:bg-[#1E3A5F]/90 text-white"
+                          onClick={handleUploadConfirm}
+                        >
+                          <UploadCloud className="h-3.5 w-3.5 mr-1.5" /> Upload
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Drop zone */}
                   <div
-                    className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center text-center bg-slate-50/50 hover:bg-slate-50 transition-colors cursor-pointer group"
-                    onClick={() => fileInputRef.current?.click()}
+                    ref={dropZoneRef}
+                    className={`relative border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 ${
+                      isDragging
+                        ? "border-[#F97316] bg-orange-50/60 shadow-[0_0_0_4px_rgba(249,115,22,0.15)] scale-[1.01]"
+                        : "border-slate-300 bg-slate-50/50 hover:border-[#1E3A5F]/50 hover:bg-slate-50 hover:shadow-[0_0_0_3px_rgba(30,58,95,0.08)]"
+                    }`}
+                    onClick={() => !uploading && fileInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragEnter={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={(e) => { e.preventDefault(); if (!dropZoneRef.current?.contains(e.relatedTarget as Node)) setIsDragging(false); }}
+                    onDrop={handleDrop}
                   >
-                    <div className="h-12 w-12 rounded-full bg-blue-50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <div className={`h-14 w-14 rounded-full flex items-center justify-center mb-4 transition-all duration-300 ${
+                      isDragging ? "bg-orange-100 scale-110" : "bg-blue-50 group-hover:scale-110"
+                    }`}>
                       {uploading ? (
-                        <Loader2 className="h-6 w-6 text-[#1E3A5F] animate-spin" />
+                        <Loader2 className="h-7 w-7 text-[#1E3A5F] animate-spin" />
+                      ) : isDragging ? (
+                        <UploadCloud className="h-7 w-7 text-[#F97316]" />
                       ) : (
-                        <UploadCloud className="h-6 w-6 text-[#1E3A5F]" />
+                        <UploadCloud className="h-7 w-7 text-[#1E3A5F]" />
                       )}
                     </div>
-                    <h4 className="font-semibold text-slate-900">
+                    <h4 className={`font-semibold text-base ${ isDragging ? "text-[#F97316]" : "text-slate-900" }`}>
                       {uploading
                         ? "Analyzing your resume..."
+                        : isDragging
+                        ? "Release to upload"
+                        : pendingFile
+                        ? "Drop another file to replace"
                         : resume
-                        ? "Replace with new PDF"
-                        : "Upload a PDF to get started"}
+                        ? "Drop PDF here or click to browse"
+                        : "Drop your PDF here or click to browse"}
                     </h4>
-                    <p className="text-sm text-slate-500 mt-1 max-w-xs">
+                    <p className="text-sm text-slate-400 mt-1.5 max-w-xs">
                       {uploading
                         ? "Extracting skills and building your profile..."
-                        : "Click to browse and upload your PDF resume."}
+                        : "Only PDF files are accepted · Max 10 MB"}
                     </p>
                     <input
                       ref={fileInputRef}

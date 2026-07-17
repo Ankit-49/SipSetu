@@ -182,7 +182,7 @@ export default function RecruiterDashboardHome() {
               ))}
             </div>
             <div className="p-3 bg-slate-50 border-t border-slate-100 text-center rounded-b-xl">
-              <Link to="/recruiter/dashboard" className="text-sm font-medium text-[#1E3A5F] hover:underline">
+              <Link to="/recruiter/candidates" className="text-sm font-medium text-[#1E3A5F] hover:underline">
                 View all postings
               </Link>
             </div>

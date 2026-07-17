@@ -81,114 +81,138 @@ export default function RecruiterCandidates() {
         <p className="text-slate-500 mt-1">Applicants automatically scored and ranked against your job requirements.</p>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input 
-            placeholder="Search candidates or skills..." 
-            className="pl-9 bg-slate-50 border-slate-200"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-4">
-          <Select value={selectedJob} onValueChange={setSelectedJob}>
-            <SelectTrigger className="w-[180px] bg-slate-50">
-              <SelectValue placeholder="Filter by Job" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all-jobs">All Postings</SelectItem>
-              {jobs.map((job) => (
-                <SelectItem key={job.job_id} value={job.job_id}>{job.title}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={selectedScore} onValueChange={setSelectedScore}>
-            <SelectTrigger className="w-[150px] bg-slate-50">
-              <SelectValue placeholder="Min Score" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all-scores">Any Score</SelectItem>
-              <SelectItem value="70">70%+</SelectItem>
-              <SelectItem value="80">80%+</SelectItem>
-              <SelectItem value="90">90%+</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Sidebar */}
+        <div className="w-full lg:w-64 shrink-0 space-y-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-2">
+            <h3 className="font-semibold text-slate-900 mb-2">Job Postings</h3>
+            <Button 
+                variant={selectedJob === "all-jobs" ? "default" : "ghost"} 
+                className={`justify-start ${selectedJob === "all-jobs" ? "bg-[#1E3A5F] text-white hover:bg-[#1E3A5F]/90" : ""}`}
+                onClick={() => setSelectedJob("all-jobs")}
+            >
+                All Postings
+            </Button>
+            {jobs.map((job) => (
+                <Button 
+                    key={job.job_id} 
+                    variant={selectedJob === job.job_id ? "default" : "ghost"} 
+                    className={`justify-start text-left truncate w-full ${selectedJob === job.job_id ? "bg-[#1E3A5F] text-white hover:bg-[#1E3A5F]/90" : ""}`}
+                    onClick={() => setSelectedJob(job.job_id)}
+                    title={job.title}
+                >
+                    <span className="truncate">{job.title}</span>
+                </Button>
+            ))}
+          </div>
 
-      {/* Candidate List */}
-      <div className="space-y-4">
-        {selectedJob === "all-jobs" ? (
-          <Card className="p-8 text-center text-slate-500 flex flex-col items-center justify-center min-h-[200px]">
-            <Briefcase className="h-8 w-8 text-slate-400 mb-2" />
-            <p className="font-medium text-slate-700">No Job Selected</p>
-            <p className="text-sm mt-1">Please select a job posting from the dropdown menu to view ranked candidates.</p>
-          </Card>
-        ) : filteredCandidates.length === 0 ? (
-          <Card className="p-8 text-center text-slate-500">No candidates found for the selected filters.</Card>
-        ) : filteredCandidates.map((candidate, i) => (
-          <Card key={candidate.ranking_id} className="overflow-hidden hover:shadow-md transition-all duration-300 animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: `${i * 50}ms` }}>
-            <CardContent className="p-0">
-              <div className="flex flex-col md:flex-row items-stretch">
-                {/* Rank & Score (Left Sidebar) */}
-                <div className="flex md:flex-col items-center justify-between md:justify-center md:w-32 p-4 md:p-6 bg-slate-50 border-b md:border-b-0 md:border-r border-slate-100 shrink-0">
-                  {selectedJob !== "all-jobs" && (
-                    <div className="text-sm font-bold text-slate-400 mb-1">RANK #{i + 1}</div>
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-4">
+             <h3 className="font-semibold text-slate-900">Filters</h3>
+             <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">Minimum Match Score</label>
+                <Select value={selectedScore} onValueChange={setSelectedScore}>
+                  <SelectTrigger className="w-full bg-slate-50">
+                    <SelectValue placeholder="Min Score" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all-scores">Any Score</SelectItem>
+                    <SelectItem value="70">70%+</SelectItem>
+                    <SelectItem value="80">80%+</SelectItem>
+                    <SelectItem value="90">90%+</SelectItem>
+                  </SelectContent>
+                </Select>
+             </div>
+          </div>
+        </div>
+
+        {/* Main Content (Candidate List) */}
+        <div className="flex-1 space-y-4">
+          {selectedJob === "all-jobs" ? (
+            <Card className="p-8 text-center text-slate-500 flex flex-col items-center justify-center min-h-[200px]">
+              <Briefcase className="h-8 w-8 text-slate-400 mb-2" />
+              <p className="font-medium text-slate-700">No Job Selected</p>
+              <p className="text-sm mt-1">Please select a job posting from the sidebar to view ranked candidates.</p>
+            </Card>
+          ) : filteredCandidates.length === 0 ? (
+            <Card className="p-8 text-center text-slate-500">No candidates found for the selected filters.</Card>
+          ) : filteredCandidates.map((candidate, i) => {
+            const score = candidate.matching_score;
+            
+            const radius = 30;
+            const circumference = 2 * Math.PI * radius;
+            const strokeDashoffset = circumference - (score / 100) * circumference;
+            
+            let strokeColor = "text-red-500";
+            if (score >= 90) strokeColor = "text-green-500";
+            else if (score >= 80) strokeColor = "text-lime-500";
+            else if (score >= 70) strokeColor = "text-yellow-500";
+            else if (score >= 50) strokeColor = "text-orange-500";
+
+            let rankColor = "text-slate-500 bg-slate-100";
+            let rankText = `RANK #${i + 1}`;
+            if (i === 0) { rankColor = "text-yellow-700 bg-yellow-100 border-yellow-300"; rankText = "1st Place"; }
+            else if (i === 1) { rankColor = "text-slate-700 bg-slate-200 border-slate-400"; rankText = "2nd Place"; }
+            else if (i === 2) { rankColor = "text-amber-800 bg-amber-100 border-amber-300"; rankText = "3rd Place"; }
+
+            return (
+            <Card key={candidate.ranking_id} className="overflow-hidden hover:shadow-md transition-all duration-300 animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: `${i * 50}ms` }}>
+              <CardContent className="p-0 flex flex-row items-stretch">
+                {/* Left: Rank */}
+                <div className="w-24 md:w-32 p-4 flex flex-col items-center justify-center bg-slate-50 border-r border-slate-100 shrink-0">
+                  {selectedJob !== "all-jobs" ? (
+                    <div className={`text-center font-bold px-3 py-1 rounded-full border text-xs md:text-sm ${rankColor}`}>
+                      {rankText}
+                    </div>
+                  ) : (
+                    <div className="text-sm font-bold text-slate-400">#{i + 1}</div>
                   )}
-                  <div className={`text-3xl font-extrabold ${candidate.matching_score >= 85 ? 'text-green-600' : candidate.matching_score >= 75 ? 'text-orange-500' : 'text-slate-600'}`}>
-                    {Number(candidate.matching_score).toFixed(2)}<span className="text-base">%</span>
-                  </div>
-                  <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mt-1">Match</div>
                 </div>
 
-                {/* Main Content */}
-                <div className="flex-1 p-4 md:p-6 flex flex-col justify-center">
-                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
-                    <div className="flex items-center gap-4">
-                      <Avatar className="h-12 w-12 border border-slate-200">
-                        <AvatarFallback className="bg-[#1E3A5F] text-white font-semibold">
-                          {candidate.applicant_name.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <h3 className="font-bold text-lg text-slate-900">{candidate.applicant_name}</h3>
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 mt-1">
-                          <span className="flex items-center gap-1"><Briefcase className="h-3.5 w-3.5" /> {candidate.job_title}</span>
-                          <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {candidate.applicant_location || "Location not provided"}</span>
-                          <span className="flex items-center gap-1 text-[#1E3A5F] font-medium">{candidate.applicant_email}</span>
-                        </div>
+                {/* Middle: Applicant Details */}
+                <div className="flex-1 p-4 md:p-6 flex flex-col justify-center min-w-0">
+                  <div className="flex items-start gap-4">
+                    <Avatar className="h-12 w-12 border border-slate-200 shrink-0 mt-1">
+                      <AvatarFallback className="bg-[#1E3A5F] text-white font-semibold">
+                        {candidate.applicant_name.split(' ').map(n => n[0]).join('')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-bold text-lg text-slate-900 truncate">{candidate.applicant_name}</h3>
+                      {(candidate as any).applicant_description && (
+                        <p className="text-sm text-slate-600 mt-1 line-clamp-2">
+                          {(candidate as any).applicant_description}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 mt-2">
+                        <span className="flex items-center gap-1 text-[#1E3A5F] font-medium"><Mail className="h-3.5 w-3.5" /> {candidate.applicant_email}</span>
+                        <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {candidate.applicant_location || "Not provided"}</span>
                       </div>
                     </div>
-                    <Badge className={candidate.matching_score >= 85 ? 'bg-green-100 text-green-700 hover:bg-green-100 border-none' : candidate.matching_score >= 75 ? 'bg-orange-100 text-orange-700 hover:bg-orange-100 border-none' : 'bg-slate-100 text-slate-700 hover:bg-slate-100 border-none'}>
-                      {Number(candidate.matching_score).toFixed(2)}% Match
-                    </Badge>
-                  </div>
-
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-auto">
-                    <div className="flex flex-wrap gap-2">
-                      {candidate.resume_skills.map(skill => (
-                        <Badge key={skill} variant="secondary" className="bg-slate-100 text-slate-700 font-normal border border-slate-200/50">
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
-                    
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button variant="outline" size="icon" className="h-9 w-9 text-slate-500 border-slate-200" title="Email Candidate" onClick={() => window.location.href = `mailto:${candidate.applicant_email}`}>
-                        <Mail className="h-4 w-4" />
-                      </Button>
-                      <Button className="h-9 bg-[#1E3A5F] hover:bg-[#1E3A5F]/90 text-white gap-2">
-                        <Briefcase className="h-4 w-4" /> {candidate.resume_skills.length} Skills
-                      </Button>
-                    </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+
+                {/* Right: Match Score */}
+                <div className="w-28 md:w-32 p-4 flex flex-col items-center justify-center border-l border-slate-100 shrink-0 bg-white">
+                   <div className="relative inline-flex items-center justify-center">
+                     <svg className="transform -rotate-90 w-16 h-16 md:w-20 md:h-20">
+                       <circle cx="50%" cy="50%" r={radius} stroke="currentColor" strokeWidth="6" fill="transparent" className="text-slate-100" />
+                       <circle 
+                         cx="50%" cy="50%" r={radius} stroke="currentColor" strokeWidth="6" fill="transparent" 
+                         strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} 
+                         className={`${strokeColor} transition-all duration-1000 ease-out`} 
+                         strokeLinecap="round" 
+                       />
+                     </svg>
+                     <div className="absolute flex flex-col items-center justify-center">
+                       <span className="text-sm md:text-lg font-bold text-slate-700">{Math.round(score)}%</span>
+                     </div>
+                   </div>
+                   <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-2">Match</div>
+                </div>
+              </CardContent>
+            </Card>
+          )})}
+        </div>
       </div>
     </div>
   );
