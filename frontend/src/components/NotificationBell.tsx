@@ -16,7 +16,9 @@ interface Notification {
 }
 
 function timeAgo(isoString: string): string {
-  const diff = Date.now() - new Date(isoString).getTime();
+  // Ensure the timestamp is parsed as UTC if it lacks timezone info
+  const dateStr = isoString.endsWith('Z') ? isoString : `${isoString}Z`;
+  const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return "Just now";
   if (mins < 60) return `${mins}m ago`;
