@@ -5,9 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MapPin, Briefcase, Mail, Loader2, Star, X, RotateCcw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import axios from "axios";
-
-const API = "http://localhost:5000/api";
+import api from "@/lib/api";
+import { useAuth } from "@/app/context/AuthContext";
 
 type Candidate = {
   ranking_id: string;
@@ -25,6 +24,7 @@ type Candidate = {
 };
 
 export default function RecruiterCandidates() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState("all-jobs");
   const [selectedScore, setSelectedScore] = useState("all-scores");
@@ -33,8 +33,7 @@ export default function RecruiterCandidates() {
   const [shortlisting, setShortlisting] = useState<string | null>(null);
 
   useEffect(() => {
-    const userId = localStorage.getItem("user_id");
-    if (!userId) {
+    if (!user) {
       setLoading(false);
       return;
     }
@@ -47,7 +46,7 @@ export default function RecruiterCandidates() {
         if (selectedJob !== "all-jobs") params.set("job_id", selectedJob);
         if (selectedScore !== "all-scores") params.set("min_score", selectedScore);
 
-        const response = await axios.get(`${API}/recruiters/${userId}/candidates?${params.toString()}`);
+        const response = await api.get(`/recruiters/${user.id}/candidates?${params.toString()}`);
         setCandidates(response.data.candidates || []);
         setJobs(response.data.jobs || []);
       } catch (err) {
@@ -59,7 +58,7 @@ export default function RecruiterCandidates() {
     };
 
     fetchCandidates();
-  }, [selectedJob, selectedScore]);
+  }, [user, selectedJob, selectedScore]);
 
   const updateStatus = async (candidate: Candidate, newStatus: "shortlisted" | "rejected" | "pending") => {
     if (!candidate.application_id) {
@@ -68,7 +67,7 @@ export default function RecruiterCandidates() {
     }
     setShortlisting(candidate.application_id);
     try {
-      await axios.patch(`${API}/applications/${candidate.application_id}/status`, { status: newStatus });
+      await api.patch(`/applications/${candidate.application_id}/status`, { status: newStatus });
       setCandidates((prev) =>
         prev.map((c) =>
           c.application_id === candidate.application_id ? { ...c, application_status: newStatus } : c

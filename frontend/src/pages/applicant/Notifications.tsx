@@ -3,9 +3,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Bell, CheckCheck, Star, XCircle, Info, Calendar } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import axios from "axios";
-
-const API = "http://localhost:5000/api";
+import api from "@/lib/api";
+import { useAuth } from "@/app/context/AuthContext";
 
 interface Notification {
   notification_id: string;
@@ -18,14 +17,14 @@ interface Notification {
 }
 
 export default function ApplicantNotifications() {
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const userId = localStorage.getItem("user_id");
 
   const fetchNotifications = async () => {
-    if (!userId) return;
+    if (!user) return;
     try {
-      const res = await axios.get(`${API}/notifications/${userId}`);
+      const res = await api.get(`/notifications/${user.id}`);
       setNotifications(res.data);
     } catch {
       toast({ title: "Failed to load notifications", variant: "destructive" });
@@ -36,12 +35,12 @@ export default function ApplicantNotifications() {
 
   useEffect(() => {
     fetchNotifications();
-  }, []);
+  }, [user]);
 
   const markAllRead = async () => {
-    if (!userId) return;
+    if (!user) return;
     try {
-      await axios.patch(`${API}/notifications/read-all/${userId}`);
+      await api.patch(`/notifications/read-all/${user.id}`);
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       toast({ title: "All notifications marked as read ✓" });
     } catch {
@@ -51,7 +50,7 @@ export default function ApplicantNotifications() {
 
   const markRead = async (id: string) => {
     try {
-      await axios.patch(`${API}/notifications/${id}/read`);
+      await api.patch(`/notifications/${id}/read`);
       setNotifications((prev) =>
         prev.map((n) => (n.notification_id === id ? { ...n, is_read: true } : n))
       );

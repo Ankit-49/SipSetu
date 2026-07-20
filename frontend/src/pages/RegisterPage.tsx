@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,9 +11,11 @@ import Lottie from "lottie-react";
 import loginAnimation from "@/imports/Login.json";
 import { VisualBackground } from "@/components/VisualBackground";
 import { SipSetuLogo } from "@/components/SipSetuLogo";
+import { useAuth } from "@/app/context/AuthContext";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const { register } = useAuth();
   const searchParams = new URLSearchParams(window.location.search);
   const initialRole = searchParams.get('role') || 'applicant';
   const [role, setRole] = React.useState(initialRole);
@@ -22,6 +23,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,42 +32,30 @@ export default function RegisterPage() {
       setError("Password must be at least 8 characters long.");
       return;
     }
+    setSubmitting(true);
     try {
-      const response = await axios.post("http://127.0.0.1:5000/api/auth/register", {
-        name,
-        email,
-        password,
-        role
-      });
-      
-      const userId = response.data.user_id;
-      if (userId) {
-        localStorage.setItem("user_id", userId);
-        localStorage.setItem("user_role", role);
-        localStorage.setItem("user_name", name);
-      }
-      
-      // Auto-login after registration could go here
-      // For now just redirect
+      await register(name, email, password, role as "applicant" | "recruiter");
       if (role === "applicant") {
-        navigate("/applicant/dashboard");
+        navigate("/applicant/dashboard", { replace: true });
       } else {
-        navigate("/recruiter/dashboard");
+        navigate("/recruiter/dashboard", { replace: true });
       }
     } catch (err: any) {
       console.error("Registration error:", err);
       const message = err.response?.data?.error || err.message || "Registration failed. Please check if the backend is running.";
       setError(message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden selection:bg-[#F97316] selection:text-white">
       <VisualBackground />
-      
+
       <div className="w-full max-w-5xl flex items-center justify-between gap-12 relative z-10">
         {/* Animation Side (Hidden on small screens) */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8 }}
@@ -74,9 +64,9 @@ export default function RegisterPage() {
           <div className="w-full max-w-lg drop-shadow-2xl">
             <Lottie
               animationData={loginAnimation}
-              loop={true}
-              autoplay={true}
-              style={{ width: '100%', height: 'auto', transform: 'scaleX(-1)' }} // Mirror it for variety
+              loop
+              autoplay
+              style={{ width: '100%', height: 'auto', transform: 'scaleX(-1)' }}
             />
           </div>
         </motion.div>
@@ -97,61 +87,58 @@ export default function RegisterPage() {
               <CardDescription>Join SipSetu to start your journey</CardDescription>
             </CardHeader>
             <CardContent>
-          <form onSubmit={handleRegister} className="space-y-6">
-            <div className="space-y-2">
-              <Label className="text-slate-600 text-xs uppercase tracking-wider font-semibold">I am a</Label>
-              <ToggleGroup 
-                type="single" 
-                value={role} 
-                onValueChange={(v) => v && setRole(v)}
-                className="justify-start w-full bg-slate-100 p-1 rounded-xl"
-              >
-                <ToggleGroupItem 
-                  value="applicant" 
-                  className={`flex-1 rounded-lg data-[state=on]:bg-[#1E3A5F] data-[state=on]:text-black ${role !== 'applicant' && 'hover:bg-slate-200 text-slate-600'}`}
-                >
-                  Job Seeker
-                </ToggleGroupItem>
-                <ToggleGroupItem 
-                  value="recruiter" 
-                  className={`flex-1 rounded-lg data-[state=on]:bg-[#1E3A5F] data-[state=on]:text-black ${role !== 'recruiter' && 'hover:bg-slate-200 text-slate-600'}`}
-                >
-                  Recruiter
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
+              <form onSubmit={handleRegister} className="space-y-6">
+                <div className="space-y-2">
+                  <Label className="text-slate-600 text-xs uppercase tracking-wider font-semibold">I am a</Label>
+                  <ToggleGroup
+                    type="single"
+                    value={role}
+                    onValueChange={(v) => v && setRole(v)}
+                    className="justify-start w-full bg-slate-100 p-1 rounded-xl"
+                  >
+                    <ToggleGroupItem value="applicant"
+                      className={`flex-1 rounded-lg data-[state=on]:bg-[#1E3A5F] data-[state=on]:text-black ${role !== 'applicant' ? 'hover:bg-slate-200 text-slate-600' : 'text-white'}`}>
+                      Job Seeker
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="recruiter"
+                      className={`flex-1 rounded-lg data-[state=on]:bg-[#1E3A5F] data-[state=on]:text-black ${role !== 'recruiter' ? 'hover:bg-slate-200 text-slate-600' : 'text-white'}`}>
+                      Recruiter
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
 
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <Input id="name" type="text" placeholder="John Doe" value={name} onChange={(e) => setName(e.target.value)} required className="h-11" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-11" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="h-11" />
-              </div>
-            </div>
-            {error && <p className="text-red-500 text-sm">{error}</p>}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Full Name</Label>
+                    <Input id="name" type="text" placeholder="John Doe" value={name} onChange={(e) => setName(e.target.value)} required className="h-11" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-11" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="h-11" />
+                  </div>
+                </div>
 
-            <Button type="submit" className="w-full h-11 text-base bg-[#1E3A5F] hover:bg-[#1E3A5F]/90">
-              Create Account
-            </Button>
+                {error && <p className="text-red-500 text-sm">{error}</p>}
 
-            <div className="text-center text-sm text-slate-600">
-              Already have an account?{" "}
-              <Link to={`/login`} className="font-medium text-[#1E3A5F] hover:underline">
-                Sign in
-              </Link>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </motion.div>
-  </div>
-</div>
+                <Button type="submit" disabled={submitting} className="w-full h-11 text-base bg-[#1E3A5F] hover:bg-[#1E3A5F]/90">
+                  {submitting ? "Creating account..." : "Create Account"}
+                </Button>
+
+                <div className="text-center text-sm text-slate-600">
+                  Already have an account?{" "}
+                  <Link to="/login" className="font-medium text-[#1E3A5F] hover:underline">
+                    Sign in
+                  </Link>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+    </div>
   );
 }

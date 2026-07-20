@@ -5,25 +5,24 @@ import { Briefcase, Users, UserCheck, TrendingUp, ChevronRight, FileText } from 
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
 import { NotificationBell } from "@/components/NotificationBell";
-import axios from "axios";
-
-const API = "http://localhost:5000/api";
+import api from "@/lib/api";
+import { useAuth } from "@/app/context/AuthContext";
 
 export default function RecruiterDashboardHome() {
+  const { user } = useAuth();
   const date = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
-    const userId = localStorage.getItem("user_id");
-    if (!userId) {
+    if (!user) {
       setLoading(false);
       return;
     }
 
     const fetchDashboard = async () => {
       try {
-        const response = await axios.get(`${API}/recruiters/${userId}/dashboard`);
+        const response = await api.get(`/recruiters/${user.id}/dashboard`);
         setData(response.data);
       } catch (err) {
         console.error("Failed to fetch recruiter dashboard", err);
@@ -32,11 +31,11 @@ export default function RecruiterDashboardHome() {
       }
     };
     fetchDashboard();
-  }, []);
+  }, [user]);
 
   const topCandidates = data?.top_candidates || [];
   const activeJobs = data?.jobs || [];
-  const userName = data?.name || localStorage.getItem("user_name") || "Recruiter";
+  const userName = data?.name || user?.name || localStorage.getItem("user_name") || "Recruiter";
 
   if (loading) {
     return (

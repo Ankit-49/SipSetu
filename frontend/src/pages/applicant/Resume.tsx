@@ -24,9 +24,8 @@ import {
   Download,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import axios from "axios";
-
-const API = "http://localhost:5000/api";
+import api from "@/lib/api";
+import { useAuth } from "@/app/context/AuthContext";
 
 // ----- Structured resume types -----
 
@@ -288,9 +287,8 @@ export default function ApplicantResume() {
     if (!userId) {
       setLoading(false);
       return;
-    }
-    try {
-      const res = await axios.get(`${API}/resumes?applicant_id=${userId}`);
+    }      try {
+          const res = await api.get(`/resumes?applicant_id=${userId}`);
       if (res.data && res.data.length > 0) {
         const latest = res.data[0];
         setResume(latest);
@@ -300,7 +298,7 @@ export default function ApplicantResume() {
         // (the raw_text alone is unstructured for a PDF, so the parser
         // would otherwise leave the skill list empty).
         try {
-          const detail = await axios.get(`${API}/resumes/${latest.resume_id}`);
+          const detail = await api.get(`/resumes/${latest.resume_id}`);
           const profileName = localStorage.getItem("user_name");
           const storedSkills: string[] = (detail.data.skills as string[]) || latest.skills || [];
           setForm(
@@ -442,7 +440,7 @@ export default function ApplicantResume() {
     try {
       if (resume?.resume_id) {
         // Update existing resume
-        const res = await axios.put(`${API}/resumes/${resume.resume_id}`, {
+        const res = await api.put(`/resumes/${resume.resume_id}`, {
           raw_text: rawText,
           file_path: resume.file_path || null,
           skills: skillsPayload,
@@ -453,7 +451,7 @@ export default function ApplicantResume() {
         });
       } else {
         // First-time create
-        const res = await axios.post(`${API}/resumes`, {
+        const res = await api.post("/resumes", {
           applicant_id: userId,
           raw_text: rawText,
           skills: skillsPayload,
@@ -468,7 +466,7 @@ export default function ApplicantResume() {
       // entries from storedSkills. Keep the user's current form state.
       const userId2 = localStorage.getItem("user_id");
       if (userId2) {
-        const metaRes = await axios.get(`${API}/resumes?applicant_id=${userId2}`);
+        const metaRes = await api.get(`/resumes?applicant_id=${userId2}`);
         if (metaRes.data?.length > 0) setResume(metaRes.data[0]);
       }
       // Restore form snapshot so deletions remain visible without a full refetch
@@ -521,7 +519,7 @@ export default function ApplicantResume() {
       const formData = new FormData();
       formData.append("file", pendingFile);
       formData.append("applicant_id", userId);
-      const res = await axios.post(`${API}/resumes/upload-pdf`, formData, {
+      const res = await api.post("/resumes/upload-pdf", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       toast({

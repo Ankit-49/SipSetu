@@ -3,12 +3,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ExternalLink, Target, CheckCircle2, ChevronDown, ChevronUp, Loader2, UploadCloud } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect } from "react"
+import { useAuth } from "@/app/context/AuthContext";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Link } from "react-router";
-import axios from "axios";
-
-const API = "http://localhost:5000/api";
+import api from "@/lib/api";
+import { useAuth } from "@/app/context/AuthContext";
 
 const LEARNING_RESOURCES: Record<string, string[]> = {
   "typescript": ["TypeScript Handbook (official)", "Udemy: TypeScript Bootcamp", "Frontend Masters: TypeScript"],
@@ -32,6 +32,7 @@ function getResources(skill: string): string[] {
 }
 
 export default function ApplicantSkillGap() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<any[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string>("all");
@@ -40,13 +41,11 @@ export default function ApplicantSkillGap() {
   const [hasResume, setHasResume] = useState(true);
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
 
-  const userId = localStorage.getItem("user_id");
-
   // Fetch all jobs for dropdown
   useEffect(() => {
     const fetchJobs = async () => {
       try {
-        const res = await axios.get(`${API}/jobs?per_page=50`);
+        const res = await api.get("/jobs?per_page=50");
         setJobs(res.data.jobs || []);
       } catch (err) {
         console.error("Failed to load jobs", err);
@@ -59,16 +58,15 @@ export default function ApplicantSkillGap() {
 
   // Fetch skill gap data
   useEffect(() => {
-    if (!userId) return;
+    if (!user) return;
     const fetchGap = async () => {
       setGapLoading(true);
       try {
         const url = selectedJobId === "all"
-          ? `${API}/applicants/${userId}/skill-gap`
-          : `${API}/applicants/${userId}/skill-gap?job_id=${selectedJobId}`;
-        const res = await axios.get(url);
+          ? `/applicants/${user.id}/skill-gap`
+          : `/applicants/${user.id}/skill-gap?job_id=${selectedJobId}`;
+        const res = await api.get(url);
         setGapData(res.data);
-        // Auto-open first item
         if (res.data.missing_skills?.length > 0) {
           setOpenItems({ [res.data.missing_skills[0].skill]: true });
         }
@@ -81,7 +79,7 @@ export default function ApplicantSkillGap() {
       }
     };
     fetchGap();
-  }, [selectedJobId, userId]);
+  }, [selectedJobId, user]);
 
   const toggleItem = (skill: string) => {
     setOpenItems(prev => ({ ...prev, [skill]: !prev[skill] }));

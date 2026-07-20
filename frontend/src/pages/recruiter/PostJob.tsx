@@ -1,5 +1,4 @@
 import { useState } from "react";
-import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { X, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import api from "@/lib/api";
 
 export default function RecruiterPostJob() {
   const { toast } = useToast();
@@ -49,10 +49,8 @@ export default function RecruiterPostJob() {
     }
     setIsSubmitting(true);
     try {
-      // In a real app, recruiter_id would come from auth context
-      const recruiter_id = localStorage.getItem("user_id") || "00000000-0000-0000-0000-000000000000"; 
-      await axios.post("http://localhost:5000/api/jobs", {
-        recruiter_id,
+      // recruiter_id is extracted from JWT on the backend — no need to send it
+      await api.post("/jobs", {
         title,
         description,
         skills,

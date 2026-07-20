@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import api from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Camera, MapPin, Phone, Mail, User, Building, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/app/context/AuthContext";
 
 export default function RecruiterProfile() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,18 +27,17 @@ export default function RecruiterProfile() {
   });
 
   useEffect(() => {
-    const userId = localStorage.getItem("user_id");
-    if (!userId) {
+    if (!user) {
       setLoading(false);
       return;
     }
 
     const fetchProfile = async () => {
       try {
-        const response = await axios.get(`http://127.0.0.1:5000/api/profile/${userId}`);
+        const response = await api.get(`/profile/${user.id}`);
         const fullName = response.data.name || "";
         const [firstName, ...lastNameParts] = fullName.split(" ");
-        
+
         setProfile({
           firstName: firstName || "",
           lastName: lastNameParts.join(" ") || "",
@@ -60,7 +61,7 @@ export default function RecruiterProfile() {
     };
 
     fetchProfile();
-  }, []);
+  }, [user]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -78,12 +79,11 @@ export default function RecruiterProfile() {
   };
 
   const handleSave = async () => {
-    const userId = localStorage.getItem("user_id");
-    if (!userId) return;
+    if (!user) return;
 
     setSaving(true);
     try {
-      await axios.put(`http://127.0.0.1:5000/api/profile/${userId}`, {
+      await api.put(`/profile/${user.id}`, {
         name: `${profile.firstName} ${profile.lastName}`.trim(),
         email: profile.email,
         phone: profile.phone,
@@ -92,13 +92,13 @@ export default function RecruiterProfile() {
         job_title: profile.role,
         profile_image: profile.profileImage,
       });
-      
+
       localStorage.setItem("user_name", `${profile.firstName} ${profile.lastName}`.trim());
       if (profile.profileImage) {
         localStorage.setItem("profile_image", profile.profileImage);
         window.dispatchEvent(new Event("storage")); // Trigger layout update
       }
-      
+
       toast({
         title: "Success",
         description: "Profile updated successfully.",

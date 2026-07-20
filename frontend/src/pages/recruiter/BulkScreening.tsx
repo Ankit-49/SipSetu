@@ -12,11 +12,8 @@ import {
   Trash2, 
   Sparkles, 
   AlertCircle, 
-  CheckCircle2, 
   FileText, 
   ChevronRight, 
-  Info, 
-  Search, 
   Award,
   BookOpen,
   Briefcase,
@@ -24,7 +21,7 @@ import {
   UserCheck,
   RefreshCw
 } from "lucide-react";
-import axios from "axios";
+import api, { API_BASE } from "@/lib/api";
 import confetti from "canvas-confetti";
 
 interface CandidateResult {
@@ -85,7 +82,7 @@ export default function RecruiterBulkScreening() {
     const fetchJobs = async () => {
       try {
         const userId = localStorage.getItem("user_id");
-        const response = await axios.get("http://localhost:5000/api/jobs", {
+        const response = await api.get("/jobs", {
           params: {
             recruiter_id: userId,
             per_page: 100
@@ -230,7 +227,7 @@ export default function RecruiterBulkScreening() {
     }, 450);
 
     try {
-      const response = await axios.post("http://localhost:5000/api/recruiters/bulk-screen", formData, {
+      const response = await api.post("/recruiters/bulk-screen", formData, {
         headers: {
           "Content-Type": "multipart/form-data"
         }

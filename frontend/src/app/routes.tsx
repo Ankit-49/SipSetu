@@ -4,6 +4,7 @@ import PreviewPage from "../pages/PreviewPage";
 import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
 import NotFound from "../pages/not-found";
+import { ProtectedRoute } from "../components/ProtectedRoute";
 
 // Applicant
 import { ApplicantLayout } from "../components/ApplicantLayout";
@@ -27,21 +28,105 @@ export const router = createBrowserRouter([
   { path: "/login", Component: LoginPage },
   { path: "/register", Component: RegisterPage },
 
-  // Applicant Routes
-  { path: "/applicant", Component: () => <Navigate to="/applicant/dashboard" replace /> },
-  { path: "/applicant/dashboard", Component: () => <ApplicantLayout><ApplicantDashboardHome /></ApplicantLayout> },
-  { path: "/applicant/resume", Component: () => <ApplicantLayout><ApplicantResume /></ApplicantLayout> },
-  { path: "/applicant/matches", Component: () => <ApplicantLayout><ApplicantJobMatches /></ApplicantLayout> },
-  { path: "/applicant/skill-gap", Component: () => <ApplicantLayout><ApplicantSkillGap /></ApplicantLayout> },
-  { path: "/applicant/profile", Component: () => <ApplicantLayout><ApplicantProfile /></ApplicantLayout> },
+  // Applicant Routes (protected — require applicant role)
+  {
+    path: "/applicant",
+    Component: () => (
+      <ProtectedRoute requiredRole="applicant">
+        <Navigate to="/applicant/dashboard" replace />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/applicant/dashboard",
+    Component: () => (
+      <ProtectedRoute requiredRole="applicant">
+        <ApplicantLayout><ApplicantDashboardHome /></ApplicantLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/applicant/resume",
+    Component: () => (
+      <ProtectedRoute requiredRole="applicant">
+        <ApplicantLayout><ApplicantResume /></ApplicantLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/applicant/matches",
+    Component: () => (
+      <ProtectedRoute requiredRole="applicant">
+        <ApplicantLayout><ApplicantJobMatches /></ApplicantLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/applicant/skill-gap",
+    Component: () => (
+      <ProtectedRoute requiredRole="applicant">
+        <ApplicantLayout><ApplicantSkillGap /></ApplicantLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/applicant/profile",
+    Component: () => (
+      <ProtectedRoute requiredRole="applicant">
+        <ApplicantLayout><ApplicantProfile /></ApplicantLayout>
+      </ProtectedRoute>
+    ),
+  },
 
-  // Recruiter Routes
-  { path: "/recruiter", Component: () => <Navigate to="/recruiter/dashboard" replace /> },
-  { path: "/recruiter/dashboard", Component: () => <RecruiterLayout><RecruiterDashboardHome /></RecruiterLayout> },
-  { path: "/recruiter/post-job", Component: () => <RecruiterLayout><RecruiterPostJob /></RecruiterLayout> },
-  { path: "/recruiter/candidates", Component: () => <RecruiterLayout><RecruiterCandidates /></RecruiterLayout> },
-  { path: "/recruiter/bulk-screen", Component: () => <RecruiterLayout><RecruiterBulkScreening /></RecruiterLayout> },
-  { path: "/recruiter/profile", Component: () => <RecruiterLayout><RecruiterProfile /></RecruiterLayout> },
+  // Recruiter Routes (protected — require recruiter role)
+  {
+    path: "/recruiter",
+    Component: () => (
+      <ProtectedRoute requiredRole="recruiter">
+        <Navigate to="/recruiter/dashboard" replace />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/recruiter/dashboard",
+    Component: () => (
+      <ProtectedRoute requiredRole="recruiter">
+        <RecruiterLayout><RecruiterDashboardHome /></RecruiterLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/recruiter/post-job",
+    Component: () => (
+      <ProtectedRoute requiredRole="recruiter">
+        <RecruiterLayout><RecruiterPostJob /></RecruiterLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/recruiter/candidates",
+    Component: () => (
+      <ProtectedRoute requiredRole="recruiter">
+        <RecruiterLayout><RecruiterCandidates /></RecruiterLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/recruiter/bulk-screen",
+    Component: () => (
+      <ProtectedRoute requiredRole="recruiter">
+        <RecruiterLayout><RecruiterBulkScreening /></RecruiterLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/recruiter/profile",
+    Component: () => (
+      <ProtectedRoute requiredRole="recruiter">
+        <RecruiterLayout><RecruiterProfile /></RecruiterLayout>
+      </ProtectedRoute>
+    ),
+  },
 
   { path: "*", Component: NotFound },
 ]);

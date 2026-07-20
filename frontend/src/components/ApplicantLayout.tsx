@@ -21,20 +21,28 @@ export function ApplicantLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user } = useAuth();
   const [profileImage, setProfileImage] = useState<string>(() => localStorage.getItem("profile_image") || "");
   const [userName, setUserName] = useState<string>(() => localStorage.getItem("user_name") || "Applicant");
-  const [userRole, setUserRole] = useState<string>(() => localStorage.getItem("user_role") || "applicant");
 
-  // Listen for localStorage changes dispatched after profile save
+  // Sync from AuthContext whenever user changes and listen for storage events
+  useEffect(() => {
+    if (user) {
+      setProfileImage(user.profile_image || localStorage.getItem("profile_image") || "");
+      setUserName(user.name || localStorage.getItem("user_name") || "Applicant");
+    }
+  }, [user]);
+
   useEffect(() => {
     const handleStorage = () => {
       setProfileImage(localStorage.getItem("profile_image") || "");
       setUserName(localStorage.getItem("user_name") || "Applicant");
-      setUserRole(localStorage.getItem("user_role") || "applicant");
     };
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
+
+  const userRole = user?.role || localStorage.getItem("user_role") || "applicant";
 
   // Close sidebar on route change (mobile)
   useEffect(() => {

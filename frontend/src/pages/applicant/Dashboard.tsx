@@ -1,18 +1,12 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { 
-  Briefcase, 
-  TrendingUp, 
-  FileText, 
-  CheckCircle2, 
+import {
+  Briefcase,
+  FileText,
   UploadCloud,
   ChevronRight,
-  Clock,
-  Building,
-  MapPin,
-  Star,
   Target,
   Zap,
   Sparkles,
@@ -21,25 +15,24 @@ import {
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
 import { NotificationBell } from "@/components/NotificationBell";
-import axios from "axios";
-
-const API = "http://localhost:5000/api";
+import api from "@/lib/api";
+import { useAuth } from "@/app/context/AuthContext";
 
 export default function ApplicantDashboardHome() {
+  const { user } = useAuth();
   const date = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
-    const userId = localStorage.getItem("user_id");
-    if (!userId) {
+    if (!user) {
       setLoading(false);
       return;
     }
 
     const fetchDashboard = async () => {
       try {
-        const response = await axios.get(`${API}/applicants/${userId}/dashboard`);
+        const response = await api.get(`/applicants/${user.id}/dashboard`);
         setData(response.data);
       } catch (err) {
         console.error("Failed to fetch applicant dashboard", err);
@@ -48,19 +41,11 @@ export default function ApplicantDashboardHome() {
       }
     };
     fetchDashboard();
-  }, []);
+  }, [user]);
 
-  const userName = data?.name || localStorage.getItem("user_name") || "Applicant";
+  const userName = data?.name || user?.name || localStorage.getItem("user_name") || "Applicant";
   const firstName = userName.split(" ")[0];
   const recentJobs = data?.recent_jobs || [];
-
-  if (loading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-[#F97316]" />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">

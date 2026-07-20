@@ -6,12 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, MapPin, Clock, Briefcase, Send, Loader2, UploadCloud } from "lucide-react";
 import { Link } from "react-router";
-import axios from "axios";
+import api from "@/lib/api";
+import { useAuth } from "@/app/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
-const API = "http://localhost:5000/api";
-
 export default function ApplicantJobMatches() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [locationFilter, setLocationFilter] = useState("all");
@@ -22,20 +22,14 @@ export default function ApplicantJobMatches() {
   const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
 
   useEffect(() => {
-    const userId = localStorage.getItem("user_id");
-    if (!userId) { setLoading(false); return; }
+    if (!user) { setLoading(false); return; }
 
     const fetchMatches = async () => {
       try {
-        const matchesRes = await axios.get(`${API}/applicants/${userId}/matched-jobs?per_page=100`);
+        const matchesRes = await api.get(`/applicants/${user.id}/matched-jobs?per_page=100`);
 
         const jobsData = matchesRes.data.matched_jobs || [];
-        setJobs(jobsData.map((job: any) => ({
-          ...job,
-          applied: Boolean(job.applied),
-        })));
-        // Keep this in sync so the disabled "Apply" button + the "Applied" label
-        // are correct without a second network call.
+        setJobs(jobsData.map((job: any) => ({ ...job, applied: Boolean(job.applied) })));
         setAppliedJobIds(jobsData.filter((j: any) => j.applied).map((j: any) => String(j.job_id)));
         if (matchesRes.data.resume_id === null) setHasResume(false);
       } catch (err) {
@@ -46,7 +40,7 @@ export default function ApplicantJobMatches() {
       }
     };
     fetchMatches();
-  }, []);
+  }, [user]);
 
   const filteredJobs = jobs.filter(j => {
     const matchesSearch = j.title.toLowerCase().includes(search.toLowerCase())
@@ -76,14 +70,13 @@ export default function ApplicantJobMatches() {
   };
 
   const handleApply = async (jobId: string) => {
-    const userId = localStorage.getItem("user_id");
-    if (!userId || applyingJobId === jobId || appliedJobIds.includes(jobId)) {
+    if (!user || applyingJobId === jobId || appliedJobIds.includes(jobId)) {
       return;
     }
 
     setApplyingJobId(jobId);
     try {
-      await axios.post(`${API}/jobs/${jobId}/apply`, { applicant_id: userId });
+      await api.post(`/jobs/${jobId}/apply`, { applicant_id: user.id });
       setAppliedJobIds((prev) => [...prev, jobId]);
       const job = jobs.find(j => String(j.job_id) === String(jobId));
       toast({

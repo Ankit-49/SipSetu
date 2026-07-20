@@ -1,9 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Bell, X, CheckCheck, Briefcase, Star, XCircle, Info } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import axios from "axios";
-
-const API = "http://localhost:5000/api";
+import api from "@/lib/api";
 
 interface Notification {
   notification_id: string;
@@ -16,7 +13,6 @@ interface Notification {
 }
 
 function timeAgo(isoString: string): string {
-  // Ensure the timestamp is parsed as UTC if it lacks timezone info
   const dateStr = isoString.endsWith('Z') ? isoString : `${isoString}Z`;
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
@@ -52,7 +48,7 @@ export function NotificationBell() {
   const fetchNotifications = async () => {
     if (!userId) return;
     try {
-      const res = await axios.get(`${API}/notifications/${userId}`);
+      const res = await api.get(`/notifications/${userId}`);
       setNotifications(res.data);
     } catch {
       // silently fail
@@ -79,14 +75,14 @@ export function NotificationBell() {
   const markAllRead = async () => {
     if (!userId) return;
     try {
-      await axios.patch(`${API}/notifications/read-all/${userId}`);
+      await api.patch(`/notifications/read-all/${userId}`);
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     } catch {}
   };
 
   const markRead = async (id: string) => {
     try {
-      await axios.patch(`${API}/notifications/${id}/read`);
+      await api.patch(`/notifications/${id}/read`);
       setNotifications((prev) =>
         prev.map((n) => (n.notification_id === id ? { ...n, is_read: true } : n))
       );
