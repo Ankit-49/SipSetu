@@ -8,7 +8,6 @@ import { useAuth } from "@/app/context/AuthContext";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Link } from "react-router";
 import api from "@/lib/api";
-import { useAuth } from "@/app/context/AuthContext";
 
 const LEARNING_RESOURCES: Record<string, string[]> = {
   "typescript": ["TypeScript Handbook (official)", "Udemy: TypeScript Bootcamp", "Frontend Masters: TypeScript"],

@@ -14,8 +14,11 @@ def create_app():
     # Load configuration from Config class
     app.config.from_object(Config)
 
-    # Configure Database
-    app.config['SQLALCHEMY_DATABASE_URI'] = Config.DATABASE_URL
+    # Configure Database — read from environment AFTER load_dotenv() so
+    # the .env file takes effect (Config is evaluated at import time,
+    # before load_dotenv runs, so its default is always used).
+    db_url = os.environ.get('DATABASE_URL') or Config.DATABASE_URL
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     db.init_app(app)
