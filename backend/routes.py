@@ -602,7 +602,7 @@ def get_applicant_applications(applicant_id):
         return jsonify({"error": "Applicant not found"}), 404
 
     applications = JobApplication.query.filter_by(applicant_id=applicant_id)\
-        .order_by(JobApplication.created_at.desc()).all()
+        .order_by(JobApplication.applied_at.desc()).all()
 
     latest_resume = Resume.query.filter_by(applicant_id=applicant_id)\
         .order_by(Resume.uploaded_at.desc()).first()
@@ -634,7 +634,7 @@ def get_applicant_applications(applicant_id):
             "recruiter_name": job.recruiter.name or "",
             "recruiter_company": job.recruiter.company or "",
             "status": app.status,
-            "applied_at": app.created_at.isoformat() if app.created_at else None,
+            "applied_at": app.applied_at.isoformat() if app.applied_at else None,
             "matching_score": round(score, 2),
         })
 
