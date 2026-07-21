@@ -515,14 +515,52 @@ def apply_for_job(job_id):
 @api.route('/applicants/<applicant_id>/applications', methods=['GET'])
 @_ownership_required
 def get_applicant_applications(applicant_id):
-    """Get the job ids that an applicant has already applied to."""
+    """Get all applications for the applicant with full job details, status, and matching scores."""
     applicant = Applicant.query.get(applicant_id)
     if not applicant:
         return jsonify({"error": "Applicant not found"}), 404
-    applications = JobApplication.query.filter_by(applicant_id=applicant_id).all()
+
+    applications = JobApplication.query.filter_by(applicant_id=applicant_id)\
+        .order_by(JobApplication.created_at.desc()).all()
+
+    latest_resume = Resume.query.filter_by(applicant_id=applicant_id)\
+        .order_by(Resume.uploaded_at.desc()).first()
+
+    result = []
+    for app in applications:
+        job = Job.query.get(app.job_id)
+        if not job:
+            continue
+
+        job_data = format_job(job)
+
+        # Calculate matching score
+        score = 0.0
+        if latest_resume:
+            score = float(_compute_job_match_score(latest_resume, job) or 0.0)
+
+        result.append({
+            "application_id": str(app.application_id),
+            "job_id": str(job.job_id),
+            "title": job.title,
+            "description": job.description,
+            "location": job.location or "",
+            "job_type": job.job_type or "",
+            "experience_level": job.experience_level or "",
+            "salary_min": job_data.get("salary_min"),
+            "salary_max": job_data.get("salary_max"),
+            "skills": job_data.get("skills", []),
+            "recruiter_name": job.recruiter.name or "",
+            "recruiter_company": job.recruiter.company or "",
+            "status": app.status,
+            "applied_at": app.created_at.isoformat() if app.created_at else None,
+            "matching_score": round(score, 2),
+        })
+
     return jsonify({
         "applicant_id": str(applicant.user_id),
-        "job_ids": [str(a.job_id) for a in applications],
+        "total": len(result),
+        "applications": result,
     }), 200
 
 

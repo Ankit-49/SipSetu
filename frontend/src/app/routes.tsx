@@ -14,6 +14,7 @@ import ApplicantResume from "../pages/applicant/Resume";
 import ApplicantJobMatches from "../pages/applicant/JobMatches";
 import ApplicantSkillGap from "../pages/applicant/SkillGap";
 import ApplicantProfile from "../pages/applicant/Profile";
+import ApplicantMyApplications from "../pages/applicant/MyApplications";
 
 // Recruiter
 import { RecruiterLayout } from "../components/RecruiterLayout";
@@ -68,6 +69,14 @@ export const router = createBrowserRouter([
     Component: () => (
       <ProtectedRoute requiredRole="applicant">
         <ApplicantLayout><ApplicantSkillGap /></ApplicantLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/applicant/applications",
+    Component: () => (
+      <ProtectedRoute requiredRole="applicant">
+        <ApplicantLayout><ApplicantMyApplications /></ApplicantLayout>
       </ProtectedRoute>
     ),
   },
