@@ -76,9 +76,9 @@ def send_email(
         return False
 
 
-def send_password_reset_email(to: str, reset_url: str, name: str = "User") -> bool:
-    """Send a password reset email with a clickable link."""
-    subject = "Reset your SipSetu password"
+def send_password_reset_otp(to: str, otp: str, name: str = "User") -> bool:
+    """Send a password reset email with a 6-digit OTP code."""
+    subject = "Your SipSetu password reset code"
     html = f"""\
 <!DOCTYPE html>
 <html>
@@ -97,20 +97,17 @@ def send_password_reset_email(to: str, reset_url: str, name: str = "User") -> bo
             <td style="padding: 32px 24px;">
               <h2 style="color: #1E3A5F; font-size: 20px; margin: 0 0 8px;">Password reset request</h2>
               <p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0 0 24px;">
-                Hi {name}, we received a request to reset your SipSetu password. Click the button below to set a new one. This link expires in 1 hour.
+                Hi {name}, we received a request to reset your SipSetu password. Use the code below to verify your identity. This code expires in 10 minutes.
               </p>
               <table cellpadding="0" cellspacing="0" style="margin: 0 auto 24px;">
                 <tr>
-                  <td style="background: #F97316; border-radius: 8px; text-align: center;">
-                    <a href="{reset_url}" style="display: inline-block; padding: 14px 32px; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; letter-spacing: 0.3px;">Reset Password</a>
+                  <td style="background: #f1f5f9; border-radius: 12px; padding: 24px 40px; letter-spacing: 12px; text-align: center;">
+                    <span style="font-size: 36px; font-weight: 800; color: #1E3A5F; font-family: 'Courier New', monospace;">{otp}</span>
                   </td>
                 </tr>
               </table>
-              <p style="color: #64748b; font-size: 13px; line-height: 1.5; margin: 0 0 4px;">
-                Or copy this link into your browser:
-              </p>
-              <p style="color: #1E3A5F; font-size: 12px; word-break: break-all; margin: 0;">
-                {reset_url}
+              <p style="color: #64748b; font-size: 13px; line-height: 1.5; margin: 0;">
+                Enter this code on the password reset page to confirm your identity and set a new password.
               </p>
             </td>
           </tr>
@@ -131,9 +128,11 @@ def send_password_reset_email(to: str, reset_url: str, name: str = "User") -> bo
     text = f"""\
 Hi {name},
 
-We received a request to reset your SipSetu password. Click the link below to set a new one. This link expires in 1 hour.
+We received a request to reset your SipSetu password. Your verification code is:
 
-{reset_url}
+{otp}
+
+This code expires in 10 minutes. Enter it on the password reset page to set a new password.
 
 If you didn't request this, you can safely ignore this email.
 """

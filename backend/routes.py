@@ -23,9 +23,10 @@ from routes_common import (
 )
 from ranking_ml import get_ranking_model_status, train_ranking_model
 from auth_middleware import create_token, extract_token as _extract_token, decode_token as _decode_token, require_auth, require_role
-from utils.email import send_password_reset_email
+from utils.email import send_password_reset_otp
 from config import Config
 import secrets
+import random
 from datetime import datetime, timedelta
 
 api = Blueprint('api', __name__)
@@ -63,7 +64,7 @@ def _ownership_required(f):
 
 @api.route('/auth/forgot-password', methods=['POST'])
 def forgot_password():
-    """Send a password reset email with a one-time link."""
+    """Send a password reset OTP to the user's email."""
     data = request.get_json()
     email = (data or {}).get('email', '').strip().lower()
 
@@ -75,48 +76,100 @@ def forgot_password():
     # Always return 200 even if email not found (prevent email enumeration)
     if not user:
         return jsonify({
-            "message": "If that email is registered, a password reset link has been sent."
+            "message": "If that email is registered, an OTP has been sent."
         }), 200
 
-    # Generate a secure random token
-    token = secrets.token_urlsafe(48)
-    expires_at = datetime.utcnow() + timedelta(hours=Config.RESET_TOKEN_EXPIRY_HOURS)
+    # Generate a 6-digit OTP
+    otp = str(random.randint(100000, 999999))
+    otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
 
-    # Invalidate any existing unused tokens for this user
+    # Store the OTP as the token in PasswordResetToken (expires in 10 min)
     PasswordResetToken.query.filter_by(user_id=user.user_id, used=False).update({"used": True})
     db.session.flush()
 
     reset_token = PasswordResetToken(
         user_id=user.user_id,
-        token=token,
-        expires_at=expires_at,
+        token=otp,
+        expires_at=otp_expires_at,
     )
     db.session.add(reset_token)
     db.session.commit()
 
-    reset_url = f"{Config.FRONTEND_URL}/reset-password?token={token}"
     name = user.name or email.split('@')[0]
-    send_password_reset_email(to=email, reset_url=reset_url, name=name)
+    send_password_reset_otp(to=email, otp=otp, name=name)
 
     return jsonify({
-        "message": "If that email is registered, a password reset link has been sent."
+        "message": "If that email is registered, an OTP has been sent."
+    }), 200
+
+
+@api.route('/auth/verify-reset-otp', methods=['POST'])
+def verify_reset_otp():
+    """Verify the OTP and return a temporary reset token for setting a new password."""
+    data = request.get_json()
+    email = (data or {}).get('email', '').strip().lower()
+    otp = (data or {}).get('otp', '').strip()
+
+    if not email or not otp:
+        return jsonify({"error": "Email and OTP are required"}), 400
+
+    if len(otp) != 6 or not otp.isdigit():
+        return jsonify({"error": "OTP must be a 6-digit code"}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    # Find the matching OTP token
+    reset_token = PasswordResetToken.query.filter_by(
+        user_id=user.user_id, token=otp, used=False
+    ).first()
+
+    if not reset_token:
+        return jsonify({"error": "Invalid OTP. Please check and try again."}), 400
+
+    if datetime.utcnow() > reset_token.expires_at:
+        reset_token.used = True
+        db.session.commit()
+        return jsonify({"error": "OTP has expired. Please request a new one."}), 400
+
+    # OTP is valid — issue a temporary token that can be used once to reset the password
+    temp_token = secrets.token_urlsafe(32)
+    temp_expires_at = datetime.utcnow() + timedelta(minutes=30)
+
+    # Store the temp token using the existing model (overwrite the OTP)
+    reset_token.token = temp_token
+    reset_token.expires_at = temp_expires_at
+    db.session.commit()
+
+    return jsonify({
+        "message": "OTP verified successfully.",
+        "reset_token": temp_token,
+        "email": email,
     }), 200
 
 
 @api.route('/auth/reset-password', methods=['POST'])
 def reset_password():
-    """Reset the password using a valid reset token."""
+    """Reset the password using a temp token (issued after OTP verification)."""
     data = request.get_json()
     token = (data or {}).get('token', '').strip()
+    email = (data or {}).get('email', '').strip().lower()
     new_password = (data or {}).get('password', '')
 
-    if not token or not new_password:
-        return jsonify({"error": "Token and password are required"}), 400
+    if not token or not new_password or not email:
+        return jsonify({"error": "Token, email, and password are required"}), 400
 
     if len(new_password) < 8:
         return jsonify({"error": "Password must be at least 8 characters long"}), 400
 
-    reset_token = PasswordResetToken.query.filter_by(token=token, used=False).first()
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    reset_token = PasswordResetToken.query.filter_by(
+        user_id=user.user_id, token=token, used=False
+    ).first()
 
     if not reset_token:
         return jsonify({"error": "Invalid or expired reset token."}), 400
@@ -124,13 +177,9 @@ def reset_password():
     if datetime.utcnow() > reset_token.expires_at:
         reset_token.used = True
         db.session.commit()
-        return jsonify({"error": "Reset token has expired. Please request a new one."}), 400
+        return jsonify({"error": "Reset token has expired. Please request a new OTP."}), 400
 
     # Update the password
-    user = User.query.get(reset_token.user_id)
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-
     user.password_hash = generate_password_hash(new_password)
     reset_token.used = True
     db.session.commit()
