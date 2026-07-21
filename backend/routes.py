@@ -534,6 +534,82 @@ def get_job(job_id):
         return jsonify({"error": "Job not found"}), 404
     return jsonify(format_job(job)), 200
 
+
+@api.route('/jobs/<job_id>', methods=['PUT'])
+@require_auth
+def update_job(job_id):
+    """Update a job posting (recruiter who owns the job only)."""
+    job = Job.query.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    # Only the recruiter who owns the job can update it
+    if str(job.recruiter_id) != g.current_user_id:
+        return jsonify({"error": "You can only edit your own job postings"}), 403
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    # Update scalar fields
+    if 'title' in data:
+        job.title = data['title']
+    if 'description' in data:
+        job.description = data.get('description', '')
+    if 'location' in data:
+        job.location = data.get('location', '')
+    if 'job_type' in data:
+        job.job_type = data.get('job_type', '')
+    if 'experience_level' in data:
+        job.experience_level = data.get('experience_level', '')
+    if 'salary_min' in data:
+        job.salary_min = float(data['salary_min']) if data['salary_min'] else None
+    if 'salary_max' in data:
+        job.salary_max = float(data['salary_max']) if data['salary_max'] else None
+
+    # Update skills
+    if 'skills' in data and isinstance(data['skills'], list):
+        job.skills.clear()
+        db.session.flush()
+        for skill_name in data['skills']:
+            if not skill_name.strip():
+                continue
+            skill = Skill.query.filter_by(skill_name=skill_name.lower()).first()
+            if not skill:
+                skill = Skill(skill_name=skill_name.lower())
+                db.session.add(skill)
+            if skill not in job.skills:
+                job.skills.append(skill)
+
+    db.session.commit()
+    create_rankings_for_job(job.job_id)
+
+    return jsonify({
+        "message": "Job updated successfully",
+        "job_id": str(job.job_id),
+        "title": job.title,
+        "skills": [s.skill_name for s in job.skills],
+    }), 200
+
+
+@api.route('/jobs/<job_id>', methods=['DELETE'])
+@require_auth
+def delete_job(job_id):
+    """Delete a job posting (recruiter who owns the job only)."""
+    job = Job.query.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    # Only the recruiter who owns the job can delete it
+    if str(job.recruiter_id) != g.current_user_id:
+        return jsonify({"error": "You can only delete your own job postings"}), 403
+
+    db.session.delete(job)
+    db.session.commit()
+
+    return jsonify({"message": "Job deleted successfully"}), 200
+
+
 # ============ RESUME & MATCHING ROUTES ============
 
 @api.route('/resumes/<resume_id>', methods=['GET', 'PUT', 'DELETE'])
