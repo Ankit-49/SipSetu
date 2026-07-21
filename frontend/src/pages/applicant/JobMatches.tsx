@@ -53,8 +53,8 @@ export default function ApplicantJobMatches() {
   const locations = Array.from(new Set(jobs.map(j => j.location).filter(Boolean)));
 
   const formatSalary = (job: any) => {
-    if (job.salary_min && job.salary_max) return `Rs.${Math.round(job.salary_min)}-${Math.round(job.salary_max)} LPA`;
-    if (job.salary_min) return `Rs.${Math.round(job.salary_min)}+ LPA`;
+    if (job.salary_min && job.salary_max) return `NPR ${Math.round(job.salary_min)} - ${Math.round(job.salary_max)} LPA`;
+    if (job.salary_min) return `NPR ${Math.round(job.salary_min)}+ LPA`;
     return null;
   };
 

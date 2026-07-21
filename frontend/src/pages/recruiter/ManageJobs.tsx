@@ -517,9 +517,14 @@ export default function RecruiterManageJobs() {
                           variant="secondary"
                           className="bg-green-50 text-green-700 border-green-200 text-xs whitespace-nowrap"
                         >
-                          <DollarSign className="h-3 w-3 mr-0.5" />
-                          {job.salary_min ? `₹${Number(job.salary_min).toLocaleString()}` : "₹0"}
-                          {job.salary_max ? ` - ₹${Number(job.salary_max).toLocaleString()}` : ""}
+                          NPR
+                          {job.salary_min
+                            ? ` ${Number(job.salary_min).toLocaleString()}`
+                            : " 0"}
+                          {job.salary_max
+                            ? ` - ${Number(job.salary_max).toLocaleString()}`
+                            : ""}
+                          {" LPA"}
                         </Badge>
                       )}
                       <div className="flex items-center gap-2">

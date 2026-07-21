@@ -193,27 +193,27 @@ export default function RecruiterPostJob() {
               </div>
 
               <div className="space-y-2">
-                <Label>Salary Range </Label>
+                <Label>Salary Range (LPA)</Label>
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">₹</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium text-xs">NPR</span>
                     <Input
                       type="number"
                       value={salaryMin}
                       onChange={(e) => setSalaryMin(e.target.value)}
                       placeholder="Min"
-                      className="h-11 pl-7"
+                      className="h-11 pl-10"
                     />
                   </div>
                   <span className="text-slate-400">-</span>
                   <div className="relative flex-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">₹</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium text-xs">NPR</span>
                     <Input
                       type="number"
                       value={salaryMax}
                       onChange={(e) => setSalaryMax(e.target.value)}
                       placeholder="Max"
-                      className="h-11 pl-7"
+                      className="h-11 pl-10"
                     />
                   </div>
                 </div>
