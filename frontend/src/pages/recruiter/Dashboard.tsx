@@ -1,46 +1,18 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Briefcase, Users, UserCheck, TrendingUp, ChevronRight, FileText, Pencil, Trash2, Loader2, X, Plus, Save } from "lucide-react";
+import { Briefcase, Users, UserCheck, TrendingUp, ChevronRight, FileText, Plus, ExternalLink } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
 import { NotificationBell } from "@/components/NotificationBell";
-import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import { useAuth } from "@/app/context/AuthContext";
 
 export default function RecruiterDashboardHome() {
   const { user } = useAuth();
   const date = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
-  const [editJob, setEditJob] = useState<any>(null);
-  const [deleteJobId, setDeleteJobId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -60,66 +32,6 @@ export default function RecruiterDashboardHome() {
       console.error("Failed to fetch recruiter dashboard", err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleEditJob = (job: any) => {
-    setEditJob({
-      job_id: job.job_id,
-      title: job.title || "",
-      description: job.description || "",
-      location: job.location || "",
-      job_type: job.job_type || "",
-      experience_level: job.experience_level || "",
-      salary_min: job.salary_min || "",
-      salary_max: job.salary_max || "",
-      skills: job.skills?.join(", ") || "",
-    });
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editJob) return;
-    setSaving(true);
-    try {
-      const skillsArray = editJob.skills
-        ? editJob.skills.split(",").map((s: string) => s.trim()).filter(Boolean)
-        : [];
-
-      await api.put(`/jobs/${editJob.job_id}`, {
-        title: editJob.title,
-        description: editJob.description,
-        location: editJob.location,
-        job_type: editJob.job_type,
-        experience_level: editJob.experience_level,
-        salary_min: editJob.salary_min || null,
-        salary_max: editJob.salary_max || null,
-        skills: skillsArray,
-      });
-
-      toast({ title: "Job updated successfully", variant: "default" });
-      setEditJob(null);
-      await fetchDashboard();
-    } catch (err: any) {
-      const msg = err?.response?.data?.error || "Failed to update job";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeleteJob = async () => {
-    if (!deleteJobId) return;
-    setDeleting(true);
-    try {
-      await api.delete(`/jobs/${deleteJobId}`);
-      toast({ title: "Job deleted successfully", variant: "default" });
-      setDeleteJobId(null);
-      await fetchDashboard();
-    } catch (err: any) {
-      const msg = err?.response?.data?.error || "Failed to delete job";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -429,7 +341,7 @@ export default function RecruiterDashboardHome() {
               {activeJobs.length === 0 ? (
                 <div className="p-8 text-center text-slate-500">No active job postings yet.</div>
               ) : activeJobs.map((post: any) => (
-                <div key={post.job_id} className="p-4 hover:bg-slate-50 transition-colors group">
+                <div key={post.job_id} className="p-4 hover:bg-slate-50 transition-colors">
                   <div className="flex justify-between items-start mb-2">
                     <h4 className="font-semibold text-slate-900">{post.title}</h4>
                     <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-200">Active</Badge>
@@ -438,42 +350,18 @@ export default function RecruiterDashboardHome() {
                     <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {data?.total_candidates ?? 0} Candidates</span>
                     <span>{post.created_at ? new Date(post.created_at).toLocaleDateString() : "Recent"}</span>
                   </div>
-                  {/* Edit / Delete actions */}
-                  <div className="mt-3 pt-3 border-t border-slate-50 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-slate-500 hover:text-[#1E3A5F] hover:bg-blue-50 gap-1.5"
-                      onClick={() => handleEditJob(post)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" /> Edit
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-slate-500 hover:text-red-600 hover:bg-red-50 gap-1.5"
-                      onClick={() => setDeleteJobId(post.job_id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" /> Delete
-                    </Button>
-                  </div>
                 </div>
               ))}
             </div>
             <div className="p-3 bg-slate-50 border-t border-slate-100 text-center rounded-b-xl">
-              <Link to="/recruiter/candidates" className="text-sm font-medium text-[#1E3A5F] hover:underline">
-                View all postings
+              <Link to="/recruiter/jobs" className="text-sm font-medium text-[#1E3A5F] hover:underline inline-flex items-center gap-1">
+                Manage Jobs <ExternalLink className="h-3 w-3" />
               </Link>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Edit Modal */}
-      {renderEditModal()}
-
-      {/* Delete Confirmation */}
-      {renderDeleteDialog()}
     </div>
   );
 }
