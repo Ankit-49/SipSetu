@@ -12,6 +12,8 @@ import loginAnimation from "@/imports/Login.json";
 import { VisualBackground } from "@/components/VisualBackground";
 import { SipSetuLogo } from "@/components/SipSetuLogo";
 import { useAuth } from "@/app/context/AuthContext";
+import { usePasswordStrength } from "@/hooks/use-password-strength";
+import { PasswordStrengthIndicator } from "@/components/PasswordStrengthIndicator";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -24,12 +26,13 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const passwordStrength = usePasswordStrength(password);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters long.");
+    if (passwordStrength.score < 40) {
+      setError("Please choose a stronger password. Enable at least 3 requirements below.");
       return;
     }
     setSubmitting(true);
@@ -119,6 +122,7 @@ export default function RegisterPage() {
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
                     <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="h-11" />
+                    <PasswordStrengthIndicator strength={passwordStrength} />
                   </div>
                 </div>
 
