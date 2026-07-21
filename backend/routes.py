@@ -1,5 +1,5 @@
 from flask import Blueprint, Flask, request, jsonify, g
-from models import db, User, Applicant, Recruiter, Job, JobApplication, Resume, Skill, Ranking, Notification, PasswordResetToken
+from models import db, User, Applicant, Recruiter, Job, JobApplication, Resume, Skill, Ranking, Notification, PasswordResetToken, EmailVerificationToken
 from werkzeug.security import generate_password_hash, check_password_hash
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -23,7 +23,7 @@ from routes_common import (
 )
 from ranking_ml import get_ranking_model_status, train_ranking_model
 from auth_middleware import create_token, extract_token as _extract_token, decode_token as _decode_token, require_auth, require_role
-from utils.email import send_password_reset_otp
+from utils.email import send_password_reset_otp, send_verification_email
 from config import Config
 import secrets
 import random
@@ -222,18 +222,33 @@ def register():
         )
 
     db.session.add(new_user)
+    db.session.flush()
+
+    # Generate email verification token
+    verification_token_str = secrets.token_urlsafe(32)
+    verification_expires = datetime.utcnow() + timedelta(hours=24)
+    verification = EmailVerificationToken(
+        user_id=new_user.user_id,
+        token=verification_token_str,
+        expires_at=verification_expires,
+    )
+    db.session.add(verification)
     db.session.commit()
+
+    # Send verification email (async-friendly; runs inline for now)
+    send_verification_email(to=email, token=verification_token_str, name=name or email.split('@')[0])
 
     # Generate JWT token and return it with user data
     token = create_token(str(new_user.user_id), role)
 
     return jsonify({
-        "message": "User registered successfully",
+        "message": "User registered successfully. Please check your email to verify your account.",
         "token": token,
         "user_id": str(new_user.user_id),
         "role": role,
         "name": name,
         "email": email,
+        "email_verified": False,
     }), 201
 
 
@@ -266,6 +281,7 @@ def login():
         "name": user.name,
         "email": user.email,
         "profile_image": user.profile_image,
+        "email_verified": user.email_verified,
     }), 200
 
 
@@ -288,6 +304,7 @@ def auth_me():
         "phone": user.phone,
         "location": user.location,
         "profile_image": user.profile_image,
+        "email_verified": user.email_verified,
         "created_at": user.created_at.isoformat() if hasattr(user, 'created_at') and user.created_at else None,
     }
     if user.role == 'recruiter':
@@ -296,6 +313,70 @@ def auth_me():
             "job_title": user.job_title,
         })
     return jsonify(result), 200
+
+
+@api.route('/auth/verify-email', methods=['POST'])
+def verify_email():
+    """Verify a user's email using a token sent to their inbox."""
+    data = request.get_json()
+    token = (data or {}).get('token', '').strip()
+
+    if not token:
+        return jsonify({"error": "Verification token is required"}), 400
+
+    verification = EmailVerificationToken.query.filter_by(token=token, used=False).first()
+    if not verification:
+        return jsonify({"error": "Invalid or expired verification link. Please request a new one."}), 400
+
+    if datetime.utcnow() > verification.expires_at:
+        verification.used = True
+        db.session.commit()
+        return jsonify({"error": "Verification link has expired. Please request a new one."}), 400
+
+    # Mark token as used and user as verified
+    verification.used = True
+    user = User.query.get(verification.user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    user.email_verified = True
+    db.session.commit()
+
+    return jsonify({
+        "message": "Email verified successfully! You can now access all features.",
+        "email_verified": True,
+    }), 200
+
+
+@api.route('/auth/resend-verification', methods=['POST'])
+@require_auth
+def resend_verification():
+    """Resend the email verification link to the authenticated user."""
+    user = User.query.get(g.current_user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    if user.email_verified:
+        return jsonify({"message": "Your email is already verified."}), 200
+
+    # Invalidate old tokens
+    EmailVerificationToken.query.filter_by(user_id=user.user_id, used=False).update({"used": True})
+    db.session.flush()
+
+    # Generate new token
+    token_str = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(hours=24)
+    verification = EmailVerificationToken(
+        user_id=user.user_id,
+        token=token_str,
+        expires_at=expires_at,
+    )
+    db.session.add(verification)
+    db.session.commit()
+
+    send_verification_email(to=user.email, token=token_str, name=user.name or user.email.split('@')[0])
+
+    return jsonify({"message": "Verification email sent. Please check your inbox."}), 200
 
 
 @api.route('/auth/logout', methods=['POST'])
@@ -941,6 +1022,7 @@ def applicant_dashboard(applicant_id):
         "name": applicant.name or applicant.email,
         "email": applicant.email,
         "has_resume": latest_resume is not None,
+        "email_verified": applicant.email_verified,
         "resume_uploaded_at": latest_resume.uploaded_at.isoformat() if latest_resume else None,
         "resume_filename": latest_resume.file_path if latest_resume else None,
         "skill_count": skill_count,

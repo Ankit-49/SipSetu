@@ -26,7 +26,9 @@ class User(db.Model):
     phone = db.Column(db.String(20), nullable=True)
     location = db.Column(db.String(255), nullable=True)
     profile_image = db.Column(db.Text, nullable=True)
-    
+    email_verified = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
     __mapper_args__ = {
         'polymorphic_on': role,
         'polymorphic_identity': 'user'
@@ -107,6 +109,18 @@ class Ranking(db.Model):
     resume_id = db.Column(UUID(as_uuid=True), db.ForeignKey('resumes.resume_id', ondelete='CASCADE'), nullable=False)
     matching_score = db.Column(db.Float)
     candidate_rank = db.Column(db.Integer)
+
+class EmailVerificationToken(db.Model):
+    __tablename__ = 'email_verification_tokens'
+    token_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    token = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='email_verification_tokens')
+
 
 class PasswordResetToken(db.Model):
     __tablename__ = 'password_reset_tokens'

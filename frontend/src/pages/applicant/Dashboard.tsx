@@ -10,7 +10,9 @@ import {
   Target,
   Zap,
   Sparkles,
-  Loader2
+  Loader2,
+  Mail,
+  X
 } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
@@ -43,6 +45,25 @@ export default function ApplicantDashboardHome() {
     fetchDashboard();
   }, [user]);
 
+  const [sendingVerification, setSendingVerification] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [dismissVerificationBanner, setDismissVerificationBanner] = useState(false);
+
+  const emailVerified = data?.email_verified;
+
+  const handleResendVerification = async () => {
+    setSendingVerification(true);
+    setVerificationSent(false);
+    try {
+      await api.post("/auth/resend-verification");
+      setVerificationSent(true);
+    } catch (err) {
+      console.error("Failed to resend verification", err);
+    } finally {
+      setSendingVerification(false);
+    }
+  };
+
   const userName = data?.name || user?.name || localStorage.getItem("user_name") || "Applicant";
   const firstName = userName.split(" ")[0];
   const recentJobs = data?.recent_jobs || [];
@@ -58,6 +79,50 @@ export default function ApplicantDashboardHome() {
           <NotificationBell />
         </div>
       </div>
+
+      {/* Email verification banner */}
+      {emailVerified === false && !dismissVerificationBanner && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+              <Mail className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="font-bold text-amber-900 text-sm">Verify your email address</h3>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Check your inbox for a verification link. Some features may be limited until your email is verified.
+              </p>
+              {verificationSent && (
+                <p className="text-xs text-green-600 font-medium mt-1">✓ Verification email sent! Check your inbox.</p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-amber-300 text-amber-800 hover:bg-amber-100 whitespace-nowrap"
+              onClick={handleResendVerification}
+              disabled={sendingVerification}
+            >
+              {sendingVerification ? (
+                <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Sending...</>
+              ) : verificationSent ? (
+                "Sent!"
+              ) : (
+                <><Mail className="h-3.5 w-3.5 mr-1.5" /> Resend Email</>
+              )}
+            </Button>
+            <button
+              onClick={() => setDismissVerificationBanner(true)}
+              className="text-amber-400 hover:text-amber-600 p-1"
+              aria-label="Dismiss"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* No resume prompt */}
       {!data?.has_resume && (
