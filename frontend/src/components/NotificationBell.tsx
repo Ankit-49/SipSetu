@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Bell, X, CheckCheck, Briefcase, Star, XCircle, Info } from "lucide-react";
 import api from "@/lib/api";
+import { useAuth } from "@/app/context/AuthContext";
 
 interface Notification {
   notification_id: string;
@@ -41,7 +42,8 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const panelRef = useRef<HTMLDivElement>(null);
-  const userId = localStorage.getItem("user_id");
+  const { user } = useAuth();
+  const userId = user?.id || localStorage.getItem("user_id");
 
   const unread = notifications.filter((n) => !n.is_read).length;
 

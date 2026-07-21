@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import axios from "axios";
+import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +8,6 @@ import { FileText, Target, TrendingUp, Award, ArrowRight, User, Briefcase, Spark
 import { motion } from "framer-motion";
 import { VisualBackground } from "@/components/VisualBackground";
 import { SipSetuLogo } from "@/components/SipSetuLogo";
-
-const API = "http://localhost:5000/api";
 
 interface PreviewStats {
   jobs: number;
@@ -60,7 +58,7 @@ export default function LandingPage() {
   useEffect(() => {
     const fetchPreview = async () => {
       try {
-        const res = await axios.get(`${API}/public/preview`);
+        const res = await api.get("/public/preview");
         setStats(res.data?.stats ?? { jobs: 0, recruiters: 0, applicants: 0, resumes: 0 });
         setRecentJobs(res.data?.recent_jobs ?? []);
         setTopCandidates(res.data?.top_candidates ?? []);

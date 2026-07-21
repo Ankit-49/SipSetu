@@ -6,6 +6,17 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/app/context/AuthContext";
 import { SipSetuLogo } from "@/components/SipSetuLogo";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 
 const navItems = [
@@ -125,13 +136,30 @@ export function ApplicantLayout({ children }: { children: React.ReactNode }) {
         </Link>
 
         <div className="p-4 border-t border-white/10">
-          <Button
-            onClick={handleLogout}
-            variant="outline"
-            className="w-full border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-          >
-            Logout
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+              >
+                Logout
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure you want to sign out?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You can sign back in anytime. Your dashboard and saved data will be waiting for you.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleLogout} className="bg-[#1E3A5F] hover:bg-[#1E3A5F]/90">
+                  Sign Out
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </aside>
 

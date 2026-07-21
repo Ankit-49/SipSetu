@@ -84,11 +84,6 @@ export default function ApplicantSkillGap() {
     setOpenItems(prev => ({ ...prev, [skill]: !prev[skill] }));
   };
 
-  const selectedJob = jobs.find(j => j.job_id === selectedJobId);
-  const jobLabel = selectedJobId === "all"
-    ? "All Matched Jobs"
-    : selectedJob ? `${selectedJob.title} @ ${selectedJob.recruiter_company || selectedJob.recruiter_name}` : "";
-
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">

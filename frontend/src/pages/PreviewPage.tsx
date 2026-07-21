@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "@/lib/api";
 import { Link } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Briefcase, Users, FileText, Sparkles, ArrowRight, Loader2, Target } from "lucide-react";
-
-const API = "http://localhost:5000/api";
 
 export default function PreviewPage() {
   const [loading, setLoading] = useState(true);
@@ -15,7 +13,7 @@ export default function PreviewPage() {
   useEffect(() => {
     const fetchPreview = async () => {
       try {
-        const response = await axios.get(`${API}/public/preview`);
+        const response = await api.get("/public/preview");
         setPreview(response.data);
       } catch (error) {
         console.error("Failed to load preview data", error);
