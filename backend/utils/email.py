@@ -5,6 +5,7 @@ the email content to the console for local development.
 """
 
 import os
+import sys
 import smtplib
 import logging
 from email.message import EmailMessage
@@ -45,12 +46,13 @@ def send_email(
     config = _smtp_config()
 
     if not config:
-        # Dev fallback — log to console
-        logger.info("=" * 60)
-        logger.info(f"📧 DEV EMAIL TO: {to}")
-        logger.info(f"   SUBJECT: {subject}")
-        logger.info(f"   BODY:\n{html_body}")
-        logger.info("=" * 60)
+        # Dev fallback — print to stderr so it's visible in the terminal
+        print("\n" + "=" * 60, file=sys.stderr)
+        print(f"📧 DEV EMAIL TO: {to}", file=sys.stderr)
+        print(f"   SUBJECT: {subject}", file=sys.stderr)
+        print(f"   BODY:\n{html_body}", file=sys.stderr)
+        print("=" * 60 + "\n", file=sys.stderr)
+        sys.stderr.flush()
         return True
 
     msg = EmailMessage()

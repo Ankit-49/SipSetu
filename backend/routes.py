@@ -1,5 +1,5 @@
 from flask import Blueprint, Flask, request, jsonify, g
-from models import db, User, Applicant, Recruiter, Job, JobApplication, Resume, Skill, Ranking, Notification
+from models import db, User, Applicant, Recruiter, Job, JobApplication, Resume, Skill, Ranking, Notification, PasswordResetToken
 from werkzeug.security import generate_password_hash, check_password_hash
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -26,7 +26,7 @@ from auth_middleware import create_token, extract_token as _extract_token, decod
 from utils.email import send_password_reset_email
 from config import Config
 import secrets
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 api = Blueprint('api', __name__)
 
