@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router";
-import { LayoutDashboard, PlusSquare, Users, User, Sparkles, Menu, X } from "lucide-react";
+import { LayoutDashboard, PlusSquare, Users, User, Sparkles, Menu, X, Briefcase } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import { useState, useEffect } from "react";
 
 const navItems = [
   { name: "Dashboard", href: "/recruiter/dashboard", icon: LayoutDashboard },
+  { name: "Manage Jobs", href: "/recruiter/jobs", icon: Briefcase },
   { name: "Post Job", href: "/recruiter/post-job", icon: PlusSquare },
   { name: "Candidates", href: "/recruiter/candidates", icon: Users },
   { name: "Bulk Screen", href: "/recruiter/bulk-screen", icon: Sparkles },

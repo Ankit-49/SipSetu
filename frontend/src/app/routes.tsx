@@ -24,6 +24,7 @@ import RecruiterPostJob from "../pages/recruiter/PostJob";
 import RecruiterCandidates from "../pages/recruiter/Candidates";
 import RecruiterProfile from "../pages/recruiter/Profile";
 import RecruiterBulkScreening from "../pages/recruiter/BulkScreening";
+import RecruiterManageJobs from "../pages/recruiter/ManageJobs";
 
 export const router = createBrowserRouter([
   { path: "/", Component: LandingPage },
@@ -105,6 +106,14 @@ export const router = createBrowserRouter([
     Component: () => (
       <ProtectedRoute requiredRole="recruiter">
         <RecruiterLayout><RecruiterDashboardHome /></RecruiterLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/recruiter/jobs",
+    Component: () => (
+      <ProtectedRoute requiredRole="recruiter">
+        <RecruiterLayout><RecruiterManageJobs /></RecruiterLayout>
       </ProtectedRoute>
     ),
   },
