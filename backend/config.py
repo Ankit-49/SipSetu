@@ -12,3 +12,5 @@ class Config:
         'DATABASE_URL',
         'postgresql://postgres:postgres@localhost:5432/sipsetu'
     )
+    RESET_TOKEN_EXPIRY_HOURS = 1
+    FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')

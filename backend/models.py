@@ -108,6 +108,18 @@ class Ranking(db.Model):
     matching_score = db.Column(db.Float)
     candidate_rank = db.Column(db.Integer)
 
+class PasswordResetToken(db.Model):
+    __tablename__ = 'password_reset_tokens'
+    token_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    token = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='password_reset_tokens')
+
+
 class Notification(db.Model):
     __tablename__ = 'notifications'
     notification_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

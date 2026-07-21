@@ -3,6 +3,8 @@ import LandingPage from "../pages/LandingPage";
 import PreviewPage from "../pages/PreviewPage";
 import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
+import ForgotPasswordPage from "../pages/ForgotPasswordPage";
+import ResetPasswordPage from "../pages/ResetPasswordPage";
 import NotFound from "../pages/not-found";
 import { ProtectedRoute } from "../components/ProtectedRoute";
 
@@ -27,6 +29,8 @@ export const router = createBrowserRouter([
   { path: "/preview", Component: PreviewPage },
   { path: "/login", Component: LoginPage },
   { path: "/register", Component: RegisterPage },
+  { path: "/forgot-password", Component: ForgotPasswordPage },
+  { path: "/reset-password", Component: ResetPasswordPage },
 
   // Applicant Routes (protected — require applicant role)
   {
