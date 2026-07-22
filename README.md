@@ -61,12 +61,6 @@ cp .env.example .env
 # Create the database in PostgreSQL
 # psql -U postgres -c "CREATE DATABASE sipsetu;"
 
-# Initialize database tables
-python -c "from app import create_app; from models import db; app = create_app(); app.app_context().push(); db.create_all()"
-
-# Apply additional schema migrations
-python update_db.py
-
 # Start the backend server
 python app.py
 ```
@@ -104,8 +98,6 @@ SipSetu/
 │   │                         #   Job, Resume, Skill, Ranking)
 │   ├── routes.py             # API endpoints (auth, jobs, resumes, profiles)
 │   ├── requirements.txt      # Python dependencies
-│   ├── update_db.py          # Schema migration helper script
-│   ├── test_login.py         # Manual login test script
 │   ├── .env                  # Environment variables (gitignored)
 │   └── .env.example          # Environment variable template
 ├── frontend/
@@ -146,11 +138,8 @@ SipSetu/
 This is an early-stage build (approx. 30-35% toward production readiness). Key limitations:
 
 - **ML is bootstrapped from existing ranking scores** — The first training run learns from historical `matching_score` values stored in the database. Replace those with recruiter feedback or hire/shortlist labels for a production-grade model.
-- **No JWT authentication** — Auth state is stored in `localStorage` (user_id, user_role) with no server-side token validation. This is not secure for production.
-- **Hardcoded demo data** — Many pages (candidates, stats, skill gaps) use static mock arrays instead of live API data.
-- **Resume file upload** — Resumes accept raw text only; multipart file upload is not implemented.
-- **No pagination** — List endpoints return all records without pagination.
-- **No test suite** — Only one manual test script exists (`test_login.py`).
+- **ML is bootstrapped from existing ranking scores** — The first training run learns from historical `matching_score` values stored in the database. Replace those with recruiter feedback or hire/shortlist labels for a production-grade model.
+- **No test suite** — No automated tests exist for the backend or frontend.
 
 ## License
 
