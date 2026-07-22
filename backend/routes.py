@@ -37,17 +37,10 @@ api = Blueprint('api', __name__)
 # ---------------------------------------------------------------------------
 
 def _ownership_required(f):
-    """Decorator that checks the URL ``user_id`` param matches the JWT subject.
-
-    Use on routes like ``/profile/<user_id>`` or
-    ``/applicants/<applicant_id>/dashboard`` where the caller must be the
-    same user they are acting on.
-    """
+    """Verify the URL user/applicant/recruiter ID matches the JWT subject."""
     @wraps(f)
     @require_auth
     def wrapper(*args, **kwargs):
-        # The URL param can be named ``user_id``, ``applicant_id``, or
-        # ``recruiter_id``; check whichever is present.
         target_id = (
             kwargs.get("user_id")
             or kwargs.get("applicant_id")
@@ -73,17 +66,15 @@ def forgot_password():
 
     user = User.query.filter_by(email=email).first()
 
-    # Always return 200 even if email not found (prevent email enumeration)
+    # Return 200 even if email not found to prevent enumeration
     if not user:
         return jsonify({
             "message": "If that email is registered, an OTP has been sent."
         }), 200
 
-    # Generate a 6-digit OTP
     otp = str(random.randint(100000, 999999))
     otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
 
-    # Store the OTP as the token in PasswordResetToken (expires in 10 min)
     PasswordResetToken.query.filter_by(user_id=user.user_id, used=False).update({"used": True})
     db.session.flush()
 
@@ -120,7 +111,6 @@ def verify_reset_otp():
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    # Find the matching OTP token
     reset_token = PasswordResetToken.query.filter_by(
         user_id=user.user_id, token=otp, used=False
     ).first()
@@ -133,11 +123,9 @@ def verify_reset_otp():
         db.session.commit()
         return jsonify({"error": "OTP has expired. Please request a new one."}), 400
 
-    # OTP is valid — issue a temporary token that can be used once to reset the password
+    # Issue a temporary reset token and overwrite the OTP
     temp_token = secrets.token_urlsafe(32)
     temp_expires_at = datetime.utcnow() + timedelta(minutes=30)
-
-    # Store the temp token using the existing model (overwrite the OTP)
     reset_token.token = temp_token
     reset_token.expires_at = temp_expires_at
     db.session.commit()
@@ -179,7 +167,6 @@ def reset_password():
         db.session.commit()
         return jsonify({"error": "Reset token has expired. Please request a new OTP."}), 400
 
-    # Update the password
     user.password_hash = generate_password_hash(new_password)
     reset_token.used = True
     db.session.commit()
@@ -224,7 +211,6 @@ def register():
     db.session.add(new_user)
     db.session.flush()
 
-    # Generate email verification token
     verification_token_str = secrets.token_urlsafe(32)
     verification_expires = datetime.utcnow() + timedelta(hours=24)
     verification = EmailVerificationToken(
@@ -235,10 +221,8 @@ def register():
     db.session.add(verification)
     db.session.commit()
 
-    # Send verification email (async-friendly; runs inline for now)
     send_verification_email(to=email, token=verification_token_str, name=name or email.split('@')[0])
 
-    # Generate JWT token and return it with user data
     token = create_token(str(new_user.user_id), role)
 
     return jsonify({
@@ -270,7 +254,6 @@ def login():
     if not user or not check_password_hash(user.password_hash, password):
         return jsonify({"error": "Invalid credentials"}), 401
 
-    # Generate JWT token and return it with user data
     token = create_token(str(user.user_id), user.role)
 
     return jsonify({
@@ -333,7 +316,6 @@ def verify_email():
         db.session.commit()
         return jsonify({"error": "Verification link has expired. Please request a new one."}), 400
 
-    # Mark token as used and user as verified
     verification.used = True
     user = User.query.get(verification.user_id)
     if not user:
@@ -359,11 +341,9 @@ def resend_verification():
     if user.email_verified:
         return jsonify({"message": "Your email is already verified."}), 200
 
-    # Invalidate old tokens
     EmailVerificationToken.query.filter_by(user_id=user.user_id, used=False).update({"used": True})
     db.session.flush()
 
-    # Generate new token
     token_str = secrets.token_urlsafe(32)
     expires_at = datetime.utcnow() + timedelta(hours=24)
     verification = EmailVerificationToken(
@@ -454,7 +434,6 @@ def public_preview():
 def jobs():
     """List all jobs or create a new job posting."""
     if request.method == 'POST':
-        # --- create job (recruiter-only) ---
         token_user_id = _resolve_current_user_id()
         if not token_user_id:
             return jsonify({"error": "You must be logged in to create a job"}), 401
@@ -471,12 +450,10 @@ def jobs():
         job_type = data.get('job_type', '')
         experience_level = data.get('experience_level', '')
         salary_min = data.get('salary_min')
-        salary_max = data.get('salary_max')
+        salary_max = data.get('salary_max')    if not title:
+        return jsonify({"error": "Missing job title"}), 400
 
-        if not title:
-            return jsonify({"error": "Missing job title"}), 400
-
-        new_job = Job(
+    new_job = Job(
             recruiter_id=token_user_id,
             title=title,
             description=description,
@@ -505,7 +482,7 @@ def jobs():
             "skills": [s.skill_name for s in new_job.skills]
         }), 201
 
-    # GET — public, no auth required (but recruiter_id filter still works)
+    # GET — recruiter_id filter is optional
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     recruiter_id = request.args.get('recruiter_id')
@@ -560,7 +537,6 @@ def apply_for_job(job_id):
         db.session.add(application)
         created = True
 
-        # Notifications
         db.session.add(Notification(
             user_id=applicant_id,
             title="Application Submitted",
@@ -615,7 +591,6 @@ def get_applicant_applications(applicant_id):
 
         job_data = format_job(job)
 
-        # Calculate matching score
         score = 0.0
         if latest_resume:
             score = float(_compute_job_match_score(latest_resume, job) or 0.0)
@@ -662,7 +637,6 @@ def update_job(job_id):
     if not job:
         return jsonify({"error": "Job not found"}), 404
 
-    # Only the recruiter who owns the job can update it
     if str(job.recruiter_id) != g.current_user_id:
         return jsonify({"error": "You can only edit your own job postings"}), 403
 
@@ -670,7 +644,6 @@ def update_job(job_id):
     if not data:
         return jsonify({"error": "No data provided"}), 400
 
-    # Update scalar fields
     if 'title' in data:
         job.title = data['title']
     if 'description' in data:
@@ -686,7 +659,6 @@ def update_job(job_id):
     if 'salary_max' in data:
         job.salary_max = float(data['salary_max']) if data['salary_max'] else None
 
-    # Update skills
     if 'skills' in data and isinstance(data['skills'], list):
         job.skills.clear()
         db.session.flush()
@@ -719,7 +691,6 @@ def delete_job(job_id):
     if not job:
         return jsonify({"error": "Job not found"}), 404
 
-    # Only the recruiter who owns the job can delete it
     if str(job.recruiter_id) != g.current_user_id:
         return jsonify({"error": "You can only delete your own job postings"}), 403
 
@@ -739,7 +710,6 @@ def resume_detail(resume_id):
     if not resume:
         return jsonify({"error": "Resume not found"}), 404
 
-    # Ownership check: the resume must belong to the authenticated user
     if str(resume.applicant_id) != g.current_user_id:
         return jsonify({"error": "You can only access your own resume"}), 403
 
@@ -760,7 +730,6 @@ def resume_detail(resume_id):
         create_rankings_for_resume_after_delete(applicant_id)
         return jsonify({"message": "Resume deleted successfully"}), 200
 
-    # PUT
     data = request.get_json(silent=True) or {}
     new_text = data.get('raw_text')
     new_file_path = data.get('file_path')
@@ -874,7 +843,7 @@ def upload_resume_pdf():
 
         extracted_skills = extract_skills_from_text(text)
 
-        # Delete old resumes for this applicant (keep only the latest)
+        # Keep only the latest resume per applicant
         for old in Resume.query.filter_by(applicant_id=applicant_id).all():
             db.session.delete(old)
         db.session.flush()
@@ -1093,7 +1062,6 @@ def get_job_candidates(job_id):
     if not job:
         return jsonify({"error": "Job not found"}), 404
 
-    # Only the recruiter who owns the job can see its candidates
     if str(job.recruiter_id) != g.current_user_id:
         return jsonify({"error": "You can only view candidates for your own jobs"}), 403
 
@@ -1265,7 +1233,6 @@ def recruiter_dashboard(recruiter_id):
 @require_auth
 def bulk_screen():
     """Upload bulk resumes in PDF (max 50) and score/rank them against a job description."""
-    # Only recruiters can bulk-screen (enforce via decorator or manual check)
     if g.current_user_role != 'recruiter':
         return jsonify({"error": "Only recruiters can use bulk screening"}), 403
 
@@ -1423,7 +1390,6 @@ def mark_notification_read(notification_id):
     n = Notification.query.get(notification_id)
     if not n:
         return jsonify({"error": "Not found"}), 404
-    # Only the owner can mark their own notifications
     if str(n.user_id) != g.current_user_id:
         return jsonify({"error": "You can only mark your own notifications"}), 403
     n.is_read = True
@@ -1450,7 +1416,6 @@ def update_application_status(application_id):
     if not application:
         return jsonify({"error": "Application not found"}), 404
 
-    # Only the recruiter who owns the job can update status
     job = Job.query.get(application.job_id)
     if not job or str(job.recruiter_id) != g.current_user_id:
         return jsonify({"error": "Only the job's recruiter can update application status"}), 403
@@ -1495,7 +1460,6 @@ def update_application_status(application_id):
 @require_auth
 def get_application_status(job_id, applicant_id):
     """Get the status and application_id for a specific application."""
-    # Only the applicant or the job's recruiter can view this
     if g.current_user_id != applicant_id:
         job = Job.query.get(job_id)
         if not job or str(job.recruiter_id) != g.current_user_id:

@@ -132,12 +132,7 @@ def calculate_ranking_score(resume, job):
 
 
 def create_rankings_for_job(job_id):
-    """Create/refresh ranking rows for a job based only on applicants who applied.
-
-    A candidate is included for a job if and only if they have a JobApplication
-    for that job. Rankings for any other applicant are removed so candidates
-    who did not apply are never surfaced for this job.
-    """
+    """Create/refresh rankings for a job — only applicants who applied are scored."""
     job = Job.query.get(job_id)
     if not job:
         return
@@ -178,12 +173,7 @@ def create_rankings_for_job(job_id):
 
 
 def create_rankings_for_resume_after_delete(applicant_id):
-    """Remove all rankings for an applicant whose resume was just deleted.
-
-    A deleted resume means there is no resume to score against the applicant's
-    job applications anymore, so any leftover rankings for this applicant must
-    go. Other applicants' rankings are not touched.
-    """
+    """Remove all rankings for an applicant whose last resume was deleted."""
     applicant_resume_ids = [
         str(r.resume_id)
         for r in Resume.query.filter_by(applicant_id=applicant_id).all()
@@ -197,12 +187,7 @@ def create_rankings_for_resume_after_delete(applicant_id):
 
 
 def create_rankings_for_resume(resume_id, applicant_id):
-    """Create/refresh ranking rows for a resume across only the jobs the applicant applied to.
-
-    Old rankings for prior resume_ids belonging to this applicant are removed
-    so a candidate never appears in a recruiter's candidate list for a job
-    they did not apply to.
-    """
+    """Create/refresh rankings for a resume — only jobs the applicant applied to are scored."""
     resume = Resume.query.get(resume_id)
     if not resume:
         return

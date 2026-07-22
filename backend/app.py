@@ -11,12 +11,10 @@ def create_app():
     app = Flask(__name__)
     CORS(app)
 
-    # Load configuration from Config class
     app.config.from_object(Config)
 
-    # Configure Database — read from environment AFTER load_dotenv() so
-    # the .env file takes effect (Config is evaluated at import time,
-    # before load_dotenv runs, so its default is always used).
+    # Read DATABASE_URL from env after load_dotenv() to override Config default
+    # (Config is evaluated at import time, before load_dotenv runs).
     db_url = os.environ.get('DATABASE_URL') or Config.DATABASE_URL
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -42,10 +40,6 @@ def create_app():
         return jsonify({"status": "healthy"}), 200
 
     return app
-
-if __name__ == '__main__':
-    app = create_app()
-    app.run(debug=True, port=5000)
 
 if __name__ == '__main__':
     app = create_app()

@@ -3,20 +3,7 @@ import docx
 import os
 
 def extract_text(file_path: str) -> str:
-    """
-    Extracts text from a PDF or DOCX file.
-    
-    Args:
-        file_path (str): The absolute path to the file.
-        
-    Returns:
-        str: The extracted text.
-        
-    Raises:
-        ValueError: If the file type is unsupported.
-        FileNotFoundError: If the file does not exist.
-        Exception: For other parsing errors.
-    """
+    """Extract text from a PDF or DOCX file."""
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"File not found: {file_path}")
 
