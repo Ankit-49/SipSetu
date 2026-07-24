@@ -1,54 +1,100 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, Clock, Briefcase, Send, Loader2, UploadCloud } from "lucide-react";
+import { Search, MapPin, Clock, Briefcase, Send, Loader2, UploadCloud, SlidersHorizontal, X, DollarSign, TrendingUp, FilterX } from "lucide-react";
 import { Link } from "react-router";
 import api from "@/lib/api";
 import { useAuth } from "@/app/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+
+const JOB_TYPE_OPTIONS = [
+  { value: "full", label: "Full-time" },
+  { value: "part", label: "Part-time" },
+  { value: "contract", label: "Contract" },
+];
+
+const EXP_LEVEL_OPTIONS = [
+  { value: "fresher", label: "Fresher" },
+  { value: "1-3", label: "1-3 years" },
+  { value: "3-5", label: "3-5 years" },
+  { value: "5+", label: "5+ years" },
+];
 
 export default function ApplicantJobMatches() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [locationFilter, setLocationFilter] = useState("all");
+  const [jobTypeFilter, setJobTypeFilter] = useState("all");
+  const [expLevelFilter, setExpLevelFilter] = useState("all");
+  const [salaryMin, setSalaryMin] = useState("");
+  const [salaryMax, setSalaryMax] = useState("");
+  const [skillFilter, setSkillFilter] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [loading, setLoading] = useState(true);
   const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
   const [jobs, setJobs] = useState<any[]>([]);
   const [hasResume, setHasResume] = useState(true);
   const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
 
+  const buildQuery = useCallback(() => {
+    const params = new URLSearchParams({ per_page: "100" });
+    if (search) params.set("search", search);
+    if (locationFilter !== "all") params.set("location", locationFilter);
+    if (jobTypeFilter !== "all") params.set("job_type", jobTypeFilter);
+    if (expLevelFilter !== "all") params.set("experience_level", expLevelFilter);
+    if (salaryMin) params.set("salary_min", salaryMin);
+    if (salaryMax) params.set("salary_max", salaryMax);
+    if (skillFilter) params.set("skill", skillFilter);
+    return params.toString();
+  }, [search, locationFilter, jobTypeFilter, expLevelFilter, salaryMin, salaryMax, skillFilter]);
+
+  const fetchMatches = useCallback(async () => {
+    if (!user) { setLoading(false); return; }
+    try {
+      const params = buildQuery();
+      const matchesRes = await api.get(`/applicants/${user.id}/matched-jobs?${params}`);
+      const jobsData = matchesRes.data.matched_jobs || [];
+      setJobs(jobsData.map((job: any) => ({ ...job, applied: Boolean(job.applied) })));
+      setAppliedJobIds(jobsData.filter((j: any) => j.applied).map((j: any) => String(j.job_id)));
+      if (matchesRes.data.resume_id === null) setHasResume(false);
+    } catch (err) {
+      console.error("Failed to load job matches", err);
+      setHasResume(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, buildQuery]);
+
   useEffect(() => {
     if (!user) { setLoading(false); return; }
+    setLoading(true);
+    const timer = setTimeout(fetchMatches, 150);
+    return () => clearTimeout(timer);
+  }, [user, fetchMatches]);
 
-    const fetchMatches = async () => {
-      try {
-        const matchesRes = await api.get(`/applicants/${user.id}/matched-jobs?per_page=100`);
+  // Count active non-search filters
+  const advancedFilterCount = [
+    jobTypeFilter !== "all",
+    expLevelFilter !== "all",
+    !!salaryMin,
+    !!salaryMax,
+    !!skillFilter,
+  ].filter(Boolean).length;
 
-        const jobsData = matchesRes.data.matched_jobs || [];
-        setJobs(jobsData.map((job: any) => ({ ...job, applied: Boolean(job.applied) })));
-        setAppliedJobIds(jobsData.filter((j: any) => j.applied).map((j: any) => String(j.job_id)));
-        if (matchesRes.data.resume_id === null) setHasResume(false);
-      } catch (err) {
-        console.error("Failed to load job matches", err);
-        setHasResume(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchMatches();
-  }, [user]);
-
-  const filteredJobs = jobs.filter(j => {
-    const matchesSearch = j.title.toLowerCase().includes(search.toLowerCase())
-      || (j.recruiter_company || "").toLowerCase().includes(search.toLowerCase());
-    const matchesLocation = locationFilter === "all"
-      || (j.location || "").toLowerCase().includes(locationFilter.toLowerCase());
-    return matchesSearch && matchesLocation;
-  });
+  const clearAllFilters = () => {
+    setSearch("");
+    setLocationFilter("all");
+    setJobTypeFilter("all");
+    setExpLevelFilter("all");
+    setSalaryMin("");
+    setSalaryMax("");
+    setSkillFilter("");
+  };
 
   const locations = Array.from(new Set(jobs.map(j => j.location).filter(Boolean)));
 
@@ -130,33 +176,174 @@ export default function ApplicantJobMatches() {
       )}
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Search roles or companies..."
-            className="pl-9 bg-slate-50 border-slate-200"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Primary filter row */}
+        <div className="p-4 flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search roles or companies..."
+              className="pl-9 bg-slate-50 border-slate-200"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-3">
+            <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <SelectTrigger className="w-[150px] bg-slate-50">
+                <SelectValue placeholder="Location" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Locations</SelectItem>
+                {locations.map(loc => (
+                  <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant={advancedFilterCount > 0 ? "default" : "outline"}
+              size="sm"
+              className={`gap-2 h-10 ${advancedFilterCount > 0 ? 'bg-[#F97316] hover:bg-[#e8630e] text-white' : 'text-slate-600'}`}
+              onClick={() => setShowAdvanced(!showAdvanced)}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filters
+              {advancedFilterCount > 0 && (
+                <span className="inline-flex items-center justify-center h-5 min-w-[20px] rounded-full bg-white/20 text-xs font-bold px-1">
+                  {advancedFilterCount}
+                </span>
+              )}
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-4">
-          <Select value={locationFilter} onValueChange={setLocationFilter}>
-            <SelectTrigger className="w-[160px] bg-slate-50">
-              <SelectValue placeholder="Location" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {locations.map(loc => (
-                <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+
+        {/* Advanced filters (collapsible) */}
+        {showAdvanced && (
+          <div className="px-4 pb-4 border-t border-slate-100 pt-4 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Job Type */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+                  <Briefcase className="h-3 w-3" /> Job Type
+                </Label>
+                <Select value={jobTypeFilter} onValueChange={setJobTypeFilter}>
+                  <SelectTrigger className="h-9 bg-slate-50 text-sm">
+                    <SelectValue placeholder="All types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    {JOB_TYPE_OPTIONS.map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Experience Level */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+                  <TrendingUp className="h-3 w-3" /> Experience
+                </Label>
+                <Select value={expLevelFilter} onValueChange={setExpLevelFilter}>
+                  <SelectTrigger className="h-9 bg-slate-50 text-sm">
+                    <SelectValue placeholder="All levels" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Levels</SelectItem>
+                    {EXP_LEVEL_OPTIONS.map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Salary Range */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+                  <DollarSign className="h-3 w-3" /> Salary (LPA)
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Min"
+                    value={salaryMin}
+                    onChange={(e) => setSalaryMin(e.target.value)}
+                    className="h-9 bg-slate-50 text-sm"
+                  />
+                  <span className="text-slate-300 text-sm">-</span>
+                  <Input
+                    type="number"
+                    placeholder="Max"
+                    value={salaryMax}
+                    onChange={(e) => setSalaryMax(e.target.value)}
+                    className="h-9 bg-slate-50 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Skill Filter */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+                  <Search className="h-3 w-3" /> Skills
+                </Label>
+                <Input
+                  placeholder="e.g. python, react (comma-sep)"
+                  value={skillFilter}
+                  onChange={(e) => setSkillFilter(e.target.value)}
+                  className="h-9 bg-slate-50 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Active filter badges */}
+            <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-slate-100">
+              {jobTypeFilter !== "all" && (
+                <Badge variant="secondary" className="bg-orange-50 text-orange-700 border-orange-200 gap-1 px-2.5 py-1">
+                  {JOB_TYPE_OPTIONS.find(o => o.value === jobTypeFilter)?.label || jobTypeFilter}
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => setJobTypeFilter("all")} />
+                </Badge>
+              )}
+              {expLevelFilter !== "all" && (
+                <Badge variant="secondary" className="bg-orange-50 text-orange-700 border-orange-200 gap-1 px-2.5 py-1">
+                  {EXP_LEVEL_OPTIONS.find(o => o.value === expLevelFilter)?.label || expLevelFilter}
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => setExpLevelFilter("all")} />
+                </Badge>
+              )}
+              {salaryMin && (
+                <Badge variant="secondary" className="bg-orange-50 text-orange-700 border-orange-200 gap-1 px-2.5 py-1">
+                  Min: NPR {salaryMin} LPA
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => setSalaryMin("")} />
+                </Badge>
+              )}
+              {salaryMax && (
+                <Badge variant="secondary" className="bg-orange-50 text-orange-700 border-orange-200 gap-1 px-2.5 py-1">
+                  Max: NPR {salaryMax} LPA
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => setSalaryMax("")} />
+                </Badge>
+              )}
+              {skillFilter && (
+                <Badge variant="secondary" className="bg-orange-50 text-orange-700 border-orange-200 gap-1 px-2.5 py-1">
+                  Skills: {skillFilter}
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => setSkillFilter("")} />
+                </Badge>
+              )}
+              {advancedFilterCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-slate-500 hover:text-red-600 gap-1"
+                  onClick={clearAllFilters}
+                >
+                  <FilterX className="h-3 w-3" /> Clear all
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Grid */}
-      {filteredJobs.length === 0 ? (
+      {jobs.length === 0 ? (
         <div className="text-center py-16 text-slate-500">
           <Briefcase className="h-12 w-12 mx-auto text-slate-200 mb-4" />
           <p className="font-medium">{hasResume ? "No job matches found." : "Upload a resume to unlock job matches."}</p>
@@ -166,7 +353,7 @@ export default function ApplicantJobMatches() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredJobs.map((job, i) => (
+          {jobs.map((job, i) => (
             <Card key={job.job_id} className="hover:shadow-md transition-shadow duration-300 animate-in fade-in zoom-in-95" style={{ animationDelay: `${i * 50}ms`, animationFillMode: 'both' }}>
               <CardContent className="p-6">
                 <div className="flex justify-between items-start mb-4">

@@ -3,7 +3,7 @@ from models import db, User, Applicant, Recruiter, Job, JobApplication, Resume, 
 from werkzeug.security import generate_password_hash, check_password_hash
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from functools import wraps
 import fitz  # PyMuPDF
 import os
@@ -450,10 +450,11 @@ def jobs():
         job_type = data.get('job_type', '')
         experience_level = data.get('experience_level', '')
         salary_min = data.get('salary_min')
-        salary_max = data.get('salary_max')    if not title:
-        return jsonify({"error": "Missing job title"}), 400
+        salary_max = data.get('salary_max')
+        if not title:
+            return jsonify({"error": "Missing job title"}), 400
 
-    new_job = Job(
+        new_job = Job(
             recruiter_id=token_user_id,
             title=title,
             description=description,
@@ -482,14 +483,48 @@ def jobs():
             "skills": [s.skill_name for s in new_job.skills]
         }), 201
 
-    # GET — recruiter_id filter is optional
+    # GET — supports filters: recruiter_id, search, job_type, experience_level,
+    # location, salary_min, salary_max, skill
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     recruiter_id = request.args.get('recruiter_id')
+    search_q = (request.args.get('search') or '').strip().lower()
+    job_type_filter = (request.args.get('job_type') or '').strip().lower()
+    exp_level_filter = (request.args.get('experience_level') or '').strip().lower()
+    location_filter = (request.args.get('location') or '').strip().lower()
+    salary_min_filter = request.args.get('salary_min', type=float)
+    salary_max_filter = request.args.get('salary_max', type=float)
+    skill_filter = (request.args.get('skill') or '').strip().lower()
 
     query = Job.query
     if recruiter_id:
         query = query.filter_by(recruiter_id=recruiter_id)
+    if job_type_filter:
+        query = query.filter(Job.job_type == job_type_filter)
+    if exp_level_filter:
+        query = query.filter(Job.experience_level == exp_level_filter)
+    if location_filter and location_filter != "all":
+        query = query.filter(Job.location.ilike(f'%{location_filter}%'))
+    if salary_min_filter is not None:
+        query = query.filter(or_(Job.salary_max.is_(None), Job.salary_max >= salary_min_filter))
+    if salary_max_filter is not None:
+        query = query.filter(or_(Job.salary_min.is_(None), Job.salary_min <= salary_max_filter))
+    if skill_filter:
+        requested_skills = [s.strip() for s in skill_filter.split(',') if s.strip()]
+        for s in requested_skills:
+            skill_obj = Skill.query.filter_by(skill_name=s).first()
+            if skill_obj:
+                query = query.filter(Job.skills.any(Skill.skill_id == skill_obj.skill_id))
+
+    if search_q:
+        query = query.filter(
+            or_(
+                Job.title.ilike(f'%{search_q}%'),
+                Job.location.ilike(f'%{search_q}%'),
+                Job.job_type.ilike(f'%{search_q}%'),
+            )
+        )
+
     pagination = query.order_by(Job.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
@@ -905,6 +940,11 @@ def get_matched_jobs(applicant_id):
     min_score = request.args.get('min_score', 0, type=float)
     search = (request.args.get('search') or '').strip().lower()
     location = (request.args.get('location') or '').strip().lower()
+    job_type_filter = (request.args.get('job_type') or '').strip().lower()
+    exp_level_filter = (request.args.get('experience_level') or '').strip().lower()
+    salary_min_filter = request.args.get('salary_min', type=float)
+    salary_max_filter = request.args.get('salary_max', type=float)
+    skill_filter = (request.args.get('skill') or '').strip().lower()
 
     all_jobs = Job.query.order_by(Job.created_at.desc()).all()
     applied_ids = {str(a.job_id) for a in JobApplication.query.filter_by(
@@ -916,6 +956,22 @@ def get_matched_jobs(applicant_id):
         score = _compute_job_match_score(latest_resume, job)
         if score < min_score:
             continue
+
+        # Apply server-side filters before enriching
+        if job_type_filter and (job.job_type or '').lower() != job_type_filter:
+            continue
+        if exp_level_filter and (job.experience_level or '').lower() != exp_level_filter:
+            continue
+        if salary_min_filter is not None and (job.salary_max or 0) < salary_min_filter:
+            continue
+        if salary_max_filter is not None and (job.salary_min or 0) > salary_max_filter:
+            continue
+        if skill_filter:
+            job_skill_names = {s.skill_name.lower() for s in job.skills}
+            requested_skills = [s.strip() for s in skill_filter.split(',') if s.strip()]
+            if not any(s in job_skill_names for s in requested_skills):
+                continue
+
         job_data = format_job(job)
         job_data["matching_score"] = round(float(score or 0.0), 2)
         job_data["applied"] = str(job.job_id) in applied_ids
