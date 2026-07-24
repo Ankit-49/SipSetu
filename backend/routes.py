@@ -1,5 +1,5 @@
 from flask import Blueprint, Flask, request, jsonify, g
-from models import db, User, Applicant, Recruiter, Job, JobApplication, Resume, Skill, Ranking, Notification, PasswordResetToken, EmailVerificationToken
+from models import db, User, Applicant, Recruiter, Job, JobApplication, Resume, Skill, Ranking, Notification, PasswordResetToken, EmailVerificationToken, Interview
 from werkzeug.security import generate_password_hash, check_password_hash
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -1043,6 +1043,10 @@ def applicant_dashboard(applicant_id):
 
     resume_strength = min(int(skill_count * 10), 100)
 
+    upcoming_interviews = Interview.query.filter_by(applicant_id=applicant_id)\
+        .filter(Interview.status.in_(['pending', 'confirmed']))\
+        .order_by(Interview.scheduled_at.asc()).limit(5).all()
+
     return jsonify({
         "name": applicant.name or applicant.email,
         "email": applicant.email,
@@ -1056,6 +1060,16 @@ def applicant_dashboard(applicant_id):
         "top_jobs": top_jobs,
         "recent_jobs": recent_jobs,
         "missing_skills": missing_skills,
+        "upcoming_interviews": [{
+            "interview_id": str(iv.interview_id),
+            "job_title": iv.job.title if iv.job else "",
+            "recruiter_name": iv.recruiter.name or iv.recruiter.email,
+            "recruiter_company": iv.recruiter.company or "",
+            "scheduled_at": iv.scheduled_at.isoformat(),
+            "duration_minutes": iv.duration_minutes,
+            "status": iv.status,
+            "meeting_link": iv.meeting_link or "",
+        } for iv in upcoming_interviews],
     }), 200
 
 
@@ -1273,6 +1287,10 @@ def recruiter_dashboard(recruiter_id):
             if len(top_candidates) >= 3:
                 break
 
+    upcoming_interviews = Interview.query.filter_by(recruiter_id=recruiter_id)\
+        .filter(Interview.status.in_(['pending', 'confirmed']))\
+        .order_by(Interview.scheduled_at.asc()).limit(5).all()
+
     return jsonify({
         "name": recruiter.name or recruiter.email,
         "email": recruiter.email,
@@ -1282,6 +1300,15 @@ def recruiter_dashboard(recruiter_id):
         "top_match_score": top_candidates[0]["matching_score"] if top_candidates else 0,
         "jobs": [format_job(j) for j in jobs[:5]],
         "top_candidates": top_candidates,
+        "upcoming_interviews": [{
+            "interview_id": str(iv.interview_id),
+            "job_title": iv.job.title if iv.job else "",
+            "applicant_name": iv.applicant.name or iv.applicant.email,
+            "scheduled_at": iv.scheduled_at.isoformat(),
+            "duration_minutes": iv.duration_minutes,
+            "status": iv.status,
+            "meeting_link": iv.meeting_link or "",
+        } for iv in upcoming_interviews],
     }), 200
 
 
@@ -1510,6 +1537,186 @@ def update_application_status(application_id):
         "application_id": str(application.application_id),
         "status": application.status,
     }), 200
+
+
+# ============ INTERVIEW ROUTES ============
+
+@api.route('/interviews', methods=['POST'])
+@require_role('recruiter')
+def propose_interview():
+    """Recruiter proposes an interview for an applicant."""
+    data = request.get_json()
+    job_id = data.get('job_id')
+    applicant_id = data.get('applicant_id')
+    scheduled_at_str = data.get('scheduled_at')
+    duration = data.get('duration_minutes', 60)
+    notes = data.get('notes', '')
+    meeting_link = data.get('meeting_link', '')
+
+    if not all([job_id, applicant_id, scheduled_at_str]):
+        return jsonify({"error": "job_id, applicant_id, and scheduled_at are required"}), 400
+
+    job = Job.query.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    if str(job.recruiter_id) != g.current_user_id:
+        return jsonify({"error": "You can only schedule interviews for your own jobs"}), 403
+
+    applicant = Applicant.query.get(applicant_id)
+    if not applicant:
+        return jsonify({"error": "Applicant not found"}), 404
+
+    try:
+        scheduled_at = datetime.fromisoformat(scheduled_at_str)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid datetime format. Use ISO 8601."}), 400
+
+    if scheduled_at < datetime.utcnow():
+        return jsonify({"error": "Interview time must be in the future"}), 400
+
+    interview = Interview(
+        job_id=job_id,
+        applicant_id=applicant_id,
+        recruiter_id=g.current_user_id,
+        scheduled_at=scheduled_at,
+        duration_minutes=duration,
+        notes=notes,
+        meeting_link=meeting_link,
+        status='pending',
+    )
+    db.session.add(interview)
+
+    db.session.add(Notification(
+        user_id=applicant_id,
+        title="Interview Invitation",
+        message=f"You've been invited for an interview for '{job.title}'.",
+        type="info",
+        related_job_id=job_id,
+    ))
+    db.session.commit()
+
+    return jsonify({
+        "message": "Interview proposed successfully",
+        "interview_id": str(interview.interview_id),
+        "scheduled_at": interview.scheduled_at.isoformat(),
+        "status": interview.status,
+    }), 201
+
+
+@api.route('/interviews/<interview_id>/respond', methods=['PATCH'])
+@require_role('applicant')
+def respond_interview(interview_id):
+    """Applicant confirms or declines an interview."""
+    interview = Interview.query.get(interview_id)
+    if not interview:
+        return jsonify({"error": "Interview not found"}), 404
+
+    if str(interview.applicant_id) != g.current_user_id:
+        return jsonify({"error": "You can only respond to your own interviews"}), 403
+
+    if interview.status != 'pending':
+        return jsonify({"error": f"Interview already {interview.status}"}), 400
+
+    data = request.get_json()
+    action = data.get('action')
+    if action not in ('confirm', 'decline'):
+        return jsonify({"error": "Action must be 'confirm' or 'decline'"}), 400
+
+    interview.status = 'confirmed' if action == 'confirm' else 'declined'
+
+    job = Job.query.get(interview.job_id)
+    job_title = job.title if job else "a position"
+
+    if action == 'confirm':
+        msg = f"{interview.applicant.name or 'The applicant'} has confirmed the interview for '{job_title}'."
+        notif_title = "Interview Confirmed"
+    else:
+        msg = f"{interview.applicant.name or 'The applicant'} has declined the interview for '{job_title}'."
+        notif_title = "Interview Declined"
+
+    db.session.add(Notification(
+        user_id=interview.recruiter_id,
+        title=notif_title,
+        message=msg,
+        type="info",
+        related_job_id=interview.job_id,
+    ))
+    db.session.commit()
+
+    return jsonify({
+        "message": f"Interview {action}ed successfully",
+        "interview_id": str(interview.interview_id),
+        "status": interview.status,
+    }), 200
+
+
+@api.route('/interviews/<interview_id>/cancel', methods=['PATCH'])
+@require_role('recruiter')
+def cancel_interview(interview_id):
+    """Recruiter cancels an interview."""
+    interview = Interview.query.get(interview_id)
+    if not interview:
+        return jsonify({"error": "Interview not found"}), 404
+
+    if str(interview.recruiter_id) != g.current_user_id:
+        return jsonify({"error": "You can only cancel your own interviews"}), 403
+
+    if interview.status not in ('pending', 'confirmed'):
+        return jsonify({"error": f"Cannot cancel an interview that is {interview.status}"}), 400
+
+    interview.status = 'cancelled'
+
+    job = Job.query.get(interview.job_id)
+    job_title = job.title if job else "a position"
+
+    db.session.add(Notification(
+        user_id=interview.applicant_id,
+        title="Interview Cancelled",
+        message=f"The interview for '{job_title}' has been cancelled.",
+        type="warning",
+        related_job_id=interview.job_id,
+    ))
+    db.session.commit()
+
+    return jsonify({
+        "message": "Interview cancelled successfully",
+        "interview_id": str(interview.interview_id),
+        "status": interview.status,
+    }), 200
+
+
+@api.route('/interviews/<user_id>', methods=['GET'])
+@_ownership_required
+def list_interviews(user_id):
+    """Get all interviews for a user (works for both applicant and recruiter)."""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    if user.role == 'recruiter':
+        interviews = Interview.query.filter_by(recruiter_id=user_id)\
+            .order_by(Interview.scheduled_at.desc()).all()
+    else:
+        interviews = Interview.query.filter_by(applicant_id=user_id)\
+            .order_by(Interview.scheduled_at.desc()).all()
+
+    return jsonify([{
+        "interview_id": str(iv.interview_id),
+        "job_id": str(iv.job_id),
+        "job_title": iv.job.title if iv.job else "",
+        "applicant_id": str(iv.applicant_id),
+        "applicant_name": iv.applicant.name or iv.applicant.email,
+        "recruiter_id": str(iv.recruiter_id),
+        "recruiter_name": iv.recruiter.name or iv.recruiter.email,
+        "recruiter_company": iv.recruiter.company or "",
+        "scheduled_at": iv.scheduled_at.isoformat(),
+        "duration_minutes": iv.duration_minutes,
+        "status": iv.status,
+        "notes": iv.notes or "",
+        "meeting_link": iv.meeting_link or "",
+        "created_at": iv.created_at.isoformat(),
+    } for iv in interviews]), 200
 
 
 @api.route('/jobs/<job_id>/application-status/<applicant_id>', methods=['GET'])

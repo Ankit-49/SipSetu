@@ -12,7 +12,12 @@ import {
   Sparkles,
   Loader2,
   Mail,
-  X
+  X,
+  Calendar,
+  Clock,
+  Video,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
@@ -185,6 +190,60 @@ export default function ApplicantDashboardHome() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Upcoming Interviews */}
+      {data?.upcoming_interviews?.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3 border-b border-slate-100">
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-[#1E3A5F]" /> Upcoming Interviews
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-slate-100">
+              {data.upcoming_interviews.slice(0, 5).map((iv: any) => {
+                const dt = new Date(iv.scheduled_at);
+                const dateStr = dt.toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: 'numeric' });
+                const timeStr = dt.toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit' });
+                return (
+                  <div key={iv.interview_id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                    <div className="flex items-start gap-4">
+                      <div className="h-10 w-10 rounded-full bg-[#1E3A5F]/5 flex items-center justify-center shrink-0">
+                        <Calendar className="h-5 w-5 text-[#1E3A5F]" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-slate-900">{iv.job_title}</h4>
+                        <p className="text-sm text-slate-500">
+                          by <span className="font-medium text-slate-700">{iv.recruiter_company || iv.recruiter_name}</span>
+                        </p>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
+                          <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {dateStr} at {timeStr}</span>
+                          <span>{iv.duration_minutes} min</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {iv.status === "pending" && (
+                        <Badge className="bg-amber-50 text-amber-700 border-amber-200">Awaiting your response</Badge>
+                      )}
+                      {iv.status === "confirmed" && (
+                        <Badge className="bg-green-50 text-green-700 border-green-200">Confirmed</Badge>
+                      )}
+                      {iv.meeting_link && iv.status === "confirmed" && (
+                        <a href={iv.meeting_link} target="_blank" rel="noopener noreferrer">
+                          <Button size="sm" variant="outline" className="h-8 gap-1.5">
+                            <Video className="h-3.5 w-3.5" /> Join
+                          </Button>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Top Matches */}

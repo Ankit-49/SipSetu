@@ -134,6 +134,24 @@ class PasswordResetToken(db.Model):
     user = db.relationship('User', backref='password_reset_tokens')
 
 
+class Interview(db.Model):
+    __tablename__ = 'interviews'
+    interview_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_id = db.Column(UUID(as_uuid=True), db.ForeignKey('jobs.job_id', ondelete='CASCADE'), nullable=False)
+    applicant_id = db.Column(UUID(as_uuid=True), db.ForeignKey('applicants.user_id', ondelete='CASCADE'), nullable=False)
+    recruiter_id = db.Column(UUID(as_uuid=True), db.ForeignKey('recruiters.user_id', ondelete='CASCADE'), nullable=False)
+    scheduled_at = db.Column(db.DateTime, nullable=False)
+    duration_minutes = db.Column(db.Integer, default=60)
+    status = db.Column(db.String(20), default='pending', nullable=False)  # 'pending', 'confirmed', 'completed', 'cancelled', 'declined'
+    notes = db.Column(db.Text, nullable=True)
+    meeting_link = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    job = db.relationship('Job', backref='interviews')
+    applicant = db.relationship('Applicant', backref='interviews', foreign_keys=[applicant_id])
+    recruiter = db.relationship('Recruiter', backref='interviews_as_recruiter', foreign_keys=[recruiter_id])
+
+
 class Notification(db.Model):
     __tablename__ = 'notifications'
     notification_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

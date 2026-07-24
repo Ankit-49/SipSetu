@@ -1,9 +1,19 @@
 import { useEffect, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MapPin, Briefcase, Mail, Loader2, Star, X, RotateCcw } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { MapPin, Briefcase, Mail, Loader2, Star, X, RotateCcw, Calendar, Clock, Video } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import { useAuth } from "@/app/context/AuthContext";
@@ -31,6 +41,15 @@ export default function RecruiterCandidates() {
   const [jobs, setJobs] = useState<{ job_id: string; title: string }[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [shortlisting, setShortlisting] = useState<string | null>(null);
+
+  // Interview modal state
+  const [interviewCandidate, setInterviewCandidate] = useState<Candidate | null>(null);
+  const [interviewDate, setInterviewDate] = useState("");
+  const [interviewTime, setInterviewTime] = useState("");
+  const [interviewDuration, setInterviewDuration] = useState("60");
+  const [interviewNotes, setInterviewNotes] = useState("");
+  const [interviewLink, setInterviewLink] = useState("");
+  const [scheduling, setScheduling] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -79,6 +98,45 @@ export default function RecruiterCandidates() {
       toast({ title: "Failed to update", description: "Please try again.", variant: "destructive" });
     } finally {
       setShortlisting(null);
+    }
+  };
+
+  const openScheduleModal = (candidate: Candidate) => {
+    setInterviewCandidate(candidate);
+    setInterviewDate("");
+    setInterviewTime("");
+    setInterviewDuration("60");
+    setInterviewNotes("");
+    setInterviewLink("");
+  };
+
+  const handleScheduleInterview = async () => {
+    if (!interviewCandidate || !interviewDate || !interviewTime) {
+      toast({ title: "Missing fields", description: "Please select a date and time for the interview.", variant: "destructive" });
+      return;
+    }
+
+    const scheduledAt = `${interviewDate}T${interviewTime}:00`;
+    setScheduling(true);
+    try {
+      await api.post("/interviews", {
+        job_id: interviewCandidate.job_id,
+        applicant_id: interviewCandidate.applicant_id,
+        scheduled_at: scheduledAt,
+        duration_minutes: parseInt(interviewDuration),
+        notes: interviewNotes,
+        meeting_link: interviewLink,
+      });
+      toast({
+        title: "Interview scheduled!",
+        description: `Interview invitation sent to ${interviewCandidate.applicant_name}.`,
+      });
+      setInterviewCandidate(null);
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || "Failed to schedule interview";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setScheduling(false);
     }
   };
 
@@ -181,7 +239,7 @@ export default function RecruiterCandidates() {
               >
                 <CardContent className="p-0 flex flex-row items-stretch">
                   {/* Left: Rank + Actions */}
-                  <div className="w-24 md:w-28 p-3 flex flex-col items-center justify-center gap-2 bg-slate-50 border-r border-slate-100 shrink-0">
+                  <div className="w-28 md:w-32 p-3 flex flex-col items-center justify-center gap-2 bg-slate-50 border-r border-slate-100 shrink-0">
                     <div className={`text-center font-bold px-2 py-0.5 rounded-full border text-xs ${rankColor}`}>
                       {rankText}
                     </div>
@@ -210,6 +268,16 @@ export default function RecruiterCandidates() {
                           </Button>
                         )}
                       </div>
+                    )}
+                    {/* Schedule Interview button (only for shortlisted) */}
+                    {status === "shortlisted" && candidate.application_id && (
+                      <Button
+                        size="sm"
+                        className="h-6 text-[10px] w-full bg-[#1E3A5F] hover:bg-[#1E3A5F]/90 text-white gap-0.5 px-1 mt-1"
+                        onClick={() => openScheduleModal(candidate)}
+                      >
+                        <Calendar className="h-2.5 w-2.5" /> Interview
+                      </Button>
                     )}
                   </div>
 
@@ -267,6 +335,108 @@ export default function RecruiterCandidates() {
           })}
         </div>
       </div>
+
+      {/* Schedule Interview Modal */}
+      <Dialog open={!!interviewCandidate} onOpenChange={() => setInterviewCandidate(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900">Schedule Interview</DialogTitle>
+            <DialogDescription>
+              Send an interview invitation to {interviewCandidate?.applicant_name} for{" "}
+              <span className="font-semibold">{interviewCandidate?.job_title}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="interview-date" className="flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-slate-500" /> Date
+                </Label>
+                <Input
+                  id="interview-date"
+                  type="date"
+                  value={interviewDate}
+                  onChange={(e) => setInterviewDate(e.target.value)}
+                  min={new Date().toISOString().split("T")[0]}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="interview-time" className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-slate-500" /> Time
+                </Label>
+                <Input
+                  id="interview-time"
+                  type="time"
+                  value={interviewTime}
+                  onChange={(e) => setInterviewTime(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="interview-duration" className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-slate-500" /> Duration
+              </Label>
+              <Select value={interviewDuration} onValueChange={setInterviewDuration}>
+                <SelectTrigger id="interview-duration" className="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="15">15 minutes</SelectItem>
+                  <SelectItem value="30">30 minutes</SelectItem>
+                  <SelectItem value="45">45 minutes</SelectItem>
+                  <SelectItem value="60">1 hour</SelectItem>
+                  <SelectItem value="90">1.5 hours</SelectItem>
+                  <SelectItem value="120">2 hours</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="interview-link" className="flex items-center gap-1.5">
+                <Video className="h-3.5 w-3.5 text-slate-500" /> Meeting Link (optional)
+              </Label>
+              <Input
+                id="interview-link"
+                type="url"
+                value={interviewLink}
+                onChange={(e) => setInterviewLink(e.target.value)}
+                placeholder="e.g. https://meet.google.com/abc-defg-hij"
+                className="h-10"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="interview-notes">Notes (optional)</Label>
+              <Textarea
+                id="interview-notes"
+                value={interviewNotes}
+                onChange={(e) => setInterviewNotes(e.target.value)}
+                placeholder="Add any notes or preparation instructions for the candidate..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+            <Button variant="outline" onClick={() => setInterviewCandidate(null)} disabled={scheduling}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleScheduleInterview}
+              disabled={scheduling || !interviewDate || !interviewTime}
+              className="bg-[#1E3A5F] hover:bg-[#1E3A5F]/90 text-white"
+            >
+              {scheduling ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
+              ) : (
+                <><Calendar className="h-4 w-4 mr-2" /> Send Invitation</>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
