@@ -1,5 +1,5 @@
 from flask import Blueprint, Flask, request, jsonify, g
-from models import db, User, Applicant, Recruiter, Job, JobApplication, Resume, Skill, Ranking, Notification, PasswordResetToken, EmailVerificationToken, Interview
+from models import db, User, Applicant, Recruiter, Job, JobApplication, Resume, Skill, Ranking, Notification, PasswordResetToken, EmailVerificationToken, Interview, SavedJob
 from werkzeug.security import generate_password_hash, check_password_hash
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -1487,6 +1487,93 @@ def mark_all_notifications_read(user_id):
     Notification.query.filter_by(user_id=user_id, is_read=False).update({"is_read": True})
     db.session.commit()
     return jsonify({"success": True}), 200
+
+
+# ============ SAVED JOBS ROUTES ============
+
+@api.route('/jobs/<job_id>/save', methods=['POST', 'DELETE'])
+@require_role('applicant')
+def toggle_saved_job(job_id):
+    """Save or unsave a job for the authenticated applicant."""
+    job = Job.query.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    existing = SavedJob.query.filter_by(
+        applicant_id=g.current_user_id, job_id=job_id
+    ).first()
+
+    if request.method == 'POST':
+        if existing:
+            return jsonify({"message": "Job already saved", "saved": True}), 200
+        saved = SavedJob(applicant_id=g.current_user_id, job_id=job_id)
+        db.session.add(saved)
+        db.session.commit()
+        return jsonify({"message": "Job saved successfully", "saved": True}), 201
+    else:
+        if not existing:
+            return jsonify({"message": "Job not saved", "saved": False}), 200
+        db.session.delete(existing)
+        db.session.commit()
+        return jsonify({"message": "Job unsaved successfully", "saved": False}), 200
+
+
+@api.route('/applicants/<applicant_id>/saved-jobs', methods=['GET'])
+@_ownership_required
+def get_saved_jobs(applicant_id):
+    """Get all saved jobs for the applicant."""
+    applicant = Applicant.query.get(applicant_id)
+    if not applicant:
+        return jsonify({"error": "Applicant not found"}), 404
+
+    saved_jobs = SavedJob.query.filter_by(applicant_id=applicant_id)\
+        .order_by(SavedJob.created_at.desc()).all()
+
+    latest_resume = Resume.query.filter_by(applicant_id=applicant_id)\
+        .order_by(Resume.uploaded_at.desc()).first()
+
+    job_ids = {str(a.job_id) for a in JobApplication.query.filter_by(
+        applicant_id=applicant_id
+    ).all()}
+
+    from routes_common import format_job
+
+    jobs = []
+    for sj in saved_jobs:
+        job = sj.job
+        if not job:
+            continue
+        job_data = format_job(job)
+        score = 0.0
+        if latest_resume:
+            try:
+                score = float(_compute_job_match_score(latest_resume, job) or 0.0)
+            except Exception:
+                pass
+        job_data["matching_score"] = round(score, 2)
+        job_data["applied"] = str(job.job_id) in job_ids
+        job_data["saved_at"] = sj.created_at.isoformat()
+        jobs.append(job_data)
+
+    return jsonify({
+        "total": len(jobs),
+        "saved_jobs": jobs,
+    }), 200
+
+
+@api.route('/applicants/<applicant_id>/saved-job-ids', methods=['GET'])
+@_ownership_required
+def get_saved_job_ids(applicant_id):
+    """Get just the IDs of saved jobs (for bookmark state on job cards)."""
+    applicant = Applicant.query.get(applicant_id)
+    if not applicant:
+        return jsonify({"error": "Applicant not found"}), 404
+
+    saved_ids = [
+        str(sj.job_id)
+        for sj in SavedJob.query.filter_by(applicant_id=applicant_id).all()
+    ]
+    return jsonify({"saved_job_ids": saved_ids}), 200
 
 
 # ============ APPLICATION STATUS / SHORTLIST ROUTES ============

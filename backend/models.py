@@ -134,6 +134,21 @@ class PasswordResetToken(db.Model):
     user = db.relationship('User', backref='password_reset_tokens')
 
 
+class SavedJob(db.Model):
+    __tablename__ = 'saved_jobs'
+    saved_job_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    applicant_id = db.Column(UUID(as_uuid=True), db.ForeignKey('applicants.user_id', ondelete='CASCADE'), nullable=False)
+    job_id = db.Column(UUID(as_uuid=True), db.ForeignKey('jobs.job_id', ondelete='CASCADE'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('applicant_id', 'job_id', name='uq_applicant_saved_job'),
+    )
+
+    applicant = db.relationship('Applicant', backref='saved_jobs')
+    job = db.relationship('Job', backref='saved_by_applicants')
+
+
 class Interview(db.Model):
     __tablename__ = 'interviews'
     interview_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

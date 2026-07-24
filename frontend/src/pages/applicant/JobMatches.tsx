@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, Clock, Briefcase, Send, Loader2, UploadCloud, SlidersHorizontal, X, DollarSign, TrendingUp, FilterX } from "lucide-react";
+import { Search, MapPin, Clock, Briefcase, Send, Loader2, UploadCloud, SlidersHorizontal, X, DollarSign, TrendingUp, FilterX, Bookmark, BookmarkCheck } from "lucide-react";
 import { Link } from "react-router";
 import api from "@/lib/api";
 import { useAuth } from "@/app/context/AuthContext";
@@ -40,6 +40,8 @@ export default function ApplicantJobMatches() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [hasResume, setHasResume] = useState(true);
   const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
+  const [savedJobIds, setSavedJobIds] = useState<string[]>([]);
+  const [savingJobId, setSavingJobId] = useState<string | null>(null);
 
   const buildQuery = useCallback(() => {
     const params = new URLSearchParams({ per_page: "100" });
@@ -70,12 +72,25 @@ export default function ApplicantJobMatches() {
     }
   }, [user, buildQuery]);
 
+  // Fetch saved job IDs
+  const fetchSavedIds = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await api.get(`/applicants/${user.id}/saved-job-ids`);
+      setSavedJobIds(res.data.saved_job_ids || []);
+    } catch (err) {
+      console.error("Failed to load saved job IDs", err);
+    }
+  }, [user]);
+
   useEffect(() => {
     if (!user) { setLoading(false); return; }
     setLoading(true);
-    const timer = setTimeout(fetchMatches, 150);
+    const timer = setTimeout(() => {
+      Promise.all([fetchMatches(), fetchSavedIds()]);
+    }, 150);
     return () => clearTimeout(timer);
-  }, [user, fetchMatches]);
+  }, [user, fetchMatches, fetchSavedIds]);
 
   // Count active non-search filters
   const advancedFilterCount = [
@@ -138,6 +153,25 @@ export default function ApplicantJobMatches() {
       });
     } finally {
       setApplyingJobId(null);
+    }
+  };
+
+  const handleToggleSave = async (jobId: string) => {
+    if (!user || savingJobId === jobId) return;
+    const isSaved = savedJobIds.includes(jobId);
+    setSavingJobId(jobId);
+    try {
+      if (isSaved) {
+        await api.delete(`/jobs/${jobId}/save`);
+        setSavedJobIds((prev) => prev.filter(id => id !== jobId));
+      } else {
+        await api.post(`/jobs/${jobId}/save`);
+        setSavedJobIds((prev) => [...prev, jobId]);
+      }
+    } catch (err) {
+      console.error("Failed to toggle save", err);
+    } finally {
+      setSavingJobId(null);
     }
   };
 
@@ -405,7 +439,29 @@ export default function ApplicantJobMatches() {
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                  <span className="text-xs text-slate-400">{formatPosted(job.created_at)}</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={`p-1.5 h-auto transition-colors ${
+                        savedJobIds.includes(job.job_id)
+                          ? "text-[#F97316] hover:text-[#e8630e]"
+                          : "text-slate-300 hover:text-slate-500"
+                      }`}
+                      onClick={() => handleToggleSave(job.job_id)}
+                      disabled={savingJobId === job.job_id}
+                      title={savedJobIds.includes(job.job_id) ? "Remove from saved" : "Save for later"}
+                    >
+                      {savingJobId === job.job_id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : savedJobIds.includes(job.job_id) ? (
+                        <BookmarkCheck className="h-4 w-4" />
+                      ) : (
+                        <Bookmark className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <span className="text-xs text-slate-400">{formatPosted(job.created_at)}</span>
+                  </div>
                   <Button
                     className="bg-[#F97316] hover:bg-[#F97316]/90 text-white gap-2"
                     onClick={() => handleApply(job.job_id)}

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router";
-import { LayoutDashboard, FileText, Briefcase, TrendingUp, User, Menu, X, ClipboardList } from "lucide-react";
+import { LayoutDashboard, FileText, Briefcase, TrendingUp, User, Menu, X, ClipboardList, Heart } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ const navItems = [
   { name: "Dashboard", href: "/applicant/dashboard", icon: LayoutDashboard },
   { name: "My Resume", href: "/applicant/resume", icon: FileText },
   { name: "Job Matches", href: "/applicant/matches", icon: Briefcase },
+  { name: "Saved Jobs", href: "/applicant/saved", icon: Heart },
   { name: "My Applications", href: "/applicant/applications", icon: ClipboardList },
   { name: "Skill Gap", href: "/applicant/skill-gap", icon: TrendingUp },
   { name: "Profile", href: "/applicant/profile", icon: User },
