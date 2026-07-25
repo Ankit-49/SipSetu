@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, Briefcase, Send, Loader2, BookmarkCheck, Bookmark, Trash2, Heart } from "lucide-react";
+import { MapPin, Clock, Briefcase, Send, Loader2, BookmarkCheck, Bookmark, Trash2, Heart, Eye, DollarSign, GraduationCap } from "lucide-react";
 import { Link } from "react-router";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import api from "@/lib/api";
 import { useAuth } from "@/app/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -16,7 +18,7 @@ export default function ApplicantSavedJobs() {
   const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
   const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
   const [unsavingId, setUnsavingId] = useState<string | null>(null);
-  const [expandedDescs, setExpandedDescs] = useState<Set<string>>(new Set());
+  const [selectedJob, setSelectedJob] = useState<any | null>(null);
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
@@ -176,32 +178,6 @@ export default function ApplicantSavedJobs() {
                   )}
                 </div>
 
-                {job.description && (
-                  <div className="mb-4">
-                    <p className="text-xs font-semibold text-slate-900 uppercase tracking-wider mb-2">Description</p>
-                    <div className="text-sm text-slate-600 leading-relaxed">
-                      {expandedDescs.has(job.job_id) ? (
-                        <>{job.description}</>
-                      ) : (
-                        <>{job.description.length > 150 ? job.description.slice(0, 150) + '...' : job.description}</>
-                      )}
-                    </div>
-                    {job.description.length > 150 && (
-                      <button
-                        onClick={() => {
-                          const next = new Set(expandedDescs);
-                          if (next.has(job.job_id)) next.delete(job.job_id);
-                          else next.add(job.job_id);
-                          setExpandedDescs(next);
-                        }}
-                        className="text-xs font-medium text-[#F97316] hover:text-[#e8630e] mt-1 transition-colors"
-                      >
-                        {expandedDescs.has(job.job_id) ? 'Show less' : 'Read more'}
-                      </button>
-                    )}
-                  </div>
-                )}
-
                 <div className="mb-6">
                   <p className="text-xs font-semibold text-slate-900 uppercase tracking-wider mb-2">Required Skills</p>
                   <div className="flex flex-wrap gap-2">
@@ -214,7 +190,12 @@ export default function ApplicantSavedJobs() {
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                  <span className="text-xs text-slate-400">{formatPosted(job.created_at)}</span>
+                  <button
+                    onClick={() => setSelectedJob(job)}
+                    className="text-xs font-medium text-[#1E3A5F] hover:text-[#F97316] transition-colors flex items-center gap-1"
+                  >
+                    <Eye className="h-3.5 w-3.5" /> View Details
+                  </button>
                   <Button
                     className="bg-[#F97316] hover:bg-[#F97316]/90 text-white gap-2"
                     onClick={() => handleApply(job.job_id)}
@@ -234,6 +215,115 @@ export default function ApplicantSavedJobs() {
           ))}
         </div>
       )}
+
+      {/* Job Details Dialog */}
+      <Dialog open={!!selectedJob} onOpenChange={(open) => { if (!open) setSelectedJob(null); }}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900">{selectedJob?.title}</DialogTitle>
+            <DialogDescription className="text-slate-600">
+              {selectedJob?.recruiter_company || selectedJob?.recruiter_name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[60vh] pr-4">
+            {selectedJob && (
+              <div className="space-y-6">
+                <div className="flex flex-wrap gap-3">
+                  {selectedJob.location && (
+                    <div className="flex items-center text-xs text-slate-500 gap-1 bg-slate-50 px-2.5 py-1.5 rounded-md">
+                      <MapPin className="h-3.5 w-3.5" /> {selectedJob.location}
+                    </div>
+                  )}
+                  {selectedJob.job_type && (
+                    <div className="flex items-center text-xs text-slate-500 gap-1 bg-slate-50 px-2.5 py-1.5 rounded-md">
+                      <Briefcase className="h-3.5 w-3.5" /> {selectedJob.job_type}
+                    </div>
+                  )}
+                  {selectedJob.experience_level && (
+                    <div className="flex items-center text-xs text-slate-500 gap-1 bg-slate-50 px-2.5 py-1.5 rounded-md">
+                      <GraduationCap className="h-3.5 w-3.5" /> {selectedJob.experience_level}
+                    </div>
+                  )}
+                  {formatSalary(selectedJob) && (
+                    <div className="flex items-center text-xs text-slate-500 gap-1 bg-slate-50 px-2.5 py-1.5 rounded-md">
+                      <DollarSign className="h-3.5 w-3.5" /> {formatSalary(selectedJob)}
+                    </div>
+                  )}
+                </div>
+
+                {selectedJob.matching_score > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-slate-700">Match Score:</span>
+                    <Badge className={
+                      selectedJob.matching_score >= 85 ? "bg-green-100 text-green-700 border-none" :
+                      selectedJob.matching_score >= 70 ? "bg-orange-100 text-orange-700 border-none" :
+                      "bg-slate-100 text-slate-700 border-none"
+                    }>
+                      {Number(selectedJob.matching_score).toFixed(2)}%
+                    </Badge>
+                  </div>
+                )}
+
+                {selectedJob.description && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-2">Job Description</h4>
+                    <div className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">
+                      {selectedJob.description}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-2">Required Skills</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedJob.skills?.length > 0 ? selectedJob.skills.map((skill: string) => (
+                      <Badge key={skill} variant="secondary" className="bg-slate-100 text-slate-600 font-normal">
+                        {skill}
+                      </Badge>
+                    )) : <span className="text-sm text-slate-400">No skills listed</span>}
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-400">
+                  Posted {formatPosted(selectedJob.created_at)}
+                </p>
+              </div>
+            )}
+          </ScrollArea>
+
+          <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-100">
+            <button
+              onClick={() => {
+                if (selectedJob) handleUnsave(selectedJob.job_id);
+              }}
+              disabled={!selectedJob || unsavingId === selectedJob?.job_id}
+              className="flex items-center gap-2 text-sm font-medium text-red-500 hover:text-red-600 transition-colors"
+            >
+              {unsavingId === selectedJob?.job_id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <><Trash2 className="h-4 w-4" /> Remove from saved</>
+              )}
+            </button>
+            <Button
+              className="bg-[#F97316] hover:bg-[#F97316]/90 text-white gap-2"
+              onClick={() => {
+                if (selectedJob) handleApply(selectedJob.job_id);
+              }}
+              disabled={!selectedJob || applyingJobId === selectedJob?.job_id || appliedJobIds.includes(selectedJob?.job_id)}
+            >
+              {selectedJob && appliedJobIds.includes(selectedJob.job_id) ? (
+                "Applied"
+              ) : applyingJobId === selectedJob?.job_id ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Applying...</>
+              ) : (
+                <><Send className="h-4 w-4" /> Apply Now</>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
