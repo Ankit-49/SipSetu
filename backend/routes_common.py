@@ -248,6 +248,7 @@ def format_job(job):
         "recruiter_id": str(job.recruiter_id),
         "recruiter_name": job.recruiter.name or "",
         "recruiter_company": job.recruiter.company or "",
+        "recruiter_profile_image": job.recruiter.profile_image or "",
         "created_at": posted_at,
         "skills": [s.skill_name for s in job.skills],
     }

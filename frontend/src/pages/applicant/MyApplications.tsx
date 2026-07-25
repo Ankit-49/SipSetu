@@ -112,46 +112,46 @@ export default function ApplicantMyApplications() {
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="hover:shadow-md transition-all duration-300">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-slate-500">Total</p>
               <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
             </div>
-            <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center shadow-sm">
               <Briefcase className="h-5 w-5 text-blue-600" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-md transition-all duration-300">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-slate-500">Shortlisted</p>
               <p className="text-2xl font-bold text-green-700">{stats.shortlisted}</p>
             </div>
-            <div className="h-10 w-10 rounded-full bg-green-50 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center shadow-sm">
               <CheckCircle2 className="h-5 w-5 text-green-600" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-md transition-all duration-300">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-slate-500">Pending</p>
               <p className="text-2xl font-bold text-amber-700">{stats.pending}</p>
             </div>
-            <div className="h-10 w-10 rounded-full bg-amber-50 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-amber-50 to-amber-100 flex items-center justify-center shadow-sm">
               <Hourglass className="h-5 w-5 text-amber-600" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-md transition-all duration-300">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-slate-500">Rejected</p>
               <p className="text-2xl font-bold text-red-700">{stats.rejected}</p>
             </div>
-            <div className="h-10 w-10 rounded-full bg-red-50 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center shadow-sm">
               <XCircle className="h-5 w-5 text-red-500" />
             </div>
           </CardContent>

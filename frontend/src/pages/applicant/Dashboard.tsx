@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { NotificationBell } from "@/components/NotificationBell";
 import api from "@/lib/api";
 import { useAuth } from "@/app/context/AuthContext";
@@ -76,10 +77,16 @@ export default function ApplicantDashboardHome() {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5 }}
+        >
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Welcome back, {firstName} 👋</h1>
-          <p className="text-slate-500 mt-1">{date}</p>
-        </div>
+          <p className="text-slate-500 mt-1 flex items-center gap-2">
+            <Calendar className="h-4 w-4" /> {date}
+          </p>
+        </motion.div>
         <div className="flex items-center gap-4">
           <NotificationBell />
         </div>
@@ -150,21 +157,26 @@ export default function ApplicantDashboardHome() {
       )}
 
       {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+      >
+        <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
           <CardContent className="p-6 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-sm font-medium text-slate-500">Avg. Match Score</p>
-              <p className="text-3xl font-bold text-[#F97316]">
+              <p className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
                 {Number(data?.avg_match_score ?? 0).toFixed(2)}%
               </p>
             </div>
-            <div className="h-12 w-12 rounded-full bg-orange-50 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-full bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center shadow-sm">
               <Target className="h-6 w-6 text-[#F97316]" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
           <CardContent className="p-6 flex flex-col justify-center space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-slate-500">Resume Strength</p>
@@ -174,22 +186,22 @@ export default function ApplicantDashboardHome() {
               <div className="flex items-center justify-between text-sm">
                 <span className="font-bold text-slate-900">{data?.resume_strength ?? 0}/100</span>
               </div>
-              <Progress value={data?.resume_strength ?? 0} className="h-2 bg-slate-100" indicatorClassName="bg-[#1E3A5F]" />
+              <Progress value={data?.resume_strength ?? 0} className="h-2.5 bg-slate-100 rounded-full" indicatorClassName="bg-gradient-to-r from-[#1E3A5F] to-[#2a4f7a]" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
           <CardContent className="p-6 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-sm font-medium text-slate-500">Skills Detected</p>
               <p className="text-3xl font-bold text-slate-900">{data?.skill_count ?? 0}</p>
             </div>
-            <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-full bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center shadow-sm">
               <Zap className="h-6 w-6 text-slate-600" />
             </div>
           </CardContent>
         </Card>
-      </div>
+      </motion.div>
 
       {/* Upcoming Interviews */}
       {data?.upcoming_interviews?.length > 0 && (
@@ -245,11 +257,18 @@ export default function ApplicantDashboardHome() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.4 }}
+        className="grid grid-cols-1 lg:grid-cols-3 gap-8"
+      >
         {/* Top Matches */}
-        <Card className="lg:col-span-2 flex flex-col">
+        <Card className="lg:col-span-2 flex flex-col hover:shadow-lg transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-slate-100">
-            <CardTitle className="text-lg font-bold">Top Job Matches</CardTitle>
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-[#1E3A5F]" /> Top Job Matches
+            </CardTitle>
             <Link to="/applicant/matches">
               <Button variant="ghost" size="sm" className="text-slate-500 hover:text-[#1E3A5F]">
                 View All <ChevronRight className="h-4 w-4 ml-1" />
@@ -288,7 +307,12 @@ export default function ApplicantDashboardHome() {
         </Card>
 
         {/* Right Column */}
-        <div className="space-y-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.5 }}
+          className="space-y-8"
+        >
           <Card>
             <CardHeader className="pb-2 border-b border-slate-100">
               <CardTitle className="text-lg font-bold flex items-center gap-2">
@@ -391,8 +415,8 @@ export default function ApplicantDashboardHome() {
               )}
             </CardContent>
           </Card>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }

@@ -8,7 +8,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import Lottie from "lottie-react";
 import loginAnimation from "@/imports/Login.json";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, Mail, Lock } from "lucide-react";
 import { VisualBackground } from "@/components/VisualBackground";
 import { SipSetuLogo } from "@/components/SipSetuLogo";
 import { useAuth } from "@/app/context/AuthContext";
@@ -35,7 +35,6 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(email, password);
-      // After successful login, the AuthContext sets localStorage + user state
       const role = localStorage.getItem("user_role");
       if (from && (from.startsWith("/applicant") || from.startsWith("/recruiter"))) {
         navigate(from, { replace: true });
@@ -53,7 +52,7 @@ export default function LoginPage() {
     }
   };
 
-  const role = "applicant"; // default for registration link
+  const role = "applicant";
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden selection:bg-[#F97316] selection:text-white">
@@ -79,28 +78,33 @@ export default function LoginPage() {
           transition={{ duration: 0.8 }}
           className="w-full max-w-md"
         >
-          <Card className="shadow-2xl border-none bg-white/95 backdrop-blur-sm">
-            <CardHeader className="space-y-3 text-center pb-6">
+          <Card className="shadow-2xl border-none bg-white/95 backdrop-blur-lg rounded-2xl overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#F97316] via-[#1E3A5F] to-[#F97316]" />
+            <CardHeader className="space-y-3 text-center pb-6 pt-8">
               <div className="flex justify-center mb-2">
                 <SipSetuLogo className="text-4xl font-black tracking-tighter text-[#1E3A5F]" />
               </div>
               <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
-              <CardDescription>Enter your details to sign in to your account</CardDescription>
+              <CardDescription className="text-slate-500">Enter your details to sign in to your account</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pb-8 px-8">
               <form onSubmit={handleLogin} className="space-y-6">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-11" />
+                    <Label htmlFor="email" className="text-sm font-medium text-slate-700">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <Input id="email" type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-11 pl-10 bg-slate-50 border-slate-200 focus:bg-white transition-all" />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="password">Password</Label>
-                      <Link to="/forgot-password" className="text-sm font-medium text-[#F97316] hover:underline">Forgot password?</Link>
+                      <Label htmlFor="password" className="text-sm font-medium text-slate-700">Password</Label>
+                      <Link to="/forgot-password" className="text-xs font-medium text-[#F97316] hover:underline">Forgot password?</Link>
                     </div>
                     <div className="relative">
-                      <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="h-11 pr-10" />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="h-11 pl-10 pr-10 bg-slate-50 border-slate-200 focus:bg-white transition-all" />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
@@ -114,16 +118,42 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {error && <p className="text-red-500 text-sm">{error}</p>}
+                {error && (
+                  <motion.p
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-red-500 text-sm bg-red-50 border border-red-100 rounded-lg p-3"
+                  >
+                    {error}
+                  </motion.p>
+                )}
 
-                <Button type="submit" disabled={submitting} className="w-full h-11 text-base bg-[#1E3A5F] hover:bg-[#1E3A5F]/90">
-                  {submitting ? "Signing in..." : "Sign In"}
+                <Button type="submit" disabled={submitting} className="w-full h-11 text-base bg-gradient-to-r from-[#1E3A5F] to-[#2a4f7a] hover:from-[#1E3A5F]/90 hover:to-[#2a4f7a]/90 shadow-lg shadow-[#1E3A5F]/20 transition-all duration-300">
+                  {submitting ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Signing in...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      Sign In <ArrowRight className="h-4 w-4" />
+                    </span>
+                  )}
                 </Button>
 
-                <div className="text-center text-sm text-slate-600">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white px-2 text-slate-400">or</span>
+                  </div>
+                </div>
+
+                <div className="text-center text-sm text-slate-500">
                   Don't have an account?{" "}
-                  <Link to={`/register?role=${role}`} className="font-medium text-[#1E3A5F] hover:underline">
-                    Register
+                  <Link to={`/register?role=${role}`} className="font-semibold text-[#1E3A5F] hover:text-[#F97316] transition-colors">
+                    Create one
                   </Link>
                 </div>
               </form>

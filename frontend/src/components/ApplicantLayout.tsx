@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/app/context/AuthContext";
 import { SipSetuLogo } from "@/components/SipSetuLogo";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,7 +39,6 @@ export function ApplicantLayout({ children }: { children: React.ReactNode }) {
   const [profileImage, setProfileImage] = useState<string>(() => localStorage.getItem("profile_image") || "");
   const [userName, setUserName] = useState<string>(() => localStorage.getItem("user_name") || "Applicant");
 
-  // Sync from AuthContext whenever user changes and listen for storage events
   useEffect(() => {
     if (user) {
       setProfileImage(user.profile_image || localStorage.getItem("profile_image") || "");
@@ -57,7 +57,6 @@ export function ApplicantLayout({ children }: { children: React.ReactNode }) {
 
   const userRole = user?.role || localStorage.getItem("user_role") || "applicant";
 
-  // Close sidebar on route change (mobile)
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
@@ -72,65 +71,83 @@ export function ApplicantLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-20 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/50 z-20 lg:hidden backdrop-blur-sm"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 bg-[#1E3A5F] flex flex-col flex-shrink-0 transition-transform duration-300 lg:relative lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-30 w-64 bg-gradient-to-b from-[#1E3A5F] to-[#162d4a] flex flex-col flex-shrink-0 transition-transform duration-300 ease-out lg:relative lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         data-testid="applicant-sidebar"
       >
-        <div className="h-16 flex items-center justify-between px-6 flex-shrink-0">
+        <div className="h-16 flex items-center justify-between px-6 flex-shrink-0 border-b border-white/5">
           <SipSetuLogo className="text-white text-2xl font-bold tracking-tight" />
-          <button className="lg:hidden text-white/70 hover:text-white" onClick={() => setSidebarOpen(false)}>
+          <button className="lg:hidden text-white/70 hover:text-white transition-colors" onClick={() => setSidebarOpen(false)}>
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
+        <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
+          {navItems.map((item, idx) => {
             const isActive = location.pathname === item.href;
             return (
-              <Link
+              <motion.div
                 key={item.href}
-                to={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                  isActive
-                    ? "bg-white/10 text-white border-l-4 border-[#F97316]"
-                    : "text-slate-300 hover:text-white hover:bg-white/5 border-l-4 border-transparent"
-                }`}
-                data-testid={`nav-link-${item.name.toLowerCase().replace(' ', '-')}`}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.05, duration: 0.3 }}
               >
-                <item.icon className="h-5 w-5" />
-                <span className="font-medium">{item.name}</span>
-              </Link>
+                <Link
+                  to={item.href}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
+                    isActive
+                      ? "bg-white/10 text-white shadow-sm border-l-[3px] border-[#F97316]"
+                      : "text-slate-300 hover:text-white hover:bg-white/5 border-l-[3px] border-transparent"
+                  }`}
+                  data-testid={`nav-link-${item.name.toLowerCase().replace(' ', '-')}`}
+                >
+                  <item.icon className={`h-5 w-5 transition-transform duration-200 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
+                  <span className="font-medium">{item.name}</span>
+                  {isActive && (
+                    <motion.div
+                      layoutId="active-indicator"
+                      className="ml-auto h-2 w-2 rounded-full bg-[#F97316]"
+                    />
+                  )}
+                </Link>
+              </motion.div>
             );
           })}
         </nav>
 
         <Link
           to="/applicant/profile"
-          className="block p-4 border-t border-white/10 transition-colors hover:bg-white/5 rounded-t-xl"
+          className="block p-4 border-t border-white/10 transition-all duration-200 hover:bg-white/5 group"
           data-testid="sidebar-profile-link"
         >
           <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9 ring-2 ring-white/20">
+            <Avatar className="h-9 w-9 ring-2 ring-white/20 group-hover:ring-[#F97316]/50 transition-all">
               <AvatarImage src={profileImage} className="object-cover" />
-              <AvatarFallback className="bg-[#F97316] text-white text-sm font-semibold">
+              <AvatarFallback className="bg-gradient-to-br from-[#F97316] to-orange-500 text-white text-sm font-semibold">
                 {userInitials}
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col min-w-0">
-              <span className="text-sm font-medium text-white truncate max-w-[140px]">
+              <span className="text-sm font-medium text-white truncate max-w-[140px] group-hover:text-orange-200 transition-colors">
                 {userName}
               </span>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-slate-400 group-hover:text-slate-300 transition-colors">
                 {userRole.toUpperCase()}
               </span>
             </div>
@@ -142,7 +159,7 @@ export function ApplicantLayout({ children }: { children: React.ReactNode }) {
             <AlertDialogTrigger asChild>
               <Button
                 variant="outline"
-                className="w-full border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+                className="w-full border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200"
               >
                 Logout
               </Button>
@@ -155,8 +172,8 @@ export function ApplicantLayout({ children }: { children: React.ReactNode }) {
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleLogout} className="bg-[#1E3A5F] hover:bg-[#1E3A5F]/90">
+                <AlertDialogCancel className="border-slate-200">Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleLogout} className="bg-[#1E3A5F] hover:bg-[#1E3A5F]/90 shadow-lg">
                   Sign Out
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -168,8 +185,8 @@ export function ApplicantLayout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Mobile top bar */}
-        <div className="lg:hidden h-14 bg-[#1E3A5F] flex items-center px-4 gap-3 flex-shrink-0">
-          <button className="text-white p-1" onClick={() => setSidebarOpen(true)}>
+        <div className="lg:hidden h-14 bg-gradient-to-r from-[#1E3A5F] to-[#162d4a] flex items-center px-4 gap-3 flex-shrink-0 shadow-md">
+          <button className="text-white p-1 hover:bg-white/10 rounded-lg transition-colors" onClick={() => setSidebarOpen(true)}>
             <Menu className="h-6 w-6" />
           </button>
           <SipSetuLogo className="text-white text-xl font-bold tracking-tight" />

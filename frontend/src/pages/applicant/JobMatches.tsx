@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, MapPin, Clock, Briefcase, Send, Loader2, UploadCloud, SlidersHorizontal, X, DollarSign, TrendingUp, FilterX, Bookmark, BookmarkCheck, Eye, GraduationCap } from "lucide-react";
 import { Link } from "react-router";
@@ -395,9 +396,12 @@ export default function ApplicantJobMatches() {
               <CardContent className="p-6">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-600 text-lg">
-                      {(job.recruiter_company || job.recruiter_name || "?").charAt(0).toUpperCase()}
-                    </div>
+                    <Avatar className="h-12 w-12 rounded-lg ring-2 ring-slate-100">
+                      <AvatarImage src={job.recruiter_profile_image} alt={job.recruiter_company || job.recruiter_name} className="object-cover rounded-lg" />
+                      <AvatarFallback className="bg-gradient-to-br from-[#1E3A5F] to-[#2a4f7a] text-white font-bold text-lg rounded-lg">
+                        {(job.recruiter_company || job.recruiter_name || "?").charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
                     <div>
                       <h3 className="font-bold text-lg text-slate-900">{job.title}</h3>
                       <p className="text-slate-600 text-sm">{job.recruiter_company || job.recruiter_name}</p>

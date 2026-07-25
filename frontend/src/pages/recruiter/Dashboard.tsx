@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Briefcase, Users, UserCheck, TrendingUp, ChevronRight, FileText, Plus, ExternalLink, Calendar, Clock, Video, Loader2 } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { NotificationBell } from "@/components/NotificationBell";
 import api from "@/lib/api";
 import { useAuth } from "@/app/context/AuthContext";
@@ -217,51 +218,62 @@ export default function RecruiterDashboardHome() {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5 }}
+        >
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Good morning, {userName.split(' ')[0]} 👋</h1>
-          <p className="text-slate-500 mt-1">{date}</p>
-        </div>
+          <p className="text-slate-500 mt-1 flex items-center gap-2">
+            <Calendar className="h-4 w-4" /> {date}
+          </p>
+        </motion.div>
         <div className="flex items-center gap-4">
           <NotificationBell />
         </div>
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+      >
+        <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
           <CardContent className="p-6 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-sm font-medium text-slate-500">Active Postings</p>
               <p className="text-3xl font-bold text-slate-900">{data?.active_postings ?? 0}</p>
             </div>
-            <div className="h-12 w-12 rounded-full bg-blue-50 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center shadow-sm">
               <Briefcase className="h-6 w-6 text-[#1E3A5F]" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
           <CardContent className="p-6 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-sm font-medium text-slate-500">Total Candidates</p>
               <p className="text-3xl font-bold text-slate-900">{data?.total_candidates ?? 0}</p>
             </div>
-            <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-full bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center shadow-sm">
               <Users className="h-6 w-6 text-slate-600" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
           <CardContent className="p-6 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-sm font-medium text-slate-500">Top Match</p>
-              <p className="text-3xl font-bold text-[#F97316]">{Number(data?.top_match_score ?? 0).toFixed(2)}%</p>
+              <p className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">{Number(data?.top_match_score ?? 0).toFixed(2)}%</p>
             </div>
-            <div className="h-12 w-12 rounded-full bg-orange-50 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-full bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center shadow-sm">
               <UserCheck className="h-6 w-6 text-[#F97316]" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
           <CardContent className="p-6 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-sm font-medium text-slate-500">Recent Jobs</p>
@@ -270,12 +282,12 @@ export default function RecruiterDashboardHome() {
                 <TrendingUp className="h-4 w-4 text-green-500" />
               </div>
             </div>
-            <div className="h-12 w-12 rounded-full bg-green-50 flex items-center justify-center">
-              <Users className="h-6 w-6 text-green-600" />
+            <div className="h-12 w-12 rounded-full bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center shadow-sm">
+              <Briefcase className="h-6 w-6 text-green-600" />
             </div>
           </CardContent>
         </Card>
-      </div>
+      </motion.div>
 
       {/* Upcoming Interviews */}
       {data?.upcoming_interviews?.length > 0 && (
@@ -329,11 +341,18 @@ export default function RecruiterDashboardHome() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.4 }}
+        className="grid grid-cols-1 lg:grid-cols-3 gap-8"
+      >
         {/* Top Candidates */}
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 hover:shadow-lg transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-slate-100">
-            <CardTitle className="text-lg font-bold">Top Matches (AI Ranked)</CardTitle>
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <Users className="h-5 w-5 text-[#1E3A5F]" /> Top Matches (AI Ranked)
+            </CardTitle>
             <Link to="/recruiter/candidates">
               <Button variant="ghost" size="sm" className="text-slate-500 hover:text-[#1E3A5F]">
                 View All <ChevronRight className="h-4 w-4 ml-1" />
@@ -344,10 +363,16 @@ export default function RecruiterDashboardHome() {
             <div className="divide-y divide-slate-100">
               {topCandidates.length === 0 ? (
                 <div className="p-8 text-center text-slate-500">No ranked candidates yet. Upload resumes and create jobs to see matches.</div>
-              ) : topCandidates.map((candidate: any) => (
-                <div key={`${candidate.applicant_id}-${candidate.job_title}`} className="p-4 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors group min-w-0">
+              ) : topCandidates.map((candidate: any, idx: number) => (
+                <motion.div
+                  key={`${candidate.applicant_id}-${candidate.job_title}`}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="p-4 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors group min-w-0"
+                >
                   <div className="flex items-start gap-4 min-w-0 flex-1">
-                    <div className="h-10 w-10 rounded-full bg-[#1E3A5F] text-white flex items-center justify-center font-semibold text-sm shrink-0 mt-0.5">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#1E3A5F] to-[#2a4f7a] text-white flex items-center justify-center font-semibold text-sm shrink-0 mt-0.5 shadow-sm">
                       {candidate.applicant_name.split(' ').map((n: string) => n[0]).join('')}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -372,18 +397,20 @@ export default function RecruiterDashboardHome() {
                       <FileText className="h-3.5 w-3.5" /> Resume
                     </Button>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           </CardContent>
         </Card>
 
         {/* Recent Postings */}
-        <Card>
+        <Card className="hover:shadow-lg transition-all duration-300">
           <CardHeader className="pb-2 border-b border-slate-100 flex flex-row items-center justify-between">
-            <CardTitle className="text-lg font-bold">Active Job Postings</CardTitle>
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-[#1E3A5F]" /> Active Job Postings
+            </CardTitle>
             <Link to="/recruiter/post-job">
-              <Button size="sm" className="bg-[#F97316] hover:bg-[#e8630e] text-white gap-1.5">
+              <Button size="sm" className="bg-[#F97316] hover:bg-[#e8630e] text-white gap-1.5 shadow-sm hover:shadow-md transition-all">
                 <Plus className="h-4 w-4" /> New Job
               </Button>
             </Link>
@@ -412,7 +439,7 @@ export default function RecruiterDashboardHome() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </motion.div>
 
     </div>
   );
