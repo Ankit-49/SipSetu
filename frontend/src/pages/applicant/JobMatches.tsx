@@ -42,6 +42,7 @@ export default function ApplicantJobMatches() {
   const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
   const [savedJobIds, setSavedJobIds] = useState<string[]>([]);
   const [savingJobId, setSavingJobId] = useState<string | null>(null);
+  const [expandedDescs, setExpandedDescs] = useState<Set<string>>(new Set());
 
   const buildQuery = useCallback(() => {
     const params = new URLSearchParams({ per_page: "100" });
@@ -400,13 +401,33 @@ export default function ApplicantJobMatches() {
                       <p className="text-slate-600 text-sm">{job.recruiter_company || job.recruiter_name}</p>
                     </div>
                   </div>
-                  <Badge className={
-                    job.matching_score >= 85 ? "bg-green-100 text-green-700 hover:bg-green-100 border-none px-3 py-1 text-sm font-bold" :
-                    job.matching_score >= 70 ? "bg-orange-100 text-orange-700 hover:bg-orange-100 border-none px-3 py-1 text-sm font-bold" :
-                    "bg-slate-100 text-slate-700 hover:bg-slate-100 border-none px-3 py-1 text-sm font-bold"
-                  }>
-                    {Number(job.matching_score).toFixed(2)}% Match
-                  </Badge>
+                  <div className="flex items-start gap-2">
+                    <Badge className={
+                      job.matching_score >= 85 ? "bg-green-100 text-green-700 hover:bg-green-100 border-none px-3 py-1 text-sm font-bold" :
+                      job.matching_score >= 70 ? "bg-orange-100 text-orange-700 hover:bg-orange-100 border-none px-3 py-1 text-sm font-bold" :
+                      "bg-slate-100 text-slate-700 hover:bg-slate-100 border-none px-3 py-1 text-sm font-bold"
+                    }>
+                      {Number(job.matching_score).toFixed(2)}% Match
+                    </Badge>
+                    <button
+                      onClick={() => handleToggleSave(job.job_id)}
+                      disabled={savingJobId === job.job_id}
+                      className={`p-2 rounded-lg transition-all duration-200 ${
+                        savedJobIds.includes(job.job_id)
+                          ? "bg-orange-50 text-[#F97316] hover:bg-orange-100 shadow-sm"
+                          : "text-slate-300 hover:text-[#F97316] hover:bg-orange-50"
+                      }`}
+                      title={savedJobIds.includes(job.job_id) ? "Remove from saved" : "Save for later"}
+                    >
+                      {savingJobId === job.job_id ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : savedJobIds.includes(job.job_id) ? (
+                        <BookmarkCheck className="h-5 w-5" />
+                      ) : (
+                        <Bookmark className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-3 mb-4">
@@ -427,6 +448,32 @@ export default function ApplicantJobMatches() {
                   )}
                 </div>
 
+                {job.description && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-slate-900 uppercase tracking-wider mb-2">Description</p>
+                    <div className="text-sm text-slate-600 leading-relaxed">
+                      {expandedDescs.has(job.job_id) ? (
+                        <>{job.description}</>
+                      ) : (
+                        <>{job.description.length > 150 ? job.description.slice(0, 150) + '...' : job.description}</>
+                      )}
+                    </div>
+                    {job.description.length > 150 && (
+                      <button
+                        onClick={() => {
+                          const next = new Set(expandedDescs);
+                          if (next.has(job.job_id)) next.delete(job.job_id);
+                          else next.add(job.job_id);
+                          setExpandedDescs(next);
+                        }}
+                        className="text-xs font-medium text-[#F97316] hover:text-[#e8630e] mt-1 transition-colors"
+                      >
+                        {expandedDescs.has(job.job_id) ? 'Show less' : 'Read more'}
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <div className="mb-6">
                   <p className="text-xs font-semibold text-slate-900 uppercase tracking-wider mb-2">Required Skills</p>
                   <div className="flex flex-wrap gap-2">
@@ -439,29 +486,7 @@ export default function ApplicantJobMatches() {
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`p-1.5 h-auto transition-colors ${
-                        savedJobIds.includes(job.job_id)
-                          ? "text-[#F97316] hover:text-[#e8630e]"
-                          : "text-slate-300 hover:text-slate-500"
-                      }`}
-                      onClick={() => handleToggleSave(job.job_id)}
-                      disabled={savingJobId === job.job_id}
-                      title={savedJobIds.includes(job.job_id) ? "Remove from saved" : "Save for later"}
-                    >
-                      {savingJobId === job.job_id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : savedJobIds.includes(job.job_id) ? (
-                        <BookmarkCheck className="h-4 w-4" />
-                      ) : (
-                        <Bookmark className="h-4 w-4" />
-                      )}
-                    </Button>
-                    <span className="text-xs text-slate-400">{formatPosted(job.created_at)}</span>
-                  </div>
+                  <span className="text-xs text-slate-400">{formatPosted(job.created_at)}</span>
                   <Button
                     className="bg-[#F97316] hover:bg-[#F97316]/90 text-white gap-2"
                     onClick={() => handleApply(job.job_id)}

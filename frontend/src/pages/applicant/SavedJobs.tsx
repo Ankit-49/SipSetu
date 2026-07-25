@@ -16,6 +16,7 @@ export default function ApplicantSavedJobs() {
   const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
   const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
   const [unsavingId, setUnsavingId] = useState<string | null>(null);
+  const [expandedDescs, setExpandedDescs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
@@ -174,6 +175,32 @@ export default function ApplicantSavedJobs() {
                     </div>
                   )}
                 </div>
+
+                {job.description && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-slate-900 uppercase tracking-wider mb-2">Description</p>
+                    <div className="text-sm text-slate-600 leading-relaxed">
+                      {expandedDescs.has(job.job_id) ? (
+                        <>{job.description}</>
+                      ) : (
+                        <>{job.description.length > 150 ? job.description.slice(0, 150) + '...' : job.description}</>
+                      )}
+                    </div>
+                    {job.description.length > 150 && (
+                      <button
+                        onClick={() => {
+                          const next = new Set(expandedDescs);
+                          if (next.has(job.job_id)) next.delete(job.job_id);
+                          else next.add(job.job_id);
+                          setExpandedDescs(next);
+                        }}
+                        className="text-xs font-medium text-[#F97316] hover:text-[#e8630e] mt-1 transition-colors"
+                      >
+                        {expandedDescs.has(job.job_id) ? 'Show less' : 'Read more'}
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 <div className="mb-6">
                   <p className="text-xs font-semibold text-slate-900 uppercase tracking-wider mb-2">Required Skills</p>
