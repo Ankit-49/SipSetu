@@ -30,6 +30,9 @@ def create_app():
         try:
             db.session.execute(db.text("ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'pending' NOT NULL"))
             db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image TEXT"))
+            db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE"))
+            db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)"))
+            db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS location VARCHAR(255)"))
             db.session.commit()
         except Exception as e:
             db.session.rollback()
