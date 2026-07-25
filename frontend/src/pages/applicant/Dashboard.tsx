@@ -12,7 +12,6 @@ import {
   Sparkles,
   Loader2,
   Mail,
-  X,
   Calendar,
   Clock,
   Video,
@@ -52,7 +51,6 @@ export default function ApplicantDashboardHome() {
 
   const [sendingVerification, setSendingVerification] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
-  const [dismissVerificationBanner, setDismissVerificationBanner] = useState(false);
 
   const emailVerified = data?.email_verified;
 
@@ -86,7 +84,7 @@ export default function ApplicantDashboardHome() {
       </div>
 
       {/* Email verification banner */}
-      {emailVerified === false && !dismissVerificationBanner && (
+      {emailVerified === false && (
         <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-start gap-3">
             <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
@@ -118,13 +116,6 @@ export default function ApplicantDashboardHome() {
                 <><Mail className="h-3.5 w-3.5 mr-1.5" /> Resend Email</>
               )}
             </Button>
-            <button
-              onClick={() => setDismissVerificationBanner(true)}
-              className="text-amber-400 hover:text-amber-600 p-1"
-              aria-label="Dismiss"
-            >
-              <X className="h-4 w-4" />
-            </button>
           </div>
         </div>
       )}

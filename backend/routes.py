@@ -382,7 +382,8 @@ def profile(user_id):
             "role": user.role,
             "phone": user.phone,
             "location": user.location,
-            "profile_image": user.profile_image
+            "profile_image": user.profile_image,
+            "email_verified": user.email_verified
         }
         if user.role == 'recruiter':
             result.update({

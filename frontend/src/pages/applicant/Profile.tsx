@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { Camera, MapPin, Phone, Mail, User, Loader2 } from "lucide-react";
+import { Camera, MapPin, Phone, Mail, User, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/app/context/AuthContext";
 
@@ -15,6 +15,9 @@ export default function ApplicantProfile() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [sendingVerification, setSendingVerification] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
   const [profile, setProfile] = useState({
     firstName: "",
     lastName: "",
@@ -44,6 +47,7 @@ export default function ApplicantProfile() {
           location: response.data.location || "",
           profileImage: response.data.profile_image || "",
         });
+        setEmailVerified(response.data.email_verified ?? false);
       } catch (error) {
         console.error("Error fetching profile:", error);
         toast({
@@ -71,6 +75,28 @@ export default function ApplicantProfile() {
         setProfile(prev => ({ ...prev, profileImage: reader.result as string }));
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setSendingVerification(true);
+    setVerificationSent(false);
+    try {
+      await api.post("/auth/resend-verification");
+      setVerificationSent(true);
+      toast({
+        title: "Verification email sent",
+        description: "Please check your inbox for the verification link.",
+      });
+    } catch (error) {
+      console.error("Failed to resend verification", error);
+      toast({
+        title: "Error",
+        description: "Failed to send verification email. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingVerification(false);
     }
   };
 
@@ -123,6 +149,56 @@ export default function ApplicantProfile() {
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">Profile Settings</h1>
         <p className="text-slate-500 mt-1">Manage your personal information and preferences.</p>
       </div>
+
+      {/* Email Verification Card */}
+      {emailVerified === false && (
+        <Card className="border-amber-200 bg-amber-50/50">
+          <CardContent className="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                <AlertTriangle className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-amber-900">Email not verified</h3>
+                <p className="text-sm text-amber-700">
+                  Your email address has not been verified yet. Please check your inbox or request a new verification link.
+                </p>
+                {verificationSent && (
+                  <p className="text-xs text-green-600 font-medium mt-1">✓ Verification email sent! Check your inbox.</p>
+                )}
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              className="border-amber-300 text-amber-800 hover:bg-amber-100 shrink-0"
+              onClick={handleResendVerification}
+              disabled={sendingVerification}
+            >
+              {sendingVerification ? (
+                <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Sending...</>
+              ) : verificationSent ? (
+                "Sent!"
+              ) : (
+                <><Mail className="h-4 w-4 mr-1.5" /> Resend Verification Email</>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {emailVerified === true && (
+        <Card className="border-green-200 bg-green-50/50">
+          <CardContent className="p-6 flex items-start gap-4">
+            <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center shrink-0 mt-0.5">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-green-900">Email verified ✓</h3>
+              <p className="text-sm text-green-700">Your email address has been verified. All features are available.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="p-8">
