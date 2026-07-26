@@ -58,10 +58,13 @@ cp .env.example .env
 > **Important:** Edit `.env` and replace the placeholder values with your own PostgreSQL credentials (password, host, port). The example file uses `YOUR_PASSWORD_HERE` — do not commit real credentials.
 
 ```bash
-# Create the database in PostgreSQL
-# psql -U postgres -c "CREATE DATABASE sipsetu;"
+# 1. Create the database in PostgreSQL
+psql -U postgres -c "CREATE DATABASE sipsetu;"
 
-# Start the backend server
+# 2. Run the schema migration
+psql -d sipsetu -U postgres -f ../migrations/001_tables.sql
+
+# 3. Start the backend server
 python app.py
 ```
 
@@ -137,7 +140,6 @@ SipSetu/
 
 This is an early-stage build (approx. 30-35% toward production readiness). Key limitations:
 
-- **ML is bootstrapped from existing ranking scores** — The first training run learns from historical `matching_score` values stored in the database. Replace those with recruiter feedback or hire/shortlist labels for a production-grade model.
 - **ML is bootstrapped from existing ranking scores** — The first training run learns from historical `matching_score` values stored in the database. Replace those with recruiter feedback or hire/shortlist labels for a production-grade model.
 - **No test suite** — No automated tests exist for the backend or frontend.
 
