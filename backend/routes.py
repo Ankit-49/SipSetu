@@ -1403,7 +1403,7 @@ def bulk_screen():
                     pass
 
             combined = 100.0 if (skills_score == 100.0 and experience_score >= 100.0) else \
-                min(round((skills_score * 0.88) + (experience_score * 0.10) + (content_score * 0.02), 2), 99.99)
+                min(round((skills_score * 0.70) + (experience_score * 0.15) + (content_score * 0.15), 2), 99.99)
 
             results.append({
                 "filename": filename, "candidate_name": candidate_name,

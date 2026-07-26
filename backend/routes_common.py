@@ -61,11 +61,7 @@ def calculate_match_score(resume_skills_list, job_skills_list):
         return 0.0
 
     intersection = len(resume_set.intersection(job_set))
-    union = len(resume_set.union(job_set))
-    if union == 0:
-        return 0.0
-
-    return round((intersection / union) * 100, 2)
+    return round((intersection / len(job_set)) * 100, 2)
 
 
 def extract_experience_years(text):
