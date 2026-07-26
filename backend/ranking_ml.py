@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from functools import lru_cache
 from math import log2, sqrt
 from pathlib import Path
 from typing import Any
@@ -28,6 +27,7 @@ MODEL_DIR = Path(__file__).resolve().parent / "ml_artifacts"
 MODEL_PATH = MODEL_DIR / "candidate_ranker.joblib"
 MODEL_VERSION = "candidate-ranker-v1"
 RELEVANCE_THRESHOLD = 60.0
+MIN_TRAINING_ROWS = 15
 
 
 @dataclass
@@ -192,12 +192,16 @@ def _heuristic_score(resume: Resume, job: Job) -> float:
     return min(round(combined_score, 2), 99.99)
 
 
-@lru_cache(maxsize=1)
 def load_ranking_bundle() -> RankingBundle | None:
     if not MODEL_PATH.exists():
         return None
 
     payload = joblib.load(MODEL_PATH)
+    row_count = int(payload.get("row_count", 0))
+    if row_count < MIN_TRAINING_ROWS:
+        MODEL_PATH.unlink(missing_ok=True)
+        return None
+
     return RankingBundle(
         model=payload["model"],
         vectorizer=payload.get("vectorizer"),
@@ -302,10 +306,10 @@ def train_ranking_model(random_state: int = 42) -> dict[str, Any]:
 
     rankings = Ranking.query.filter(Ranking.matching_score.isnot(None)).all()
 
-    if len(rankings) < 5:
+    if len(rankings) < MIN_TRAINING_ROWS:
         return {
             "trained": False,
-            "message": "Not enough ranked resume/job pairs to train the model.",
+            "message": f"Not enough ranked resume/job pairs to train the model. Need at least {MIN_TRAINING_ROWS}, got {len(rankings)}.",
             "row_count": len(rankings),
         }
 
@@ -375,8 +379,6 @@ def train_ranking_model(random_state: int = 42) -> dict[str, Any]:
         },
         MODEL_PATH,
     )
-
-    load_ranking_bundle.cache_clear()
 
     return {
         "trained": True,

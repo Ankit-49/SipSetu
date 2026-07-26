@@ -117,18 +117,9 @@ def calculate_ranking_score(resume, job):
 
         return predict_ranking_score(resume, job)
     except Exception:
-        resume_skills = [s.skill_name for s in resume.skills]
-        job_skills = [s.skill_name for s in job.skills]
-        skills_score = calculate_match_score(resume_skills, job_skills)
-        experience_years = extract_experience_years(resume.raw_text or "")
-        target_experience_years = experience_level_to_years(job.experience_level)
-        experience_score = calculate_experience_score(experience_years, target_experience_years)
+        from ranking_ml import _heuristic_score
 
-        if skills_score == 100.0 and experience_score >= 100.0:
-            return 100.0
-
-        combined_score = (skills_score * 0.88) + (experience_score * 0.10)
-        return min(round(combined_score, 2), 99.99)
+        return _heuristic_score(resume, job)
 
 
 def create_rankings_for_job(job_id):
