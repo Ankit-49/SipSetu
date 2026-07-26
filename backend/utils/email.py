@@ -139,11 +139,9 @@ If you didn't request this, you can safely ignore this email.
     return send_email(to, subject, html, text)
 
 
-def send_verification_email(to: str, token: str, name: str = "User") -> bool:
-    """Send an email verification link."""
-    subject = "Verify your SipSetu email address"
-    verify_url = f"{os.environ.get('FRONTEND_URL', 'http://localhost:5173')}/verify-email?token={token}"
-
+def send_verification_otp(to: str, otp: str, name: str = "User") -> bool:
+    """Send an email verification OTP code."""
+    subject = "Your SipSetu email verification code"
     html = f"""\
 <!DOCTYPE html>
 <html>
@@ -162,20 +160,17 @@ def send_verification_email(to: str, token: str, name: str = "User") -> bool:
             <td style="padding: 32px 24px;">
               <h2 style="color: #1E3A5F; font-size: 20px; margin: 0 0 8px;">Verify your email address</h2>
               <p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0 0 24px;">
-                Hi {name}, thanks for creating your SipSetu account! Please verify your email address by clicking the button below. This link expires in 24 hours.
+                Hi {name}, thanks for creating your SipSetu account! Please use the code below to verify your email address. This code expires in 10 minutes.
               </p>
               <table cellpadding="0" cellspacing="0" style="margin: 0 auto 24px;">
                 <tr>
-                  <td style="background: #F97316; border-radius: 8px; padding: 14px 32px; text-align: center;">
-                    <a href="{verify_url}" style="color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; display: inline-block;">
-                      Verify Email Address
-                    </a>
+                  <td style="background: #f1f5f9; border-radius: 12px; padding: 24px 40px; letter-spacing: 12px; text-align: center;">
+                    <span style="font-size: 36px; font-weight: 800; color: #1E3A5F; font-family: 'Courier New', monospace;">{otp}</span>
                   </td>
                 </tr>
               </table>
               <p style="color: #64748b; font-size: 13px; line-height: 1.5; margin: 0;">
-                Or copy and paste this link into your browser:<br>
-                <span style="color: #F97316; font-size: 12px;">{verify_url}</span>
+                Enter this code on the verification page to confirm your email address and unlock all features.
               </p>
             </td>
           </tr>
@@ -196,11 +191,11 @@ def send_verification_email(to: str, token: str, name: str = "User") -> bool:
     text = f"""\
 Hi {name},
 
-Thanks for creating your SipSetu account! Please verify your email address by visiting the link below:
+Thanks for creating your SipSetu account! Your email verification code is:
 
-{verify_url}
+{otp}
 
-This link expires in 24 hours.
+This code expires in 10 minutes. Enter it on the verification page to confirm your email address.
 
 If you didn't create this account, you can safely ignore this email.
 """

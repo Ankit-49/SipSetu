@@ -23,7 +23,8 @@ from routes_common import (
 )
 from ranking_ml import get_ranking_model_status, train_ranking_model
 from auth_middleware import create_token, extract_token as _extract_token, decode_token as _decode_token, require_auth, require_role
-from utils.email import send_password_reset_otp, send_verification_email
+from rate_limiter import rate_limit
+from utils.email import send_password_reset_otp, send_verification_otp
 from config import Config
 import secrets
 import random
@@ -56,6 +57,7 @@ def _ownership_required(f):
 
 
 @api.route('/auth/forgot-password', methods=['POST'])
+@rate_limit(max_requests=3, window_seconds=900, key_by="email")
 def forgot_password():
     """Send a password reset OTP to the user's email."""
     data = request.get_json()
@@ -175,6 +177,7 @@ def reset_password():
 
 
 @api.route('/auth/register', methods=['POST'])
+@rate_limit(max_requests=5, window_seconds=3600, key_by="ip")
 def register():
     """Register a new user (applicant or recruiter)"""
     data = request.get_json()
@@ -211,17 +214,17 @@ def register():
     db.session.add(new_user)
     db.session.flush()
 
-    verification_token_str = secrets.token_urlsafe(32)
-    verification_expires = datetime.utcnow() + timedelta(hours=24)
+    otp = str(random.randint(100000, 999999))
+    otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
     verification = EmailVerificationToken(
         user_id=new_user.user_id,
-        token=verification_token_str,
-        expires_at=verification_expires,
+        token=otp,
+        expires_at=otp_expires_at,
     )
     db.session.add(verification)
     db.session.commit()
 
-    send_verification_email(to=email, token=verification_token_str, name=name or email.split('@')[0])
+    send_verification_otp(to=email, otp=otp, name=name or email.split('@')[0])
 
     token = create_token(str(new_user.user_id), role)
 
@@ -299,28 +302,35 @@ def auth_me():
 
 
 @api.route('/auth/verify-email', methods=['POST'])
+@rate_limit(max_requests=5, window_seconds=600, key_by="email")
 def verify_email():
-    """Verify a user's email using a token sent to their inbox."""
+    """Verify a user's email using an OTP code."""
     data = request.get_json()
-    token = (data or {}).get('token', '').strip()
+    email = (data or {}).get('email', '').strip().lower()
+    otp = (data or {}).get('otp', '').strip()
 
-    if not token:
-        return jsonify({"error": "Verification token is required"}), 400
+    if not email or not otp:
+        return jsonify({"error": "Email and verification code are required"}), 400
 
-    verification = EmailVerificationToken.query.filter_by(token=token, used=False).first()
+    if len(otp) != 6 or not otp.isdigit():
+        return jsonify({"error": "Verification code must be a 6-digit code"}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    verification = EmailVerificationToken.query.filter_by(
+        user_id=user.user_id, token=otp, used=False
+    ).first()
     if not verification:
-        return jsonify({"error": "Invalid or expired verification link. Please request a new one."}), 400
+        return jsonify({"error": "Invalid or expired verification code. Please check and try again."}), 400
 
     if datetime.utcnow() > verification.expires_at:
         verification.used = True
         db.session.commit()
-        return jsonify({"error": "Verification link has expired. Please request a new one."}), 400
+        return jsonify({"error": "Verification code has expired. Please request a new one."}), 400
 
     verification.used = True
-    user = User.query.get(verification.user_id)
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-
     user.email_verified = True
     db.session.commit()
 
@@ -332,8 +342,9 @@ def verify_email():
 
 @api.route('/auth/resend-verification', methods=['POST'])
 @require_auth
+@rate_limit(max_requests=3, window_seconds=900, key_by="user_id")
 def resend_verification():
-    """Resend the email verification link to the authenticated user."""
+    """Resend the email verification OTP to the authenticated user."""
     user = User.query.get(g.current_user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
@@ -344,17 +355,17 @@ def resend_verification():
     EmailVerificationToken.query.filter_by(user_id=user.user_id, used=False).update({"used": True})
     db.session.flush()
 
-    token_str = secrets.token_urlsafe(32)
-    expires_at = datetime.utcnow() + timedelta(hours=24)
+    otp = str(random.randint(100000, 999999))
+    otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
     verification = EmailVerificationToken(
         user_id=user.user_id,
-        token=token_str,
-        expires_at=expires_at,
+        token=otp,
+        expires_at=otp_expires_at,
     )
     db.session.add(verification)
     db.session.commit()
 
-    send_verification_email(to=user.email, token=token_str, name=user.name or user.email.split('@')[0])
+    send_verification_otp(to=user.email, otp=otp, name=user.name or user.email.split('@')[0])
 
     return jsonify({"message": "Verification email sent. Please check your inbox."}), 200
 
