@@ -1070,6 +1070,7 @@ def applicant_dashboard(applicant_id):
             "duration_minutes": iv.duration_minutes,
             "status": iv.status,
             "meeting_link": iv.meeting_link or "",
+            "notes": iv.notes or "",
         } for iv in upcoming_interviews],
     }), 200
 

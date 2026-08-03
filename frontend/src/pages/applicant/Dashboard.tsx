@@ -17,13 +17,33 @@ import {
   Clock,
   Video,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Eye,
+  Ban
 } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { NotificationBell } from "@/components/NotificationBell";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import api from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/app/context/AuthContext";
 
 export default function ApplicantDashboardHome() {
@@ -32,28 +52,60 @@ export default function ApplicantDashboardHome() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
 
+  const fetchDashboard = async () => {
+    if (!user) return;
+    try {
+      const response = await api.get(`/applicants/${user.id}/dashboard`);
+      setData(response.data);
+    } catch (err) {
+      console.error("Failed to fetch applicant dashboard", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!user) {
       setLoading(false);
       return;
     }
-
-    const fetchDashboard = async () => {
-      try {
-        const response = await api.get(`/applicants/${user.id}/dashboard`);
-        setData(response.data);
-      } catch (err) {
-        console.error("Failed to fetch applicant dashboard", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+    setLoading(true);
     fetchDashboard();
   }, [user]);
 
   const [sendingVerification, setSendingVerification] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
   const [dismissedBanner, setDismissedBanner] = useState(false);
+
+  // Interview respond state
+  const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [selectedInterview, setSelectedInterview] = useState<any>(null);
+  const [declineTarget, setDeclineTarget] = useState<any>(null);
+  const [declining, setDeclining] = useState(false);
+
+  const respondToInterview = async (iv: any, action: "confirm" | "decline") => {
+    setRespondingId(iv.interview_id);
+    if (action === "decline") setDeclining(true);
+    try {
+      await api.patch(`/interviews/${iv.interview_id}/respond`, { action });
+      toast({
+        title: action === "confirm" ? "Interview confirmed! 🎉" : "Interview declined",
+        description:
+          action === "confirm"
+            ? `You're all set for ${iv.job_title}. The recruiter has been notified.`
+            : `You declined the interview for ${iv.job_title}. The recruiter has been notified.`,
+      });
+      setDeclineTarget(null);
+      setSelectedInterview(null);
+      fetchDashboard();
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || "Failed to update interview";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setRespondingId(null);
+      setDeclining(false);
+    }
+  };
 
   const emailVerified = data?.email_verified;
 
@@ -224,13 +276,14 @@ export default function ApplicantDashboardHome() {
                 const dt = new Date(iv.scheduled_at);
                 const dateStr = dt.toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: 'numeric' });
                 const timeStr = dt.toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit' });
+                const isResponding = respondingId === iv.interview_id;
                 return (
-                  <div key={iv.interview_id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                    <div className="flex items-start gap-4">
+                  <div key={iv.interview_id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors gap-3 flex-wrap">
+                    <div className="flex items-start gap-4 min-w-0">
                       <div className="h-10 w-10 rounded-full bg-[#1E3A5F]/5 flex items-center justify-center shrink-0">
                         <Calendar className="h-5 w-5 text-[#1E3A5F]" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <h4 className="font-semibold text-slate-900">{iv.job_title}</h4>
                         <p className="text-sm text-slate-500">
                           by <span className="font-medium text-slate-700">{iv.recruiter_company || iv.recruiter_name}</span>
@@ -241,12 +294,41 @@ export default function ApplicantDashboardHome() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {iv.status === "pending" && (
                         <Badge className="bg-amber-50 text-amber-700 border-amber-200">Awaiting your response</Badge>
                       )}
                       {iv.status === "confirmed" && (
                         <Badge className="bg-green-50 text-green-700 border-green-200">Confirmed</Badge>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1.5"
+                        onClick={() => setSelectedInterview(iv)}
+                      >
+                        <Eye className="h-3.5 w-3.5" /> Details
+                      </Button>
+                      {iv.status === "pending" && (
+                        <>
+                          <Button
+                            size="sm"
+                            className="h-8 gap-1.5 bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => respondToInterview(iv, "confirm")}
+                            disabled={isResponding}
+                          >
+                            {isResponding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />} Accept
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-1.5 text-red-600 border-red-200 hover:bg-red-50"
+                            onClick={() => setDeclineTarget(iv)}
+                            disabled={isResponding}
+                          >
+                            <XCircle className="h-3.5 w-3.5" /> Decline
+                          </Button>
+                        </>
                       )}
                       {iv.meeting_link && iv.status === "confirmed" && (
                         <a href={iv.meeting_link} target="_blank" rel="noopener noreferrer">
@@ -424,6 +506,132 @@ export default function ApplicantDashboardHome() {
           </Card>
         </motion.div>
       </motion.div>
+
+      {/* Interview Details Dialog */}
+      <Dialog open={!!selectedInterview} onOpenChange={() => setSelectedInterview(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900">Interview Details</DialogTitle>
+            <DialogDescription>
+              {selectedInterview?.job_title} with {selectedInterview?.recruiter_company || selectedInterview?.recruiter_name}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedInterview && (() => {
+            const dt = new Date(selectedInterview.scheduled_at);
+            return (
+              <div className="space-y-4 py-2">
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <div className="h-10 w-10 rounded-full bg-[#1E3A5F]/10 flex items-center justify-center shrink-0">
+                    <Calendar className="h-5 w-5 text-[#1E3A5F]" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {dt.toLocaleDateString("en-US", { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    </p>
+                    <p className="text-sm text-slate-500">
+                      {dt.toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit' })} • {selectedInterview.duration_minutes} minutes
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="p-3 rounded-xl border border-slate-100">
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Recruiter</p>
+                    <p className="font-semibold text-slate-800 mt-0.5">{selectedInterview.recruiter_name}</p>
+                    <p className="text-slate-500">{selectedInterview.recruiter_company || "—"}</p>
+                  </div>
+                  <div className="p-3 rounded-xl border border-slate-100">
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Status</p>
+                    {selectedInterview.status === "pending" && (
+                      <p className="font-semibold text-amber-600 mt-0.5">Awaiting your response</p>
+                    )}
+                    {selectedInterview.status === "confirmed" && (
+                      <p className="font-semibold text-green-600 mt-0.5">Confirmed</p>
+                    )}
+                    {selectedInterview.status === "declined" && (
+                      <p className="font-semibold text-red-500 mt-0.5">Declined</p>
+                    )}
+                    {selectedInterview.status === "cancelled" && (
+                      <p className="font-semibold text-slate-500 mt-0.5">Cancelled</p>
+                    )}
+                  </div>
+                </div>
+
+                {selectedInterview.notes && (
+                  <div className="p-3 rounded-xl border border-slate-100">
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Notes from recruiter</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{selectedInterview.notes}</p>
+                  </div>
+                )}
+
+                {selectedInterview.meeting_link && (
+                  <a href={selectedInterview.meeting_link} target="_blank" rel="noopener noreferrer" className="block">
+                    <Button variant="outline" className="w-full gap-2 border-[#1E3A5F]/20 text-[#1E3A5F] hover:bg-blue-50">
+                      <Video className="h-4 w-4" /> Join Meeting Link
+                    </Button>
+                  </a>
+                )}
+
+                {selectedInterview.status === "pending" && (
+                  <div className="flex gap-3 pt-2 border-t border-slate-100">
+                    <Button
+                      className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => respondToInterview(selectedInterview, "confirm")}
+                      disabled={respondingId === selectedInterview.interview_id}
+                    >
+                      {respondingId === selectedInterview.interview_id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4" />
+                      )} Accept Interview
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={() => {
+                        const t = selectedInterview;
+                        setSelectedInterview(null);
+                        setDeclineTarget(t);
+                      }}
+                      disabled={respondingId === selectedInterview.interview_id}
+                    >
+                      <XCircle className="h-4 w-4" /> Decline
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Decline Confirmation */}
+      <AlertDialog open={!!declineTarget} onOpenChange={() => setDeclineTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg font-bold text-slate-900">Decline Interview</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600">
+              Are you sure you want to decline the interview for{" "}
+              <span className="font-semibold">{declineTarget?.job_title}</span>? The recruiter will be notified
+              that you are not available.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={declining}>Keep Interview</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => declineTarget && respondToInterview(declineTarget, "decline")}
+              disabled={declining}
+              className="bg-red-600 hover:bg-red-700 text-white focus:ring-red-600"
+            >
+              {declining ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Declining...</>
+              ) : (
+                <><Ban className="h-4 w-4 mr-2" /> Decline Interview</>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
