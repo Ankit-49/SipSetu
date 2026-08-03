@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Briefcase, Users, UserCheck, TrendingUp, ChevronRight, FileText, Plus, ExternalLink, Calendar, Clock, Loader2, Mail, X, CheckCircle2, Ban, BarChart3, Search, Sparkles } from "lucide-react";
+import { Briefcase, Users, UserCheck, TrendingUp, ChevronRight, FileText, Plus, ExternalLink, Calendar, Clock, Loader2, Mail, X, CheckCircle2, Ban, BarChart3, Search, Sparkles, Brain, RefreshCw, Database, AlertTriangle } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -63,6 +63,27 @@ export default function RecruiterDashboardHome() {
 
   const topCandidates = data?.top_candidates || [];
   const activeJobs = data?.jobs || [];
+
+  const [modelStatus, setModelStatus] = useState<any>(null);
+  const [modelLoading, setModelLoading] = useState(true);
+
+  const fetchModelStatus = async () => {
+    setModelLoading(true);
+    try {
+      const response = await api.get("/ml/ranking/status");
+      setModelStatus(response.data);
+    } catch (err) {
+      console.error("Failed to fetch model status", err);
+      setModelStatus(null);
+    } finally {
+      setModelLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    fetchModelStatus();
+  }, [user]);
 
   const [sendingVerification, setSendingVerification] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
@@ -303,6 +324,86 @@ export default function RecruiterDashboardHome() {
           </Card>
         </motion.div>
       )}
+
+      {/* ML Ranking Model Status */}
+      <motion.div variants={fadeUp}>
+        <Card className="group border-0 shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden">
+          <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between gap-3">
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                <Brain className="h-4 w-4 text-white" />
+              </div>
+              Ranking Model
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              {modelLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+              ) : modelStatus?.available ? (
+                <Badge className="bg-green-50 text-green-700 border-green-200 gap-1">
+                  <CheckCircle2 className="h-3 w-3" /> Trained
+                </Badge>
+              ) : (
+                <Badge className="bg-amber-50 text-amber-700 border-amber-200 gap-1">
+                  <AlertTriangle className="h-3 w-3" /> Not Trained
+                </Badge>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 text-slate-400 hover:text-[#1E3A5F] transition-colors"
+                onClick={fetchModelStatus}
+                disabled={modelLoading}
+                aria-label="Refresh model status"
+              >
+                <RefreshCw className={`h-4 w-4 ${modelLoading ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-5">
+            {modelStatus?.available ? (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: "RMSE", value: modelStatus.metrics?.rmse, fmt: (v: number) => v.toFixed(2), hint: "Lower is better" },
+                    { label: "NDCG@5", value: modelStatus.metrics?.ndcg_at_5, fmt: (v: number) => v.toFixed(3), hint: "Ranking quality" },
+                    { label: "R²", value: modelStatus.metrics?.r2, fmt: (v: number) => v.toFixed(2), hint: "Score fit" },
+                    { label: "Blend α", value: modelStatus.alpha, fmt: (v: number) => v.toFixed(2), hint: "Model weight" },
+                  ].map((m) => (
+                    <div key={m.label} className="rounded-xl bg-slate-50 p-3 group-hover:bg-slate-100/70 transition-colors">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{m.label}</p>
+                      <p className="text-xl font-bold text-slate-900 mt-1">
+                        {m.value != null ? m.fmt(Number(m.value)) : "—"}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">{m.hint}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+                  <span className="flex items-center gap-1.5">
+                    <Database className="h-3 w-3" /> {modelStatus.row_count} pairs · {modelStatus.job_count} jobs · {modelStatus.n_features} features
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="h-3 w-3" /> Last trained{" "}
+                    {modelStatus.trained_at
+                      ? new Date(modelStatus.trained_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+                      : "—"}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center mb-3">
+                  <Brain className="h-6 w-6 text-slate-300" />
+                </div>
+                <p className="text-sm font-medium text-slate-600 mb-1">No model trained yet</p>
+                <p className="text-xs text-slate-400 max-w-sm">
+                  Rankings currently use the deterministic coverage heuristic. The model auto-trains in the background once enough ranked pairs exist.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
 
       <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Top Candidates */}
