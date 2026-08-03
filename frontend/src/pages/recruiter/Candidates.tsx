@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { MapPin, Briefcase, Mail, Loader2, Star, X, RotateCcw, Calendar, Clock, Video } from "lucide-react";
+import { MapPin, Briefcase, Mail, Loader2, Star, X, RotateCcw, Calendar, Clock, Video, CheckCircle2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import { useAuth } from "@/app/context/AuthContext";
@@ -31,6 +31,12 @@ type Candidate = {
   application_id: string | null;
   application_status: "pending" | "shortlisted" | "rejected";
   applicant_profile_image?: string;
+  interview?: {
+    interview_id: string;
+    scheduled_at: string;
+    status: "pending" | "confirmed";
+    meeting_link?: string;
+  } | null;
 };
 
 export default function RecruiterCandidates() {
@@ -102,6 +108,14 @@ export default function RecruiterCandidates() {
   };
 
   const openScheduleModal = (candidate: Candidate) => {
+    if (candidate.interview) {
+      toast({
+        title: "Interview already scheduled",
+        description: `${candidate.applicant_name} already has an interview for ${candidate.job_title}.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setInterviewCandidate(candidate);
     setInterviewDate("");
     setInterviewTime("");
@@ -119,7 +133,7 @@ export default function RecruiterCandidates() {
     const scheduledAt = `${interviewDate}T${interviewTime}:00`;
     setScheduling(true);
     try {
-      await api.post("/interviews", {
+      const res = await api.post("/interviews", {
         job_id: interviewCandidate.job_id,
         applicant_id: interviewCandidate.applicant_id,
         scheduled_at: scheduledAt,
@@ -131,6 +145,16 @@ export default function RecruiterCandidates() {
         title: "Interview scheduled!",
         description: `Interview invitation sent to ${interviewCandidate.applicant_name}.`,
       });
+      // Reflect the new interview on the candidate card immediately
+      const candidateId = interviewCandidate.applicant_id;
+      const interviewId = res.data?.interview_id || "";
+      setCandidates((prev) =>
+        prev.map((c) =>
+          c.applicant_id === candidateId && c.job_id === interviewCandidate.job_id
+            ? { ...c, interview: { interview_id: interviewId, scheduled_at: scheduledAt, status: "pending" } }
+            : c
+        )
+      );
       setInterviewCandidate(null);
     } catch (err: any) {
       const msg = err?.response?.data?.error || "Failed to schedule interview";
@@ -270,7 +294,17 @@ export default function RecruiterCandidates() {
                       </div>
                     )}
                     {/* Schedule Interview button (only for shortlisted) */}
-                    {status === "shortlisted" && candidate.application_id && (
+                    {status === "shortlisted" && candidate.application_id && candidate.interview ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-[10px] w-full border-green-300 text-green-700 bg-green-50 gap-0.5 px-1 mt-1 cursor-default"
+                        onClick={() => openScheduleModal(candidate)}
+                      >
+                        <CheckCircle2 className="h-2.5 w-2.5" />
+                        {candidate.interview.status === "confirmed" ? "Confirmed" : "Invited"}
+                      </Button>
+                    ) : status === "shortlisted" && candidate.application_id ? (
                       <Button
                         size="sm"
                         className="h-6 text-[10px] w-full bg-[#1E3A5F] hover:bg-[#1E3A5F]/90 text-white gap-0.5 px-1 mt-1"
@@ -278,7 +312,7 @@ export default function RecruiterCandidates() {
                       >
                         <Calendar className="h-2.5 w-2.5" /> Interview
                       </Button>
-                    )}
+                    ) : null}
                   </div>
 
                   {/* Middle: Applicant Details */}

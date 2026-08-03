@@ -1,12 +1,23 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Briefcase, Users, UserCheck, TrendingUp, ChevronRight, FileText, Plus, ExternalLink, Calendar, Clock, Video, Loader2, Mail, X, CheckCircle2 } from "lucide-react";
+import { Briefcase, Users, UserCheck, TrendingUp, ChevronRight, FileText, Plus, ExternalLink, Calendar, Clock, Video, Loader2, Mail, X, CheckCircle2, Ban } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { NotificationBell } from "@/components/NotificationBell";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import api from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/app/context/AuthContext";
 
 export default function RecruiterDashboardHome() {
@@ -44,6 +55,29 @@ export default function RecruiterDashboardHome() {
   const [verificationSent, setVerificationSent] = useState(false);
   const [dismissedBanner, setDismissedBanner] = useState(false);
 
+  // Cancel interview state
+  const [cancelTarget, setCancelTarget] = useState<any>(null);
+  const [cancelling, setCancelling] = useState(false);
+
+  const handleCancelInterview = async () => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    try {
+      await api.patch(`/interviews/${cancelTarget.interview_id}/cancel`);
+      toast({
+        title: "Interview cancelled",
+        description: `The interview for ${cancelTarget.job_title} has been cancelled and the candidate has been notified.`,
+      });
+      setCancelTarget(null);
+      fetchDashboard();
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || "Failed to cancel interview";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const handleResendVerification = async () => {
     setSendingVerification(true);
     setVerificationSent(false);
@@ -55,172 +89,6 @@ export default function RecruiterDashboardHome() {
     } finally {
       setSendingVerification(false);
     }
-  };
-  // ------------- Edit Job Modal -------------
-  const renderEditModal = () => {
-    if (!editJob) return null;
-    return (
-      <Dialog open={!!editJob} onOpenChange={() => setEditJob(null)}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-slate-900">Edit Job Posting</DialogTitle>
-            <DialogDescription>
-              Update the details of your job posting below.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-5 py-4">
-            {/* Title */}
-            <div className="space-y-2">
-              <Label htmlFor="edit-title">Job Title <span className="text-red-500">*</span></Label>
-              <Input
-                id="edit-title"
-                value={editJob.title}
-                onChange={(e) => setEditJob({ ...editJob, title: e.target.value })}
-                placeholder="e.g. Senior Software Engineer"
-              />
-            </div>
-
-            {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="edit-desc">Job Description</Label>
-              <Textarea
-                id="edit-desc"
-                value={editJob.description}
-                onChange={(e) => setEditJob({ ...editJob, description: e.target.value })}
-                placeholder="Describe the role, responsibilities, and requirements..."
-                rows={5}
-              />
-            </div>
-
-            {/* Skills */}
-            <div className="space-y-2">
-              <Label htmlFor="edit-skills">Skills (comma-separated)</Label>
-              <Input
-                id="edit-skills"
-                value={editJob.skills}
-                onChange={(e) => setEditJob({ ...editJob, skills: e.target.value })}
-                placeholder="e.g. Python, React, SQL, Machine Learning"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Location */}
-              <div className="space-y-2">
-                <Label htmlFor="edit-location">Location</Label>
-                <Input
-                  id="edit-location"
-                  value={editJob.location}
-                  onChange={(e) => setEditJob({ ...editJob, location: e.target.value })}
-                  placeholder="e.g. New York, NY"
-                />
-              </div>
-
-              {/* Job Type */}
-              <div className="space-y-2">
-                <Label htmlFor="edit-type">Job Type</Label>
-                <Select
-                  value={editJob.job_type}
-                  onValueChange={(v) => setEditJob({ ...editJob, job_type: v })}
-                >
-                  <SelectTrigger id="edit-type">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Full-time">Full-time</SelectItem>
-                    <SelectItem value="Part-time">Part-time</SelectItem>
-                    <SelectItem value="Contract">Contract</SelectItem>
-                    <SelectItem value="Internship">Internship</SelectItem>
-                    <SelectItem value="Remote">Remote</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Experience Level */}
-              <div className="space-y-2">
-                <Label htmlFor="edit-exp">Experience Level</Label>
-                <Select
-                  value={editJob.experience_level}
-                  onValueChange={(v) => setEditJob({ ...editJob, experience_level: v })}
-                >
-                  <SelectTrigger id="edit-exp">
-                    <SelectValue placeholder="Select level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Entry">Entry</SelectItem>
-                    <SelectItem value="Mid">Mid</SelectItem>
-                    <SelectItem value="Senior">Senior</SelectItem>
-                    <SelectItem value="Lead">Lead</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Salary Range */}
-              <div className="space-y-2">
-                <Label>Salary Range</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    type="number"
-                    placeholder="Min"
-                    value={editJob.salary_min}
-                    onChange={(e) => setEditJob({ ...editJob, salary_min: e.target.value })}
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Max"
-                    value={editJob.salary_max}
-                    onChange={(e) => setEditJob({ ...editJob, salary_max: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
-            <Button variant="outline" onClick={() => setEditJob(null)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveEdit} disabled={saving || !editJob.title.trim()}>
-              {saving ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
-              ) : (
-                <><Save className="h-4 w-4 mr-2" /> Save Changes</>
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  };
-
-  // ------------- Delete Confirmation -------------
-  const renderDeleteDialog = () => {
-    return (
-      <AlertDialog open={!!deleteJobId} onOpenChange={() => setDeleteJobId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-lg font-bold text-slate-900">Delete Job Posting</AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-600">
-              Are you sure you want to delete this job posting? This action cannot be undone.
-              All associated applications, rankings, and notifications will be permanently removed.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteJob}
-              disabled={deleting}
-              className="bg-red-600 hover:bg-red-700 text-white focus:ring-red-600"
-            >
-              {deleting ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Deleting...</>
-              ) : (
-                <><Trash2 className="h-4 w-4 mr-2" /> Delete</>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    );
   };
 
   const userName = data?.name || user?.name || localStorage.getItem("user_name") || "Recruiter";
@@ -399,6 +267,14 @@ export default function RecruiterDashboardHome() {
                           </Button>
                         </a>
                       )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 gap-1.5 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => setCancelTarget(iv)}
+                      >
+                        <Ban className="h-3.5 w-3.5" /> Cancel
+                      </Button>
                     </div>
                   </div>
                 );
@@ -508,6 +384,34 @@ export default function RecruiterDashboardHome() {
         </Card>
       </motion.div>
 
+      {/* Cancel Interview Confirmation */}
+      <AlertDialog open={!!cancelTarget} onOpenChange={() => setCancelTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg font-bold text-slate-900">Cancel Interview</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600">
+              Are you sure you want to cancel the interview for{" "}
+              <span className="font-semibold">{cancelTarget?.job_title}</span> with{" "}
+              <span className="font-semibold">{cancelTarget?.applicant_name}</span>?
+              The candidate will be notified immediately.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelling}>Keep Interview</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelInterview}
+              disabled={cancelling}
+              className="bg-red-600 hover:bg-red-700 text-white focus:ring-red-600"
+            >
+              {cancelling ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cancelling...</>
+              ) : (
+                <><Ban className="h-4 w-4 mr-2" /> Cancel Interview</>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

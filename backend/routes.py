@@ -1237,6 +1237,14 @@ def get_recruiter_candidates(recruiter_id):
             "application_id": str(app.application_id) if (app := JobApplication.query.filter_by(
                 job_id=r.job.job_id, applicant_id=r.resume.applicant_id).first()) else None,
             "application_status": app.status if app else "pending",
+            "interview": ({
+                "interview_id": str(iv.interview_id),
+                "scheduled_at": iv.scheduled_at.isoformat(),
+                "status": iv.status,
+                "meeting_link": iv.meeting_link or "",
+            } if (iv := Interview.query.filter_by(
+                job_id=r.job.job_id, applicant_id=r.resume.applicant_id
+            ).filter(Interview.status.in_(['pending', 'confirmed'])).first()) else None),
         } for r in rankings],
     }), 200
 
@@ -1702,6 +1710,18 @@ def propose_interview():
     applicant = Applicant.query.get(applicant_id)
     if not applicant:
         return jsonify({"error": "Applicant not found"}), 404
+
+    # Prevent scheduling a second interview for the same job + applicant
+    # while one is still pending or confirmed.
+    existing = Interview.query.filter_by(
+        job_id=job_id, applicant_id=applicant_id
+    ).filter(Interview.status.in_(['pending', 'confirmed'])).first()
+    if existing:
+        return jsonify({
+            "error": "An interview is already scheduled for this candidate and posting.",
+            "interview_id": str(existing.interview_id),
+            "status": existing.status,
+        }), 409
 
     try:
         scheduled_at = datetime.fromisoformat(scheduled_at_str)
