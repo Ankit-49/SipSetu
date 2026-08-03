@@ -21,7 +21,6 @@ from routes_common import (
     format_candidate_preview,
     format_job,
 )
-from ranking_ml import get_ranking_model_status, train_ranking_model
 from auth_middleware import create_token, require_auth, require_role
 from rate_limiter import rate_limit
 from utils.email import send_password_reset_otp, send_verification_otp
