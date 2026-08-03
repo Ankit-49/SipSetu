@@ -13,7 +13,7 @@ import {
   MapPin,
   Briefcase,
   GraduationCap,
-  DollarSign,
+  Banknote,
   BookOpen,
   Sparkles,
   TrendingUp,
@@ -142,10 +142,9 @@ export default function ApplicantSkillGap() {
   };
 
   const formatSalary = (min: number | null, max: number | null): string => {
-    const fmt = (n: number) => `$${n >= 1000 ? `${n / 1000}k` : n}`;
-    if (min && max) return `${fmt(min)} – ${fmt(max)}`;
-    if (min) return `From ${fmt(min)}`;
-    if (max) return `Up to ${fmt(max)}`;
+    if (min && max) return `NPR ${Math.round(min)} - ${Math.round(max)} LPA`;
+    if (min) return `NPR ${Math.round(min)}+ LPA`;
+    if (max) return `Up to NPR ${Math.round(max)} LPA`;
     return "Not disclosed";
   };
 
@@ -260,7 +259,7 @@ export default function ApplicantSkillGap() {
                     </span>
                   )}
                   <span className="flex items-center gap-1.5 bg-white/10 rounded-lg px-3 py-1.5">
-                    <DollarSign className="h-3.5 w-3.5" /> {formatSalary(jobDetail.salary_min, jobDetail.salary_max)}
+                    <Banknote className="h-3.5 w-3.5" /> {formatSalary(jobDetail.salary_min, jobDetail.salary_max)}
                   </span>
                 </div>
               </CardContent>
