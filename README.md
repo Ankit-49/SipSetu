@@ -70,7 +70,7 @@ graph TB
 The system follows a standard two-tier architecture:
 
 - **Frontend:** React 18 single-page application built with Vite 6, TypeScript, Tailwind CSS v4, shadcn/ui, and Framer Motion.
-- **Backend:** Flask REST API with SQLAlchemy ORM, JWT authentication, and an optional scikit-learn Random Forest ranker.
+- **Backend:** Flask REST API with SQLAlchemy ORM, JWT authentication, and an optional scikit-learn gradient-boosted candidate ranker.
 - **Database:** PostgreSQL 15+ with the `uuid-ossp` extension.
 
 Authentication is stateless via JWT tokens stored in `localStorage`. File uploads (PDF resumes) are parsed server-side with PyMuPDF.
@@ -90,8 +90,9 @@ Authentication is stateless via JWT tokens stored in `localStorage`. File upload
 | SQLAlchemy | 2.0.29 | Database toolkit |
 | psycopg2-binary | 2.9.9 | PostgreSQL driver |
 | PyJWT | 2.8.0 | JWT encode/decode |
-| scikit-learn | 1.3.2 | TF-IDF content similarity in scoring |
+| scikit-learn | 1.3.2 | Candidate ranking model + TF-IDF content similarity |
 | numpy | 1.24.3 | Numerical operations |
+| joblib | 1.3.2 | Model persistence (ml_artifacts) |
 | PyMuPDF (fitz) | 1.22.0 | PDF text extraction |
 | python-dotenv | 1.2.2 | Environment variables |
 | Werkzeug | 3.0.2 | Password hashing |
@@ -904,6 +905,34 @@ If a candidate has all required job skills, the minimum score is:
 ```
 
 Even with zero experience and zero text similarity.
+
+### ML Ranking Model (Optional)
+
+`backend/ranking_ml.py` provides an optional **gradient-boosted ranker** that
+learns from historical ranked pairs and refines the heuristic above:
+
+- **17 features** — skill coverage/Jaccard/specificity (IDF-weighted, so rare
+  skills like *kubernetes* outweigh generic ones like *communication*),
+  experience fit/gap, TF-IDF content similarity, title similarity, keyword
+  density, resume length, seniority & education signals.
+- **HistGradientBoostingRegressor** with early stopping, trained on a
+  **grouped train/test split by job** so it generalizes to unseen jobs
+  rather than memorizing per-job rankings.
+- **Recruiter-feedback labels** — shortlisted applications are pulled toward
+  a high target, rejected ones toward a low target, so the model learns
+  recruiter preferences, not just the heuristic.
+- **Safe blending** — predictions are `alpha × model + (1-alpha) × heuristic`
+  (`alpha` ramps up to 0.8 as training rows grow), so scores stay on the
+  0-100 scale and never degrade below the heuristic on small datasets.
+- Training guard: requires ≥15 ranked pairs with ≥2 distinct labels.
+
+**Trigger:** `POST /api/ml/ranking/train` (authenticated).
+**Status:** `GET /api/ml/ranking/status` (authenticated) — reports model
+availability, metrics (RMSE/MAE/R²/NDCG@5/precision@5/recall@5/MRR@5),
+training rows, and the current blend `alpha`.
+
+Without a trained model, `calculate_ranking_score()` falls back to the
+coverage-based heuristic above, so the app works identically either way.
 
 ---
 

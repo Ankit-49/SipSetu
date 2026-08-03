@@ -107,12 +107,13 @@ def calculate_experience_score(candidate_years, target_years):
     return round(max(0.0, (candidate_years / target_years) * 100.0), 2)
 
 
-def calculate_ranking_score(resume, job):
+def calculate_heuristic_score(resume, job):
     """Coverage-based match score between a resume and a job (0-100).
 
     Deterministic heuristic: skill coverage (70%) + experience fit (15%)
     + text-content similarity (15%), matching the bulk-screening formula.
-    Replaces the retired ML ranking model.
+    This is the safety anchor for the ML ranking model and the fallback
+    when no trained model exists.
     """
     resume_skills = [s.skill_name for s in resume.skills]
     job_skills = [s.skill_name for s in job.skills]
@@ -144,6 +145,21 @@ def calculate_ranking_score(resume, job):
 
     combined = (skills_score * 0.70) + (experience_score * 0.15) + (content_score * 0.15)
     return min(round(combined, 2), 99.99)
+
+
+def calculate_ranking_score(resume, job):
+    """Score a resume against a job, preferring the trained ML model.
+
+    Uses the deterministic heuristic as the safety anchor (the model
+    blends with it internally and falls back to it entirely when no
+    trained model exists or inference fails).
+    """
+    try:
+        from ranking_ml import predict_ranking_score
+
+        return predict_ranking_score(resume, job)
+    except Exception:
+        return calculate_heuristic_score(resume, job)
 
 
 def create_rankings_for_job(job_id):

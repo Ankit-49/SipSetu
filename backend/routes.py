@@ -21,6 +21,7 @@ from routes_common import (
     format_candidate_preview,
     format_job,
 )
+from ranking_ml import get_ranking_model_status, train_ranking_model
 from auth_middleware import create_token, require_auth, require_role
 from rate_limiter import rate_limit
 from utils.email import send_password_reset_otp, send_verification_otp
@@ -421,6 +422,27 @@ def profile(user_id):
 
         db.session.commit()
         return jsonify({"message": "Profile updated successfully"}), 200
+
+@api.route('/ml/ranking/train', methods=['POST'])
+@require_auth
+def ml_ranking_train():
+    """(Re)train the ML ranking model from historical ranked pairs.
+
+    Training labels blend the deterministic heuristic with recruiter
+    decisions (shortlisted/rejected applications). Returns training
+    metrics or a not-enough-data message.
+    """
+    result = train_ranking_model()
+    status_code = 200 if result.get("trained") else 422
+    return jsonify(result), status_code
+
+
+@api.route('/ml/ranking/status', methods=['GET'])
+@require_auth
+def ml_ranking_status():
+    """Report whether the ML ranking model is trained and its metrics."""
+    return jsonify(get_ranking_model_status()), 200
+
 
 @api.route('/public/preview', methods=['GET'])
 def public_preview():
