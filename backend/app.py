@@ -33,6 +33,7 @@ def create_app():
             db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE"))
             db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)"))
             db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS location VARCHAR(255)"))
+            db.session.execute(db.text("ALTER TABLE interviews ADD COLUMN IF NOT EXISTS reminders_sent VARCHAR(255) DEFAULT ''"))
             db.session.commit()
         except Exception as e:
             db.session.rollback()
@@ -46,4 +47,14 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(debug=True, port=5000)
+    # Start the interview reminder scheduler (24h / 1h before). With the
+    # debug reloader, this module runs in BOTH the monitor and serving
+    # processes, so only the serving child (WERKZEUG_RUN_MAIN=true) should
+    # own the background thread to avoid duplicate emails. When the reloader
+    # is disabled there is a single process, so start it directly. `debug` is
+    # a local here because app.debug is only set by app.run() below.
+    debug = True
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not debug:
+        from reminders import start_reminder_scheduler
+        start_reminder_scheduler(app)
+    app.run(debug=debug, port=5000)

@@ -200,3 +200,121 @@ This code expires in 10 minutes. Enter it on the verification page to confirm yo
 If you didn't create this account, you can safely ignore this email.
 """
     return send_email(to, subject, html, text)
+
+
+def send_interview_reminder(
+    to: str,
+    name: str,
+    role: str,  # 'applicant' or 'recruiter'
+    job_title: str,
+    company: str,
+    other_name: str,
+    scheduled_at,
+    duration_minutes: int = 60,
+    meeting_link: str = "",
+    remaining_hours: float = 24,
+) -> bool:
+    """Send a reminder email for an upcoming interview."""
+    when = scheduled_at.strftime("%A, %B %d at %I:%M %p")
+    # Label adapts to the real time left, so interviews created inside the
+    # 24h window still get an accurate subject line.
+    if remaining_hours <= 1.5:
+        time_label = "in about an hour"
+    elif remaining_hours <= 8:
+        time_label = "later today"
+    elif remaining_hours <= 26:
+        time_label = "tomorrow"
+    else:
+        time_label = f"in {int(round(remaining_hours))} hours"
+
+    if role == "recruiter":
+        subject = f"Interview reminder: {job_title} with {other_name} {time_label}"
+        greeting = (
+            f"Hi {name}, this is a friendly reminder about your interview with "
+            f"<strong>{other_name}</strong> for <strong>{job_title}</strong>."
+        )
+        schedule_line = (
+            f"The interview is scheduled for <strong>{when}</strong> and should last about "
+            f"{duration_minutes} minutes."
+        )
+        cta = f"Join the interview on time and review the candidate's resume beforehand."
+    else:
+        subject = f"Interview reminder: {job_title} at {company} {time_label}"
+        greeting = (
+            f"Hi {name}, this is a friendly reminder about your upcoming interview for "
+            f"<strong>{job_title}</strong> at <strong>{company}</strong>."
+        )
+        schedule_line = (
+            f"The interview is scheduled for <strong>{when}</strong> and should last about "
+            f"{duration_minutes} minutes. Your interviewer is {other_name}."
+        )
+        cta = "Prepare your questions and make sure you can join from a quiet, well-lit space."
+
+    link_button = ""
+    if meeting_link:
+        link_button = (
+            f'<table cellpadding="0" cellspacing="0" style="margin: 0 auto 24px;">'
+            "<tr><td>"
+            f'<a href="{meeting_link}" style="background: #F97316; color: #ffffff; text-decoration: none; '
+            'padding: 12px 28px; border-radius: 10px; font-size: 15px; font-weight: 600; display: inline-block;">'
+            "Join the interview</a></td></tr></table>"
+        )
+
+    html = f"""\
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; margin: 0; padding: 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="480" cellpadding="0" cellspacing="0" style="background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
+          <tr>
+            <td style="background: #1E3A5F; padding: 32px 24px; text-align: center;">
+              <h1 style="color: #ffffff; font-size: 24px; margin: 0; letter-spacing: -0.5px;">SipSetu</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px 24px;">
+              <h2 style="color: #1E3A5F; font-size: 20px; margin: 0 0 8px;">⏰ Interview reminder</h2>
+              <p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0 0 24px;">
+                {greeting}
+              </p>
+              <table cellpadding="0" cellspacing="0" style="background: #f8fafc; border-radius: 12px; padding: 20px 24px; width: 100%; margin-bottom: 24px;">
+                <tr>
+                  <td style="font-size: 14px; color: #64748b; padding: 4px 0;">{schedule_line}</td>
+                </tr>
+              </table>
+              {link_button}
+              <p style="color: #64748b; font-size: 13px; line-height: 1.5; margin: 0;">
+                {cta}
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background: #f1f5f9; padding: 16px 24px; text-align: center;">
+              <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+                You're receiving this because you have an interview scheduled on SipSetu.<br>
+                &copy; {datetime.now().year} SipSetu
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+    text = f"""\
+Hi {name},
+
+This is a reminder about your interview {time_label}:
+
+  Role: {job_title}
+  When: {scheduled_at.strftime('%A, %B %d at %I:%M %p')}
+  Duration: {duration_minutes} minutes
+  Meeting link: {meeting_link or 'will be shared by the recruiter'}
+
+{cta}
+"""
+    return send_email(to, subject, html, text)

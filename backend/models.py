@@ -160,6 +160,8 @@ class Interview(db.Model):
     status = db.Column(db.String(20), default='pending', nullable=False)  # 'pending', 'confirmed', 'completed', 'cancelled', 'declined'
     notes = db.Column(db.Text, nullable=True)
     meeting_link = db.Column(db.String(500), nullable=True)
+    # Comma-separated reminder tokens already sent, e.g. "1h_applicant,24h_recruiter".
+    reminders_sent = db.Column(db.String(255), default="", nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     job = db.relationship('Job', backref='interviews')
