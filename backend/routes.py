@@ -22,7 +22,7 @@ from routes_common import (
     format_job,
 )
 from ranking_ml import get_ranking_model_status, train_ranking_model
-from auth_middleware import create_token, extract_token as _extract_token, decode_token as _decode_token, require_auth, require_role
+from auth_middleware import create_token, require_auth, require_role
 from rate_limiter import rate_limit
 from utils.email import send_password_reset_otp, send_verification_otp
 from config import Config
@@ -442,59 +442,9 @@ def public_preview():
 
 # ============ JOB POSTING ROUTES ============
 
-@api.route('/jobs', methods=['GET', 'POST'])
+@api.route('/jobs', methods=['GET'])
 def jobs():
-    """List all jobs or create a new job posting."""
-    if request.method == 'POST':
-        token_user_id = _resolve_current_user_id()
-        if not token_user_id:
-            return jsonify({"error": "You must be logged in to create a job"}), 401
-
-        recruiter = Recruiter.query.get(token_user_id)
-        if not recruiter:
-            return jsonify({"error": "Only recruiters can post jobs"}), 403
-
-        data = request.get_json()
-        title = data.get('title')
-        skills = data.get('skills', [])
-        description = data.get('description', '')
-        location = data.get('location', '')
-        job_type = data.get('job_type', '')
-        experience_level = data.get('experience_level', '')
-        salary_min = data.get('salary_min')
-        salary_max = data.get('salary_max')
-        if not title:
-            return jsonify({"error": "Missing job title"}), 400
-
-        new_job = Job(
-            recruiter_id=token_user_id,
-            title=title,
-            description=description,
-            location=location,
-            job_type=job_type,
-            experience_level=experience_level,
-            salary_min=float(salary_min) if salary_min else None,
-            salary_max=float(salary_max) if salary_max else None
-        )
-        for skill_name in skills:
-            if not skill_name.strip():
-                continue
-            skill = Skill.query.filter_by(skill_name=skill_name.lower()).first()
-            if not skill:
-                skill = Skill(skill_name=skill_name.lower())
-                db.session.add(skill)
-            if skill not in new_job.skills:
-                new_job.skills.append(skill)
-        db.session.add(new_job)
-        db.session.commit()
-        create_rankings_for_job(new_job.job_id)
-        return jsonify({
-            "message": "Job posted successfully",
-            "job_id": str(new_job.job_id),
-            "title": new_job.title,
-            "skills": [s.skill_name for s in new_job.skills]
-        }), 201
-
+    """List all jobs (public)."""
     # GET — supports filters: recruiter_id, search, job_type, experience_level,
     # location, salary_min, salary_max, skill
     page = request.args.get('page', 1, type=int)
@@ -549,18 +499,50 @@ def jobs():
     }), 200
 
 
-def _resolve_current_user_id() -> str | None:
-    """Return the user_id from the JWT token if present, else None."""
-    from jwt import InvalidTokenError
-    token = _extract_token()
-    if not token:
-        return None
-    try:
-        payload = _decode_token(token)
-        return payload.get("user_id")
-    except InvalidTokenError:
-        return None
+@api.route('/jobs', methods=['POST'])
+@require_role('recruiter')
+def create_job():
+    """Create a new job posting (recruiter only)."""
+    data = request.get_json()
+    title = data.get('title')
+    skills = data.get('skills', [])
+    description = data.get('description', '')
+    location = data.get('location', '')
+    job_type = data.get('job_type', '')
+    experience_level = data.get('experience_level', '')
+    salary_min = data.get('salary_min')
+    salary_max = data.get('salary_max')
+    if not title:
+        return jsonify({"error": "Missing job title"}), 400
 
+    new_job = Job(
+        recruiter_id=g.current_user_id,
+        title=title,
+        description=description,
+        location=location,
+        job_type=job_type,
+        experience_level=experience_level,
+        salary_min=float(salary_min) if salary_min else None,
+        salary_max=float(salary_max) if salary_max else None
+    )
+    for skill_name in skills:
+        if not skill_name.strip():
+            continue
+        skill = Skill.query.filter_by(skill_name=skill_name.lower()).first()
+        if not skill:
+            skill = Skill(skill_name=skill_name.lower())
+            db.session.add(skill)
+        if skill not in new_job.skills:
+            new_job.skills.append(skill)
+    db.session.add(new_job)
+    db.session.commit()
+    create_rankings_for_job(new_job.job_id)
+    return jsonify({
+        "message": "Job posted successfully",
+        "job_id": str(new_job.job_id),
+        "title": new_job.title,
+        "skills": [s.skill_name for s in new_job.skills]
+    }), 201
 
 @api.route('/jobs/<job_id>/apply', methods=['POST'])
 @require_role('applicant')
@@ -816,7 +798,7 @@ def resume_detail(resume_id):
 
 
 @api.route('/resumes', methods=['POST', 'GET'])
-@require_auth
+@require_role('applicant')
 def resumes():
     """Upload a new resume or list the authenticated applicant's resumes."""
     applicant_id = g.current_user_id
@@ -1327,12 +1309,9 @@ def recruiter_dashboard(recruiter_id):
 
 
 @api.route('/recruiters/bulk-screen', methods=['POST'])
-@require_auth
+@require_role('recruiter')
 def bulk_screen():
     """Upload bulk resumes in PDF (max 50) and score/rank them against a job description."""
-    if g.current_user_role != 'recruiter':
-        return jsonify({"error": "Only recruiters can use bulk screening"}), 403
-
     uploaded_files = request.files.getlist('files')
     if not uploaded_files or len(uploaded_files) == 0 or (len(uploaded_files) == 1 and uploaded_files[0].filename == ''):
         return jsonify({"error": "No files uploaded"}), 400
@@ -1445,12 +1424,17 @@ def bulk_screen():
 
 
 @api.route('/rankings/<ranking_id>', methods=['PUT'])
-@require_auth
+@require_role('recruiter')
 def update_ranking(ranking_id):
-    """Update candidate ranking/status."""
+    """Update candidate ranking/status (recruiter who owns the job only)."""
     ranking = Ranking.query.get(ranking_id)
     if not ranking:
         return jsonify({"error": "Ranking not found"}), 404
+
+    job = Job.query.get(ranking.job_id)
+    if not job or str(job.recruiter_id) != g.current_user_id:
+        return jsonify({"error": "You can only update rankings for your own jobs"}), 403
+
     data = request.get_json()
     if 'candidate_rank' in data:
         ranking.candidate_rank = data.get('candidate_rank')
