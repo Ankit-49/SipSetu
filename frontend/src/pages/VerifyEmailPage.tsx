@@ -1,14 +1,18 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, CheckCircle2, XCircle, Mail, ArrowLeft } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Mail, ArrowLeft, Clock } from "lucide-react";
 import { SipSetuLogo } from "@/components/SipSetuLogo";
 import api from "@/lib/api";
 import { useAuth } from "@/app/context/AuthContext";
 
 type PageState = "form" | "loading" | "success" | "error";
+
+// Matches the backend OTP lifetime (10 minutes) and the resend cadence.
+const OTP_LIFETIME_SECONDS = 10 * 60;
+const RESEND_COOLDOWN_SECONDS = 60;
 
 export default function VerifyEmailPage() {
   const navigate = useNavigate();
@@ -21,8 +25,37 @@ export default function VerifyEmailPage() {
   const [state, setState] = useState<PageState>(prefillEmail ? "form" : "form");
   const [message, setMessage] = useState("");
   const [resending, setResending] = useState(false);
+  // A fresh code was just sent on signup, so start both timers immediately.
+  // Note: the initial expiry assumes the code was just sent; it becomes exact
+  // once a resend returns the backend's expires_at.
+  const [resendCooldown, setResendCooldown] = useState(RESEND_COOLDOWN_SECONDS);
+  const [expiresAt, setExpiresAt] = useState<number>(() => Date.now() + OTP_LIFETIME_SECONDS * 1000);
+  const [now, setNow] = useState(() => Date.now());
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Tick every second: drives the resend cooldown and the expiry countdown.
+  useEffect(() => {
+    const id = setInterval(() => {
+      setNow(Date.now());
+      setResendCooldown((c) => (c > 0 ? c - 1 : 0));
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const secondsLeft = Math.max(0, Math.floor((expiresAt - now) / 1000));
+  const expired = secondsLeft <= 0;
+
+  // Once the code expires, unlock resend immediately so users can get a fresh one.
+  useEffect(() => {
+    if (expired) setResendCooldown(0);
+  }, [expired]);
+
+  const formatCountdown = (totalSeconds: number) => {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m}:${String(s).padStart(2, "0")}`;
+  };
 
   const handleOtpChange = (index: number, value: string) => {
     if (value && !/^\d$/.test(value)) return;
@@ -65,15 +98,21 @@ export default function VerifyEmailPage() {
   };
 
   const handleResend = async () => {
-    if (!email) return;
+    if (!email || resending || resendCooldown > 0) return;
     setResending(true);
     try {
       // Resend needs auth — if the user isn't logged in, redirect to login
-      await api.post("/auth/resend-verification");
+      const res = await api.post("/auth/resend-verification");
       setOtp(["", "", "", "", "", ""]);
       inputRefs.current[0]?.focus();
       setMessage("A new verification code has been sent to your email.");
       setState("form");
+      // Restart the cooldown and sync the countdown to the backend's expiry time.
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
+      const backendExpiresAt = res.data?.expires_at;
+      setExpiresAt(
+        backendExpiresAt ? new Date(backendExpiresAt).getTime() : Date.now() + OTP_LIFETIME_SECONDS * 1000
+      );
     } catch (err: any) {
       if (err?.response?.status === 401) {
         setMessage("Session expired. Please log in to request a new code.");
@@ -178,6 +217,30 @@ export default function VerifyEmailPage() {
                 </div>
               </div>
 
+              {/* Code expiry countdown */}
+              <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className={`flex items-center gap-1.5 font-medium ${expired ? "text-red-600" : "text-slate-600"}`}>
+                    <Clock className="h-3.5 w-3.5" />
+                    {expired ? "This code has expired" : "Code expires in"}
+                  </span>
+                  <span className={`font-bold tabular-nums ${expired ? "text-red-600" : "text-[#1E3A5F]"}`}>
+                    {expired ? "Expired" : formatCountdown(secondsLeft)}
+                  </span>
+                </div>
+                <div className="mt-2 h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-1000 ${expired ? "bg-red-500" : "bg-[#F97316]"}`}
+                    style={{ width: `${(secondsLeft / OTP_LIFETIME_SECONDS) * 100}%` }}
+                  />
+                </div>
+                {expired && (
+                  <p className="mt-2 text-xs text-red-600">
+                    Request a new code below to continue verifying your email.
+                  </p>
+                )}
+              </div>
+
               {/* Error message */}
               {state === "error" && message && (
                 <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200">
@@ -190,7 +253,7 @@ export default function VerifyEmailPage() {
               <Button
                 type="submit"
                 className="w-full bg-[#F97316] hover:bg-[#e8630e] text-white gap-2"
-                disabled={state === "loading"}
+                disabled={state === "loading" || expired}
               >
                 {state === "loading" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -216,10 +279,18 @@ export default function VerifyEmailPage() {
                 <button
                   type="button"
                   onClick={handleResend}
-                  disabled={resending || !email}
-                  className="text-[#F97316] hover:text-[#e8630e] font-medium disabled:text-slate-300 disabled:cursor-not-allowed"
+                  disabled={resending || !email || resendCooldown > 0}
+                  className="text-[#F97316] hover:text-[#e8630e] font-medium disabled:text-slate-300 disabled:cursor-not-allowed flex items-center gap-1"
                 >
-                  {resending ? "Sending..." : "Resend code"}
+                  {resending ? (
+                    "Sending..."
+                  ) : resendCooldown > 0 ? (
+                    <>
+                      <Clock className="h-3 w-3" /> Resend in {resendCooldown}s
+                    </>
+                  ) : (
+                    "Resend code"
+                  )}
                 </button>
               </div>
             </form>

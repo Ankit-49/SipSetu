@@ -367,7 +367,12 @@ def resend_verification():
 
     send_verification_otp(to=user.email, otp=otp, name=user.name or user.email.split('@')[0])
 
-    return jsonify({"message": "Verification email sent. Please check your inbox."}), 200
+    return jsonify({
+        "message": "Verification email sent. Please check your inbox.",
+        # expires_at is UTC (datetime.utcnow) — the trailing Z lets clients
+        # parse it as UTC instead of their local timezone.
+        "expires_at": verification.expires_at.isoformat() + "Z",
+    }), 200
 
 
 @api.route('/auth/logout', methods=['POST'])
