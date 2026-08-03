@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Briefcase, Users, UserCheck, TrendingUp, ChevronRight, FileText, Plus, ExternalLink, Calendar, Clock, Video, Loader2, Mail, X, CheckCircle2, Ban } from "lucide-react";
+import { Briefcase, Users, UserCheck, TrendingUp, ChevronRight, FileText, Plus, ExternalLink, Calendar, Clock, Loader2, Mail, X, CheckCircle2, Ban } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -19,6 +19,7 @@ import {
 import api from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/app/context/AuthContext";
+import { JoinInterviewButton } from "@/components/JoinInterviewButton";
 
 export default function RecruiterDashboardHome() {
   const { user } = useAuth();
@@ -261,11 +262,11 @@ export default function RecruiterDashboardHome() {
                         <Badge className="bg-green-50 text-green-700 border-green-200">Confirmed</Badge>
                       )}
                       {iv.meeting_link && (
-                        <a href={iv.meeting_link} target="_blank" rel="noopener noreferrer">
-                          <Button size="sm" variant="outline" className="h-8 gap-1.5">
-                            <Video className="h-3.5 w-3.5" /> Join
-                          </Button>
-                        </a>
+                        <JoinInterviewButton
+                          scheduledAt={iv.scheduled_at}
+                          durationMinutes={iv.duration_minutes}
+                          meetingLink={iv.meeting_link}
+                        />
                       )}
                       <Button
                         size="sm"

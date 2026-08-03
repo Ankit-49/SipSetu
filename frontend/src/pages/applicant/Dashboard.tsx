@@ -15,7 +15,6 @@ import {
   X,
   Calendar,
   Clock,
-  Video,
   CheckCircle2,
   XCircle,
   Eye,
@@ -45,6 +44,7 @@ import {
 import api from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/app/context/AuthContext";
+import { JoinInterviewButton } from "@/components/JoinInterviewButton";
 
 export default function ApplicantDashboardHome() {
   const { user } = useAuth();
@@ -331,11 +331,11 @@ export default function ApplicantDashboardHome() {
                         </>
                       )}
                       {iv.meeting_link && iv.status === "confirmed" && (
-                        <a href={iv.meeting_link} target="_blank" rel="noopener noreferrer">
-                          <Button size="sm" variant="outline" className="h-8 gap-1.5">
-                            <Video className="h-3.5 w-3.5" /> Join
-                          </Button>
-                        </a>
+                        <JoinInterviewButton
+                          scheduledAt={iv.scheduled_at}
+                          durationMinutes={iv.duration_minutes}
+                          meetingLink={iv.meeting_link}
+                        />
                       )}
                     </div>
                   </div>
@@ -565,11 +565,14 @@ export default function ApplicantDashboardHome() {
                 )}
 
                 {selectedInterview.meeting_link && (
-                  <a href={selectedInterview.meeting_link} target="_blank" rel="noopener noreferrer" className="block">
-                    <Button variant="outline" className="w-full gap-2 border-[#1E3A5F]/20 text-[#1E3A5F] hover:bg-blue-50">
-                      <Video className="h-4 w-4" /> Join Meeting Link
-                    </Button>
-                  </a>
+                  <JoinInterviewButton
+                    scheduledAt={selectedInterview.scheduled_at}
+                    durationMinutes={selectedInterview.duration_minutes}
+                    meetingLink={selectedInterview.meeting_link}
+                    label="Join Meeting Link"
+                    variant="outline"
+                    className="w-full"
+                  />
                 )}
 
                 {selectedInterview.status === "pending" && (
