@@ -40,11 +40,8 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       await register(name, email, password, role as "applicant" | "recruiter");
-      if (role === "applicant") {
-        navigate("/applicant/dashboard", { replace: true });
-      } else {
-        navigate("/recruiter/dashboard", { replace: true });
-      }
+      // A verification OTP was just emailed — send the user to enter it now
+      navigate(`/verify-email?email=${encodeURIComponent(email)}`, { replace: true });
     } catch (err: any) {
       console.error("Registration error:", err);
       const message = err.response?.data?.error || err.message || "Registration failed. Please check if the backend is running.";

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Camera, MapPin, Phone, Mail, User, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Link } from "react-router";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/app/context/AuthContext";
 
@@ -161,27 +162,34 @@ export default function ApplicantProfile() {
               <div>
                 <h3 className="font-semibold text-amber-900">Email not verified</h3>
                 <p className="text-sm text-amber-700">
-                  Your email address has not been verified yet. Please check your inbox or request a new verification link.
+                  Enter the 6-digit verification code we emailed you, or request a new one.
                 </p>
                 {verificationSent && (
-                  <p className="text-xs text-green-600 font-medium mt-1">✓ Verification email sent! Check your inbox.</p>
+                  <p className="text-xs text-green-600 font-medium mt-1">✓ A new verification code has been sent! Check your inbox.</p>
                 )}
               </div>
             </div>
-            <Button
-              variant="outline"
-              className="border-amber-300 text-amber-800 hover:bg-amber-100 shrink-0"
-              onClick={handleResendVerification}
-              disabled={sendingVerification}
-            >
-              {sendingVerification ? (
-                <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Sending...</>
-              ) : verificationSent ? (
-                "Sent!"
-              ) : (
-                <><Mail className="h-4 w-4 mr-1.5" /> Resend Verification Email</>
-              )}
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Link to={`/verify-email?email=${encodeURIComponent(user?.email || profile.email || "")}`}>
+                <Button className="bg-amber-500 hover:bg-amber-600 text-white gap-1.5">
+                  <CheckCircle2 className="h-4 w-4" /> Enter Code
+                </Button>
+              </Link>
+              <Button
+                variant="outline"
+                className="border-amber-300 text-amber-800 hover:bg-amber-100 shrink-0"
+                onClick={handleResendVerification}
+                disabled={sendingVerification}
+              >
+                {sendingVerification ? (
+                  <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Sending...</>
+                ) : verificationSent ? (
+                  "Sent!"
+                ) : (
+                  <><Mail className="h-4 w-4 mr-1.5" /> Resend Code</>
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}

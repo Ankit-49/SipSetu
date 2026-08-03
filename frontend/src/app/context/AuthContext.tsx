@@ -11,6 +11,7 @@ export interface User {
   profile_image: string | null;
   company?: string | null;
   job_title?: string | null;
+  emailVerified: boolean;
 }
 
 interface AuthContextType {
@@ -20,6 +21,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string, role: "applicant" | "recruiter") => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
+  markEmailVerified: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -49,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           profile_image: res.data.profile_image,
           company: res.data.company,
           job_title: res.data.job_title,
+          emailVerified: res.data.email_verified ?? false,
         };
         setUser(u);
         // Sync localStorage for components that read these directly
@@ -91,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       phone: null,
       location: null,
       profile_image: data.profile_image,
+      emailVerified: data.email_verified ?? false,
     });
   }, []);
 
@@ -113,7 +117,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       phone: null,
       location: null,
       profile_image: null,
+      emailVerified: data.email_verified ?? false,
     });
+  }, []);
+
+  const markEmailVerified = useCallback(() => {
+    setUser((prev) => (prev ? { ...prev, emailVerified: true } : prev));
   }, []);
 
   const logout = useCallback(async () => {
@@ -133,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, register, logout, isAuthenticated: !!user }}
+      value={{ user, loading, login, register, logout, isAuthenticated: !!user, markEmailVerified }}
     >
       {children}
     </AuthContext.Provider>

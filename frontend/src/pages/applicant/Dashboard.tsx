@@ -102,14 +102,21 @@ export default function ApplicantDashboardHome() {
             <div>
               <h3 className="font-bold text-amber-900 text-sm">Verify your email address</h3>
               <p className="text-xs text-amber-700 mt-0.5">
-                Check your inbox for a verification link. Some features may be limited until your email is verified.
+                Enter the 6-digit verification code we emailed you to unlock all features.
               </p>
               {verificationSent && (
-                <p className="text-xs text-green-600 font-medium mt-1">✓ Verification email sent! Check your inbox.</p>
+                <p className="text-xs text-green-600 font-medium mt-1">✓ A new verification code has been sent! Check your inbox.</p>
               )}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <Link
+              to={`/verify-email?email=${encodeURIComponent(user?.email || data?.email || "")}`}
+            >
+              <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white whitespace-nowrap gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Enter Code
+              </Button>
+            </Link>
             <Button
               size="sm"
               variant="outline"
@@ -122,7 +129,7 @@ export default function ApplicantDashboardHome() {
               ) : verificationSent ? (
                 "Sent!"
               ) : (
-                <><Mail className="h-3.5 w-3.5 mr-1.5" /> Resend Email</>
+                <><Mail className="h-3.5 w-3.5 mr-1.5" /> Resend Code</>
               )}
             </Button>
             <button

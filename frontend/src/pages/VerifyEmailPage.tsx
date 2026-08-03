@@ -6,11 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Loader2, CheckCircle2, XCircle, Mail, ArrowLeft } from "lucide-react";
 import { SipSetuLogo } from "@/components/SipSetuLogo";
 import api from "@/lib/api";
+import { useAuth } from "@/app/context/AuthContext";
 
 type PageState = "form" | "loading" | "success" | "error";
 
 export default function VerifyEmailPage() {
   const navigate = useNavigate();
+  const { user, markEmailVerified } = useAuth();
   const [searchParams] = useSearchParams();
   const prefillEmail = searchParams.get("email") || "";
 
@@ -53,6 +55,7 @@ export default function VerifyEmailPage() {
     setState("loading");
     try {
       const response = await api.post("/auth/verify-email", { email, otp: code });
+      markEmailVerified();
       setState("success");
       setMessage(response.data.message || "Email verified successfully!");
     } catch (err: any) {
@@ -112,9 +115,11 @@ export default function VerifyEmailPage() {
               <div className="pt-2">
                 <Button
                   className="w-full bg-[#F97316] hover:bg-[#e8630e] text-white"
-                  onClick={() => navigate("/login")}
+                  onClick={() =>
+                    navigate(user?.role === "recruiter" ? "/recruiter/dashboard" : "/applicant/dashboard")
+                  }
                 >
-                  Sign In
+                  Go to Dashboard
                 </Button>
               </div>
             </div>
@@ -199,10 +204,14 @@ export default function VerifyEmailPage() {
               <div className="flex items-center justify-between text-sm pt-1">
                 <button
                   type="button"
-                  onClick={() => navigate("/login")}
+                  onClick={() =>
+                    navigate(user
+                      ? (user.role === "recruiter" ? "/recruiter/dashboard" : "/applicant/dashboard")
+                      : "/login")
+                  }
                   className="text-slate-500 hover:text-slate-700 flex items-center gap-1"
                 >
-                  <ArrowLeft className="h-3 w-3" /> Back to login
+                  <ArrowLeft className="h-3 w-3" /> Back to dashboard
                 </button>
                 <button
                   type="button"
