@@ -959,9 +959,10 @@ def get_matched_jobs(applicant_id):
     skill_filter = (request.args.get('skill') or '').strip().lower()
 
     all_jobs = Job.query.order_by(Job.created_at.desc()).all()
-    applied_ids = {str(a.job_id) for a in JobApplication.query.filter_by(
-        applicant_id=applicant_id
-    ).all()}
+    applied_map = {
+        str(a.job_id): str(a.application_id)
+        for a in JobApplication.query.filter_by(applicant_id=applicant_id).all()
+    }
 
     enriched = []
     for job in all_jobs:
@@ -986,7 +987,8 @@ def get_matched_jobs(applicant_id):
 
         job_data = format_job(job)
         job_data["matching_score"] = round(float(score or 0.0), 2)
-        job_data["applied"] = str(job.job_id) in applied_ids
+        job_data["applied"] = str(job.job_id) in applied_map
+        job_data["application_id"] = applied_map.get(str(job.job_id))
         enriched.append(job_data)
 
     if search:
@@ -1544,9 +1546,10 @@ def get_saved_jobs(applicant_id):
     latest_resume = Resume.query.filter_by(applicant_id=applicant_id)\
         .order_by(Resume.uploaded_at.desc()).first()
 
-    job_ids = {str(a.job_id) for a in JobApplication.query.filter_by(
-        applicant_id=applicant_id
-    ).all()}
+    applied_map = {
+        str(a.job_id): str(a.application_id)
+        for a in JobApplication.query.filter_by(applicant_id=applicant_id).all()
+    }
 
     from routes_common import format_job
 
@@ -1563,7 +1566,8 @@ def get_saved_jobs(applicant_id):
             except Exception:
                 pass
         job_data["matching_score"] = round(score, 2)
-        job_data["applied"] = str(job.job_id) in job_ids
+        job_data["applied"] = str(job.job_id) in applied_map
+        job_data["application_id"] = applied_map.get(str(job.job_id))
         job_data["saved_at"] = sj.created_at.isoformat()
         jobs.append(job_data)
 
@@ -1635,6 +1639,50 @@ def update_application_status(application_id):
         "success": True,
         "application_id": str(application.application_id),
         "status": application.status,
+    }), 200
+
+
+@api.route('/applications/<application_id>', methods=['DELETE'])
+@require_auth
+def cancel_application(application_id):
+    """Allow an applicant to withdraw/cancel their own job application."""
+    application = JobApplication.query.get(application_id)
+    if not application:
+        return jsonify({"error": "Application not found"}), 404
+
+    if str(application.applicant_id) != g.current_user_id:
+        return jsonify({"error": "You can only cancel your own applications"}), 403
+
+    job = Job.query.get(application.job_id)
+    applicant = Applicant.query.get(application.applicant_id)
+
+    # Cancel any pending/confirmed interviews tied to this application
+    interviews = Interview.query.filter_by(
+        job_id=application.job_id, applicant_id=application.applicant_id
+    ).filter(Interview.status.in_(['pending', 'confirmed'])).all()
+    for iv in interviews:
+        iv.status = 'cancelled'
+
+    # Let the recruiter know the applicant withdrew
+    if job:
+        db.session.add(Notification(
+            user_id=job.recruiter_id,
+            title="Application Withdrawn",
+            message=f"{applicant.name or applicant.email} withdrew their application for '{job.title}'.",
+            type="info",
+            related_job_id=application.job_id,
+        ))
+
+    application_id_str = str(application.application_id)
+    job_id_str = str(application.job_id)
+
+    db.session.delete(application)
+    db.session.commit()
+
+    return jsonify({
+        "message": "Application cancelled successfully",
+        "application_id": application_id_str,
+        "job_id": job_id_str,
     }), 200
 
 

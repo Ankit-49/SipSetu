@@ -12,12 +12,19 @@ import {
   Hourglass,
   Loader2,
   Search,
+  Ban,
+  GraduationCap,
+  DollarSign,
 } from "lucide-react";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
 import { NotificationBell } from "@/components/NotificationBell";
 import api from "@/lib/api";
 import { useAuth } from "@/app/context/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any; bg: string }> = {
   shortlisted: {
@@ -42,10 +49,14 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any; b
 
 export default function ApplicantMyApplications() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [cancelTarget, setCancelTarget] = useState<any | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<any | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -64,6 +75,29 @@ export default function ApplicantMyApplications() {
     };
     fetchApplications();
   }, [user]);
+
+  const handleCancelApplication = async () => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    try {
+      await api.delete(`/applications/${cancelTarget.application_id}`);
+      setData((prev) => prev.filter((a) => a.application_id !== cancelTarget.application_id));
+      toast({
+        title: "Application cancelled",
+        description: `You withdrew your application for "${cancelTarget.title || "the job"}".`,
+      });
+      setCancelTarget(null);
+    } catch (err: any) {
+      console.error("Failed to cancel application", err);
+      toast({
+        title: "Could not cancel",
+        description: err?.response?.data?.error || "Please try again in a moment.",
+        variant: "destructive",
+      });
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const filtered = data.filter((app) => {
     if (statusFilter !== "all" && app.status !== statusFilter) return false;
@@ -307,9 +341,24 @@ export default function ApplicantMyApplications() {
                           {app.matching_score}% Match
                         </Badge>
                       )}
-                      <Button variant="ghost" size="sm" className="text-slate-400 hover:text-[#1E3A5F] gap-1" disabled>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-slate-400 hover:text-[#1E3A5F] gap-1"
+                        onClick={() => setSelectedJob(app)}
+                      >
                         View Job
                       </Button>
+                      {app.status !== "rejected" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 gap-1.5"
+                          onClick={() => setCancelTarget(app)}
+                        >
+                          <Ban className="h-3.5 w-3.5" /> Cancel Application
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -318,6 +367,110 @@ export default function ApplicantMyApplications() {
           })}
         </div>
       )}
+
+      {/* Job Details Dialog */}
+      <Dialog open={!!selectedJob} onOpenChange={(open) => { if (!open) setSelectedJob(null); }}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900">{selectedJob?.title}</DialogTitle>
+            <DialogDescription className="text-slate-600">
+              {selectedJob?.recruiter_company || selectedJob?.recruiter_name}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] pr-4">
+            {selectedJob && (
+              <div className="space-y-6">
+                <div className="flex flex-wrap gap-3">
+                  {selectedJob.location && (
+                    <div className="flex items-center text-xs text-slate-500 gap-1 bg-slate-50 px-2.5 py-1.5 rounded-md">
+                      <MapPin className="h-3.5 w-3.5" /> {selectedJob.location}
+                    </div>
+                  )}
+                  {selectedJob.job_type && (
+                    <div className="flex items-center text-xs text-slate-500 gap-1 bg-slate-50 px-2.5 py-1.5 rounded-md">
+                      <Briefcase className="h-3.5 w-3.5" /> {selectedJob.job_type}
+                    </div>
+                  )}
+                  {selectedJob.experience_level && (
+                    <div className="flex items-center text-xs text-slate-500 gap-1 bg-slate-50 px-2.5 py-1.5 rounded-md">
+                      <GraduationCap className="h-3.5 w-3.5" /> {selectedJob.experience_level}
+                    </div>
+                  )}
+                  {selectedJob.salary_min && selectedJob.salary_max && (
+                    <div className="flex items-center text-xs text-slate-500 gap-1 bg-slate-50 px-2.5 py-1.5 rounded-md">
+                      <DollarSign className="h-3.5 w-3.5" /> NPR {Math.round(selectedJob.salary_min)} - {Math.round(selectedJob.salary_max)} LPA
+                    </div>
+                  )}
+                </div>
+
+                {selectedJob.matching_score > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-slate-700">Match Score:</span>
+                    <Badge className={
+                      selectedJob.matching_score >= 85 ? "bg-green-100 text-green-700 border-none" :
+                      selectedJob.matching_score >= 70 ? "bg-orange-100 text-orange-700 border-none" :
+                      "bg-slate-100 text-slate-700 border-none"
+                    }>
+                      {Number(selectedJob.matching_score).toFixed(2)}%
+                    </Badge>
+                  </div>
+                )}
+
+                {selectedJob.description && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-2">Job Description</h4>
+                    <div className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">
+                      {selectedJob.description}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-2">Required Skills</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedJob.skills?.length > 0 ? selectedJob.skills.map((skill: string) => (
+                      <Badge key={skill} variant="secondary" className="bg-slate-100 text-slate-600 font-normal">
+                        {skill}
+                      </Badge>
+                    )) : <span className="text-sm text-slate-400">No skills listed</span>}
+                  </div>
+                </div>
+              </div>
+            )}
+          </ScrollArea>
+          <div className="flex justify-end pt-4 border-t border-slate-100">
+            <Button variant="outline" onClick={() => setSelectedJob(null)}>Close</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel confirmation dialog */}
+      <AlertDialog open={!!cancelTarget} onOpenChange={(open) => { if (!open && !cancelling) setCancelTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg font-bold text-slate-900">Cancel Application?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600">
+              Are you sure you want to withdraw your application for{" "}
+              <span className="font-semibold text-slate-800">{cancelTarget?.title}</span>?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelling}>Keep Application</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelApplication}
+              disabled={cancelling}
+              className="bg-red-600 hover:bg-red-700 text-white focus:ring-red-600"
+            >
+              {cancelling ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cancelling...</>
+              ) : (
+                <><Ban className="h-4 w-4 mr-2" /> Cancel Application</>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

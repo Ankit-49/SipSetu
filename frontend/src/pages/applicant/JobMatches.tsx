@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, Clock, Briefcase, Send, Loader2, UploadCloud, SlidersHorizontal, X, DollarSign, TrendingUp, FilterX, Bookmark, BookmarkCheck, Eye, GraduationCap } from "lucide-react";
+import { Search, MapPin, Clock, Briefcase, Send, Loader2, UploadCloud, SlidersHorizontal, X, DollarSign, TrendingUp, FilterX, Bookmark, BookmarkCheck, Eye, GraduationCap, Ban, CheckCircle2 } from "lucide-react";
 import { Link } from "react-router";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import api from "@/lib/api";
 import { useAuth } from "@/app/context/AuthContext";
@@ -46,6 +47,8 @@ export default function ApplicantJobMatches() {
   const [savedJobIds, setSavedJobIds] = useState<string[]>([]);
   const [savingJobId, setSavingJobId] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<any | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<any | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   const buildQuery = useCallback(() => {
     const params = new URLSearchParams({ per_page: "100" });
@@ -157,6 +160,42 @@ export default function ApplicantJobMatches() {
       });
     } finally {
       setApplyingJobId(null);
+    }
+  };
+
+  const handleCancelApplication = async () => {
+    if (!cancelTarget?.application_id) {
+      setCancelTarget(null);
+      toast({
+        title: "Could not cancel",
+        description: "This application is no longer active.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setCancelling(true);
+    try {
+      await api.delete(`/applications/${cancelTarget.application_id}`);
+      setAppliedJobIds((prev) => prev.filter((id) => id !== String(cancelTarget.job_id)));
+      setJobs((prev) => prev.map((j) =>
+        String(j.job_id) === String(cancelTarget.job_id)
+          ? { ...j, applied: false, application_id: null }
+          : j
+      ));
+      toast({
+        title: "Application cancelled",
+        description: `You withdrew your application for "${cancelTarget.title || "the job"}".`,
+      });
+      setCancelTarget(null);
+    } catch (err: any) {
+      console.error("Failed to cancel application", err);
+      toast({
+        title: "Could not cancel",
+        description: err?.response?.data?.error || "Please try again in a moment.",
+        variant: "destructive",
+      });
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -472,23 +511,31 @@ export default function ApplicantJobMatches() {
                   >
                     <Eye className="h-3.5 w-3.5" /> View Details
                   </button>
-                  <Button
-                    className="bg-[#F97316] hover:bg-[#F97316]/90 text-white gap-2"
-                    onClick={() => handleApply(job.job_id)}
-                    disabled={applyingJobId === job.job_id || appliedJobIds.includes(job.job_id)}
-                  >
-                    {appliedJobIds.includes(job.job_id) ? (
-                      "Applied"
-                    ) : applyingJobId === job.job_id ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" /> Applying...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4" /> Apply Now
-                      </>
-                    )}
-                  </Button>
+                  {appliedJobIds.includes(job.job_id) ? (
+                    <Button
+                      variant="outline"
+                      className="text-green-700 border-green-300 bg-green-50 hover:bg-green-100 gap-2"
+                      onClick={() => setCancelTarget(job)}
+                    >
+                      <CheckCircle2 className="h-4 w-4" /> Applied — Click to Withdraw
+                    </Button>
+                  ) : (
+                    <Button
+                      className="bg-[#F97316] hover:bg-[#F97316]/90 text-white gap-2"
+                      onClick={() => handleApply(job.job_id)}
+                      disabled={applyingJobId === job.job_id}
+                    >
+                      {applyingJobId === job.job_id ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" /> Applying...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4" /> Apply Now
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -594,24 +641,60 @@ export default function ApplicantJobMatches() {
                 <><Bookmark className="h-4 w-4" /> Save for later</>
               )}
             </button>
-            <Button
-              className="bg-[#F97316] hover:bg-[#F97316]/90 text-white gap-2"
-              onClick={() => {
-                if (selectedJob) handleApply(selectedJob.job_id);
-              }}
-              disabled={!selectedJob || applyingJobId === selectedJob?.job_id || appliedJobIds.includes(selectedJob?.job_id)}
-            >
-              {selectedJob && appliedJobIds.includes(selectedJob.job_id) ? (
-                "Applied"
-              ) : applyingJobId === selectedJob?.job_id ? (
-                <><Loader2 className="h-4 w-4 animate-spin" /> Applying...</>
-              ) : (
-                <><Send className="h-4 w-4" /> Apply Now</>
-              )}
-            </Button>
+            {selectedJob && appliedJobIds.includes(selectedJob.job_id) ? (
+              <Button
+                variant="outline"
+                className="text-green-700 border-green-300 bg-green-50 hover:bg-green-100 gap-2"
+                onClick={() => { setCancelTarget(selectedJob); setSelectedJob(null); }}
+              >
+                <CheckCircle2 className="h-4 w-4" /> Applied — Withdraw
+              </Button>
+            ) : (
+              <Button
+                className="bg-[#F97316] hover:bg-[#F97316]/90 text-white gap-2"
+                onClick={() => {
+                  if (selectedJob) handleApply(selectedJob.job_id);
+                }}
+                disabled={!selectedJob || applyingJobId === selectedJob?.job_id}
+              >
+                {applyingJobId === selectedJob?.job_id ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Applying...</>
+                ) : (
+                  <><Send className="h-4 w-4" /> Apply Now</>
+                )}
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Withdraw confirmation dialog */}
+      <AlertDialog open={!!cancelTarget} onOpenChange={(open) => { if (!open && !cancelling) setCancelTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg font-bold text-slate-900">Withdraw Application?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600">
+              Are you sure you want to withdraw your application for{" "}
+              <span className="font-semibold text-slate-800">{cancelTarget?.title}</span>?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelling}>Keep Application</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelApplication}
+              disabled={cancelling}
+              className="bg-red-600 hover:bg-red-700 text-white focus:ring-red-600"
+            >
+              {cancelling ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Withdrawing...</>
+              ) : (
+                <><Ban className="h-4 w-4 mr-2" /> Withdraw Application</>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
