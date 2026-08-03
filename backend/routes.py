@@ -1078,7 +1078,7 @@ def applicant_dashboard(applicant_id):
 @api.route('/applicants/<applicant_id>/skill-gap', methods=['GET'])
 @_ownership_required
 def applicant_skill_gap(applicant_id):
-    """Compare applicant resume skills vs a specific job's skills."""
+    """Compare applicant resume skills vs their target roles (matched jobs)."""
     applicant = Applicant.query.get(applicant_id)
     if not applicant:
         return jsonify({"error": "Applicant not found"}), 404
@@ -1091,6 +1091,33 @@ def applicant_skill_gap(applicant_id):
 
     resume_skills = {s.skill_name for s in latest_resume.skills}
 
+    # Rank every job against the resume (same scoring as matched-jobs) so the
+    # page only surfaces roles that are actually relevant to the applicant.
+    all_jobs = Job.query.order_by(Job.created_at.desc()).all()
+    scored = []
+    for job in all_jobs:
+        score = float(_compute_job_match_score(latest_resume, job) or 0.0)
+        if score > 0:
+            scored.append((score, job))
+    scored.sort(key=lambda p: p[0], reverse=True)
+
+    matched_jobs = [{
+        "job_id": str(job.job_id),
+        "title": job.title,
+        "company": job.recruiter.company or job.recruiter.name or "",
+        "matching_score": round(score, 1),
+    } for score, job in scored[:10]]
+
+    considered_jobs = scored[:5]
+    considered = [{
+        "job_id": str(job.job_id),
+        "title": job.title,
+        "company": job.recruiter.company or job.recruiter.name or "",
+        "matching_score": round(score, 1),
+        "location": job.location or "",
+        "job_type": job.job_type or "",
+    } for score, job in considered_jobs]
+
     if job_id:
         job = Job.query.get(job_id)
         if not job:
@@ -1098,27 +1125,67 @@ def applicant_skill_gap(applicant_id):
         job_skills = {s.skill_name for s in job.skills}
         job_title = job.title
         job_company = job.recruiter.company or job.recruiter.name or ""
+        job_detail = {
+            "title": job.title,
+            "company": job_company,
+            "location": job.location or "",
+            "job_type": job.job_type or "",
+            "experience_level": job.experience_level or "",
+            "salary_min": float(job.salary_min) if job.salary_min else None,
+            "salary_max": float(job.salary_max) if job.salary_max else None,
+        }
     else:
-        rankings = Ranking.query.filter_by(resume_id=latest_resume.resume_id)\
-            .order_by(Ranking.matching_score.desc()).limit(5).all()
         job_skills = set()
-        for r in rankings:
-            job_skills.update(s.skill_name for s in r.job.skills)
+        for _, job in considered_jobs:
+            job_skills.update(s.skill_name for s in job.skills)
         job_title = "All Matched Jobs"
         job_company = ""
+        job_detail = None
 
     matched = list(resume_skills & job_skills)
     missing = sorted(job_skills - resume_skills)
     total = len(job_skills)
     readiness = round((len(matched) / total * 100), 1) if total > 0 else 0.0
 
-    missing_with_priority = [
-        {"skill": s, "priority": "High" if len(missing) <= 2 else ("Medium" if len(missing) <= 5 else "Low")}
-        for s in missing
-    ]
+    # How many considered roles require a given skill (aggregate view only).
+    job_skill_sets = [{s.skill_name for s in j.skills} for _, j in considered_jobs]
+
+    def frequency(skill):
+        return sum(1 for js in job_skill_sets if skill in js)
+
+    def priority_for(freq):
+        if job_id:
+            # Single job: the fewer remaining gaps, the more urgent each one is.
+            if len(missing) <= 2:
+                return "High"
+            if len(missing) <= 5:
+                return "Medium"
+            return "Low"
+        # Aggregate: skills required by most of your target roles are most valuable.
+        n = len(considered_jobs) or 1
+        ratio = (freq or 0) / n
+        if ratio >= 0.6:
+            return "High"
+        if ratio >= 0.3:
+            return "Medium"
+        return "Low"
+
+    missing_with_priority = []
+    for s in missing:
+        freq = frequency(s) if not job_id else None
+        missing_with_priority.append({
+            "skill": s,
+            "priority": priority_for(freq),
+            "frequency": freq,
+        })
+    order = {"High": 0, "Medium": 1, "Low": 2}
+    missing_with_priority.sort(key=lambda x: (order.get(x["priority"], 3), x["skill"]))
 
     return jsonify({
         "job_id": job_id, "job_title": job_title, "job_company": job_company,
+        "job_detail": job_detail,
+        "matched_jobs": matched_jobs,
+        "considered_jobs": considered,
         "resume_skills": list(resume_skills),
         "matched_skills": matched, "missing_skills": missing_with_priority,
         "readiness_score": readiness,
