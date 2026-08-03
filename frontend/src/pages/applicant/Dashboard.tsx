@@ -18,7 +18,9 @@ import {
   CheckCircle2,
   XCircle,
   Eye,
-  Ban
+  Ban,
+  ChevronDown,
+  Info
 } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
@@ -51,6 +53,7 @@ export default function ApplicantDashboardHome() {
   const date = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
+  const [showStrengthBreakdown, setShowStrengthBreakdown] = useState(false);
 
   const fetchDashboard = async () => {
     if (!user) return;
@@ -244,9 +247,67 @@ export default function ApplicantDashboardHome() {
             <div className="space-y-1">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-bold text-slate-900">{data?.resume_strength ?? 0}/100</span>
+                <button
+                  onClick={() => setShowStrengthBreakdown(v => !v)}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-[#1E3A5F] hover:text-[#F97316] transition-colors cursor-pointer"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                  {showStrengthBreakdown ? "Hide breakdown" : "Why this score?"}
+                  <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${showStrengthBreakdown ? "rotate-180" : ""}`} />
+                </button>
               </div>
               <Progress value={data?.resume_strength ?? 0} className="h-2.5 bg-slate-100 rounded-full" indicatorClassName="bg-gradient-to-r from-[#1E3A5F] to-[#2a4f7a]" />
             </div>
+
+            {showStrengthBreakdown && (
+              <div className="pt-3 border-t border-slate-100 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                {[
+                  {
+                    key: "content",
+                    label: "Content depth",
+                    hint: "How much detail your resume contains",
+                    max: 30,
+                  },
+                  {
+                    key: "skills",
+                    label: "Skill coverage",
+                    hint: "Number of skills extracted from your resume",
+                    max: 25,
+                  },
+                  {
+                    key: "match",
+                    label: "Match quality",
+                    hint: "Average score against your best-matched roles",
+                    max: 30,
+                  },
+                  {
+                    key: "gaps",
+                    label: "Gap closure",
+                    hint: "Fewer missing skills for target roles = higher score",
+                    max: 15,
+                  },
+                ].map((row) => {
+                  const val = Number(data?.resume_strength_breakdown?.[row.key] ?? 0);
+                  const pct = row.max > 0 ? Math.min(100, (val / row.max) * 100) : 0;
+                  return (
+                    <div key={row.key} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-slate-700">{row.label}</span>
+                        <span className="font-semibold text-slate-500">
+                          {val}/{row.max}
+                        </span>
+                      </div>
+                      <Progress
+                        value={pct}
+                        className="h-1.5 bg-slate-100 rounded-full"
+                        indicatorClassName="bg-[#1E3A5F]"
+                      />
+                      <p className="text-[11px] text-slate-400 leading-snug">{row.hint}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">

@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   ExternalLink,
@@ -102,6 +103,8 @@ export default function ApplicantSkillGap() {
   const [gapLoading, setGapLoading] = useState(false);
   const [hasResume, setHasResume] = useState(true);
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
+  const [progressBySkill, setProgressBySkill] = useState<Record<string, string>>({});
+  const [savingSkill, setSavingSkill] = useState<string | null>(null);
 
   // Fetch skill gap data (matched jobs come back with it, so no separate call needed)
   useEffect(() => {
@@ -117,6 +120,9 @@ export default function ApplicantSkillGap() {
           : `/applicants/${user.id}/skill-gap?job_id=${selectedJobId}`;
         const res = await api.get(url);
         setGapData(res.data);
+        const prog: Record<string, string> = {};
+        for (const m of res.data.missing_skills || []) prog[m.skill] = m.status || "not_started";
+        setProgressBySkill(prog);
         if (res.data.missing_skills?.length > 0) {
           setOpenItems({ [res.data.missing_skills[0].skill]: true });
         }
@@ -141,6 +147,28 @@ export default function ApplicantSkillGap() {
     setOpenItems({});
   };
 
+  const statusOf = (skill: string, fallback?: string): string =>
+    progressBySkill[skill] || fallback || "not_started";
+
+  const statusPct = (status: string): number =>
+    status === "learned" ? 100 : status === "learning" ? 50 : 0;
+
+  const updateStatus = async (skill: string, status: string) => {
+    if (!user) return;
+    const prev = statusOf(skill);
+    if (prev === status) return;
+    setProgressBySkill(p => ({ ...p, [skill]: status }));
+    setSavingSkill(skill);
+    try {
+      await api.put(`/applicants/${user.id}/skill-progress`, { skill, status });
+    } catch (err) {
+      console.error("Failed to update skill progress", err);
+      setProgressBySkill(p => ({ ...p, [skill]: prev }));
+    } finally {
+      setSavingSkill(null);
+    }
+  };
+
   const formatSalary = (min: number | null, max: number | null): string => {
     if (min && max) return `NPR ${Math.round(min)} - ${Math.round(max)} LPA`;
     if (min) return `NPR ${Math.round(min)}+ LPA`;
@@ -159,6 +187,13 @@ export default function ApplicantSkillGap() {
   const missingCount = gapData?.missing_skills?.length ?? 0;
   const highCount = gapData?.missing_skills?.filter((m: any) => m.priority === "High").length ?? 0;
   const mediumCount = gapData?.missing_skills?.filter((m: any) => m.priority === "Medium").length ?? 0;
+  const learnedCount = gapData?.missing_skills?.filter(
+    (m: any) => statusOf(m.skill, m.status) === "learned"
+  ).length ?? 0;
+  const learningCount = gapData?.missing_skills?.filter(
+    (m: any) => statusOf(m.skill, m.status) === "learning"
+  ).length ?? 0;
+  const closedPct = missingCount > 0 ? Math.round((learnedCount / missingCount) * 100) : 0;
   const matchedJobs = gapData?.matched_jobs || [];
   const consideredJobs = gapData?.considered_jobs || [];
   const jobDetail = gapData?.job_detail;
@@ -294,6 +329,30 @@ export default function ApplicantSkillGap() {
                       )}
                     </div>
                   )}
+                  {missingCount > 0 && (
+                    <div className="mt-4 bg-slate-50 border border-slate-100 rounded-xl p-4">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <TrendingUp className="h-4 w-4 text-[#F97316] shrink-0" />
+                          <span className="text-sm font-semibold text-slate-700">Gap closure progress</span>
+                        </div>
+                        <span className="text-sm font-semibold text-[#1E3A5F] whitespace-nowrap">
+                          {learnedCount}/{missingCount} closed
+                          {learningCount > 0 ? ` • ${learningCount} learning` : ""}
+                        </span>
+                      </div>
+                      <Progress
+                        value={closedPct}
+                        className="h-2.5 bg-slate-200 rounded-full"
+                        indicatorClassName="bg-gradient-to-r from-[#1E3A5F] to-[#2a4f7a]"
+                      />
+                      {learningCount > 0 && (
+                        <p className="text-xs text-slate-500 mt-1.5">
+                          Mark a skill as Learning to track it — Learned skills count as closed.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent className="p-0">
                   {missingCount === 0 ? (
@@ -313,14 +372,18 @@ export default function ApplicantSkillGap() {
                             onOpenChange={() => toggleItem(item.skill)}
                             className="p-4 bg-white"
                           >
-                            <CollapsibleTrigger className="w-full flex items-center justify-between group">
+                            <CollapsibleTrigger className="w-full flex items-center justify-between gap-3 group">
                               <div className="flex items-center gap-3 flex-wrap">
                                 <div className={`p-2 rounded-lg ${
+                                  statusOf(item.skill, item.status) === 'learned' ? 'bg-green-50 text-green-600' :
+                                  statusOf(item.skill, item.status) === 'learning' ? 'bg-amber-50 text-amber-600' :
                                   item.priority === 'High' ? 'bg-red-50 text-red-600' :
                                   item.priority === 'Medium' ? 'bg-orange-50 text-orange-600' :
                                   'bg-slate-100 text-slate-600'
                                 }`}>
-                                  <Target className="h-4 w-4" />
+                                  {statusOf(item.skill, item.status) === 'learned' ? <CheckCircle2 className="h-4 w-4" /> :
+                                   statusOf(item.skill, item.status) === 'learning' ? <GraduationCap className="h-4 w-4" /> :
+                                   <Target className="h-4 w-4" />}
                                 </div>
                                 <span className="font-semibold text-slate-900 capitalize">{item.skill}</span>
                                 <Badge variant="outline" className={
@@ -336,15 +399,75 @@ export default function ApplicantSkillGap() {
                                   </Badge>
                                 )}
                               </div>
-                              <Button variant="ghost" size="sm" className="text-slate-400 group-hover:text-slate-900">
-                                {openItems[item.skill] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                              </Button>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <div className="hidden sm:flex items-center gap-2">
+                                  <div className="w-20">
+                                    <Progress
+                                      value={statusPct(statusOf(item.skill, item.status))}
+                                      className="h-1.5 bg-slate-100 rounded-full"
+                                      indicatorClassName={statusOf(item.skill, item.status) === 'learned'
+                                        ? 'bg-green-500'
+                                        : statusOf(item.skill, item.status) === 'learning'
+                                        ? 'bg-amber-500'
+                                        : 'bg-slate-300'}
+                                    />
+                                  </div>
+                                  <span className={`text-xs font-semibold whitespace-nowrap ${
+                                    statusOf(item.skill, item.status) === 'learned' ? 'text-green-600' :
+                                    statusOf(item.skill, item.status) === 'learning' ? 'text-amber-600' :
+                                    'text-slate-400'
+                                  }`}>
+                                    {statusOf(item.skill, item.status) === 'learned' ? 'Learned' :
+                                     statusOf(item.skill, item.status) === 'learning' ? 'Learning' :
+                                     'Not started'}
+                                  </span>
+                                </div>
+                                <Button variant="ghost" size="sm" className="text-slate-400 group-hover:text-slate-900">
+                                  {openItems[item.skill] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                </Button>
+                              </div>
                             </CollapsibleTrigger>
 
-                            <CollapsibleContent className="pt-4 pl-14">
-                              <p className="text-sm font-medium text-slate-900 mb-3 uppercase tracking-wider flex items-center gap-1.5">
-                                <Sparkles className="h-3.5 w-3.5 text-[#F97316]" /> Recommended Resources
-                              </p>
+                            <CollapsibleContent className="pt-4 pl-14 space-y-5">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <span className="text-sm font-medium text-slate-700">My progress:</span>
+                                <div className="flex rounded-lg border border-slate-200 overflow-hidden bg-white">
+                                  {["not_started", "learning", "learned"].map(st => {
+                                    const current = statusOf(item.skill, item.status);
+                                    const active = current === st;
+                                    return (
+                                      <button
+                                        key={st}
+                                        onClick={() => updateStatus(item.skill, st)}
+                                        disabled={savingSkill === item.skill}
+                                        className={`px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-60 ${
+                                          active
+                                            ? st === "learned"
+                                              ? "bg-green-600 text-white"
+                                              : st === "learning"
+                                              ? "bg-amber-500 text-white"
+                                              : "bg-slate-200 text-slate-700"
+                                            : "bg-white text-slate-500 hover:bg-slate-50"
+                                        }`}
+                                      >
+                                        {st === "not_started" ? "Not started" : st === "learning" ? "Learning" : "Learned"}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                {savingSkill === item.skill && (
+                                  <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                                )}
+                                {statusOf(item.skill, item.status) === "learned" && (
+                                  <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                                    <CheckCircle2 className="h-3.5 w-3.5" /> Nice — this gap is closed!
+                                  </span>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-slate-900 mb-3 uppercase tracking-wider flex items-center gap-1.5">
+                                  <Sparkles className="h-3.5 w-3.5 text-[#F97316]" /> Recommended Resources
+                                </p>
                               <ul className="space-y-2">
                                 {getResources(item.skill).map((res, i) => (
                                   <li key={i}>
@@ -360,6 +483,7 @@ export default function ApplicantSkillGap() {
                                   </li>
                                 ))}
                               </ul>
+                              </div>
                             </CollapsibleContent>
                           </Collapsible>
                         ))}

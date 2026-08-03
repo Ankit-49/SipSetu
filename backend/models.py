@@ -134,6 +134,22 @@ class PasswordResetToken(db.Model):
     user = db.relationship('User', backref='password_reset_tokens')
 
 
+class SkillProgress(db.Model):
+    __tablename__ = 'skill_progress'
+    progress_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    applicant_id = db.Column(UUID(as_uuid=True), db.ForeignKey('applicants.user_id', ondelete='CASCADE'), nullable=False)
+    skill_name = db.Column(db.String(100), nullable=False)
+    status = db.Column(db.String(20), default='learning', nullable=False)  # 'learning', 'learned'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('applicant_id', 'skill_name', name='uq_applicant_skill_progress'),
+    )
+
+    applicant = db.relationship('Applicant', backref='skill_progress')
+
+
 class SavedJob(db.Model):
     __tablename__ = 'saved_jobs'
     saved_job_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

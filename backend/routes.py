@@ -1,5 +1,5 @@
 from flask import Blueprint, Flask, request, jsonify, g
-from models import db, User, Applicant, Recruiter, Job, JobApplication, Resume, Skill, Ranking, Notification, PasswordResetToken, EmailVerificationToken, Interview, SavedJob
+from models import db, User, Applicant, Recruiter, Job, JobApplication, Resume, Skill, Ranking, Notification, PasswordResetToken, EmailVerificationToken, Interview, SavedJob, SkillProgress
 from werkzeug.security import generate_password_hash, check_password_hash
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -918,6 +918,83 @@ def _compute_job_match_score(resume, job):
     return calculate_ranking_score(resume, job)
 
 
+def _resume_strength(raw_text, skill_count, avg_score, missing_count):
+    """Composite 0-100 resume strength with a sub-score breakdown.
+
+    Weights: content depth 30, skill coverage 25, match quality 30,
+    gap closure 15. Pass missing_count=None when no target roles were
+    evaluated (no resume or no jobs), in which case the gap-closure
+    bonus is skipped so a resume-less user doesn't get a fake score.
+    Returns a dict with the rounded total plus the four component
+    scores so the dashboard can explain why the score is what it is.
+    """
+    text_len = len((raw_text or "").strip())
+
+    # Content depth (0-30): real text is the backbone of a resume.
+    if text_len >= 2000:
+        content_score = 30
+    elif text_len >= 1000:
+        content_score = 22
+    elif text_len >= 500:
+        content_score = 14
+    elif text_len >= 100:
+        content_score = 6
+    else:
+        content_score = 0
+
+    # Skill coverage (0-25): more extracted skills, up to a point.
+    if skill_count >= 15:
+        skills_score = 25
+    elif skill_count >= 10:
+        skills_score = 20
+    elif skill_count >= 6:
+        skills_score = 14
+    elif skill_count >= 3:
+        skills_score = 8
+    elif skill_count > 0:
+        skills_score = 4
+    else:
+        skills_score = 0
+
+    # Match quality (0-30): how well the resume scores against target roles.
+    if avg_score >= 85:
+        match_score = 30
+    elif avg_score >= 70:
+        match_score = 24
+    elif avg_score >= 55:
+        match_score = 18
+    elif avg_score >= 40:
+        match_score = 12
+    elif avg_score >= 20:
+        match_score = 6
+    else:
+        match_score = 0
+
+    # Gap closure (0-15): fewer missing skills for target roles = stronger.
+    # Skip entirely when no target roles were evaluated (missing_count=None).
+    if missing_count is None:
+        gap_score = 0
+    elif missing_count == 0:
+        gap_score = 15
+    elif missing_count <= 2:
+        gap_score = 12
+    elif missing_count <= 4:
+        gap_score = 8
+    elif missing_count <= 6:
+        gap_score = 4
+    else:
+        gap_score = 0
+
+    total = min(100, int(round(content_score + skills_score + match_score + gap_score)))
+    return {
+        "content": content_score,
+        "skills": skills_score,
+        "match": match_score,
+        "gaps": gap_score,
+        "total": total,
+    }
+
+
 @api.route('/applicants/<applicant_id>/matched-jobs', methods=['GET'])
 @_ownership_required
 def get_matched_jobs(applicant_id):
@@ -1042,7 +1119,19 @@ def applicant_dashboard(applicant_id):
                 missing_skills.extend(job_skills - resume_skills)
             missing_skills = list(set(missing_skills))[:6]
 
-    resume_strength = min(int(skill_count * 10), 100)
+    strength = _resume_strength(
+        latest_resume.raw_text if latest_resume else None,
+        skill_count,
+        avg_score,
+        len(missing_skills) if top_jobs else None,
+    )
+    resume_strength = strength["total"]
+    resume_strength_breakdown = {
+        "content": strength["content"],
+        "skills": strength["skills"],
+        "match": strength["match"],
+        "gaps": strength["gaps"],
+    }
 
     upcoming_interviews = Interview.query.filter_by(applicant_id=applicant_id)\
         .filter(Interview.status.in_(['pending', 'confirmed']))\
@@ -1057,6 +1146,7 @@ def applicant_dashboard(applicant_id):
         "resume_filename": latest_resume.file_path if latest_resume else None,
         "skill_count": skill_count,
         "resume_strength": resume_strength,
+        "resume_strength_breakdown": resume_strength_breakdown,
         "avg_match_score": avg_score,
         "top_jobs": top_jobs,
         "recent_jobs": recent_jobs,
@@ -1088,6 +1178,12 @@ def applicant_skill_gap(applicant_id):
         .order_by(Resume.uploaded_at.desc()).first()
     if not latest_resume:
         return jsonify({"error": "No resume found. Please upload a resume first."}), 404
+
+    # Skills the applicant is actively tracking toward closing (persisted).
+    progress_map = {
+        p.skill_name: p.status
+        for p in SkillProgress.query.filter_by(applicant_id=applicant_id).all()
+    }
 
     resume_skills = {s.skill_name for s in latest_resume.skills}
 
@@ -1144,8 +1240,12 @@ def applicant_skill_gap(applicant_id):
 
     matched = list(resume_skills & job_skills)
     missing = sorted(job_skills - resume_skills)
+    # Skills the applicant has marked as "learned" close their gap, so count
+    # them as effectively matched — keeps the readiness ring consistent with
+    # the gap-closure progress tracker.
+    learned_count = sum(1 for s in missing if progress_map.get(s) == "learned")
     total = len(job_skills)
-    readiness = round((len(matched) / total * 100), 1) if total > 0 else 0.0
+    readiness = round((len(matched) + learned_count) / total * 100, 1) if total > 0 else 0.0
 
     # How many considered roles require a given skill (aggregate view only).
     job_skill_sets = [{s.skill_name for s in j.skills} for _, j in considered_jobs]
@@ -1177,6 +1277,7 @@ def applicant_skill_gap(applicant_id):
             "skill": s,
             "priority": priority_for(freq),
             "frequency": freq,
+            "status": progress_map.get(s, "not_started"),
         })
     order = {"High": 0, "Medium": 1, "Low": 2}
     missing_with_priority.sort(key=lambda x: (order.get(x["priority"], 3), x["skill"]))
@@ -1191,7 +1292,51 @@ def applicant_skill_gap(applicant_id):
         "readiness_score": readiness,
     }), 200
 
+
+@api.route('/applicants/<applicant_id>/skill-progress', methods=['PUT'])
+@_ownership_required
+def update_skill_progress(applicant_id):
+    """Track an applicant's progress toward closing a skill gap.
+
+    Body: {"skill": "python", "status": "learning" | "learned" | "not_started"}.
+    "learning" / "learned" upsert a row; "not_started" clears any saved
+    progress for that skill (back to an untracked gap).
+    """
+    applicant = Applicant.query.get(applicant_id)
+    if not applicant:
+        return jsonify({"error": "Applicant not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    skill = (data.get('skill') or '').strip().lower()
+    status = (data.get('status') or '').strip().lower()
+
+    if not skill:
+        return jsonify({"error": "skill is required"}), 400
+    if status not in ('learning', 'learned', 'not_started'):
+        return jsonify({"error": "status must be 'learning', 'learned', or 'not_started'"}), 400
+
+    progress = SkillProgress.query.filter_by(
+        applicant_id=applicant_id, skill_name=skill
+    ).first()
+
+    if status == 'not_started':
+        if progress:
+            db.session.delete(progress)
+            db.session.commit()
+        return jsonify({"skill": skill, "status": "not_started"}), 200
+
+    if not progress:
+        progress = SkillProgress(applicant_id=applicant_id, skill_name=skill, status=status)
+        db.session.add(progress)
+    else:
+        progress.status = status
+    db.session.commit()
+
+    return jsonify({"skill": skill, "status": status}), 200
+
+
 # ============ RECRUITER CANDIDATE ROUTES ============
+
 
 @api.route('/jobs/<job_id>/candidates', methods=['GET'])
 @require_auth

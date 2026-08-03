@@ -224,6 +224,23 @@ CREATE TABLE IF NOT EXISTS interviews (
 );
 
 -- ============================================================================
+-- SKILL PROGRESS  (applicant's learning tracker for skill gaps)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS skill_progress (
+    progress_id  UUID        DEFAULT uuid_generate_v4() NOT NULL PRIMARY KEY,
+    applicant_id UUID                                    NOT NULL
+        REFERENCES applicants(user_id) ON DELETE CASCADE,
+    skill_name   VARCHAR(100)                            NOT NULL,
+    status       VARCHAR(20) DEFAULT 'learning'          NOT NULL
+        CHECK (status IN ('learning', 'learned')),
+    created_at   TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT uq_applicant_skill_progress UNIQUE (applicant_id, skill_name)
+);
+
+-- ============================================================================
 -- NOTIFICATIONS
 -- ============================================================================
 
