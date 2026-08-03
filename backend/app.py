@@ -57,4 +57,6 @@ if __name__ == '__main__':
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not debug:
         from reminders import start_reminder_scheduler
         start_reminder_scheduler(app)
+        from retrain_scheduler import start_retrain_scheduler
+        start_retrain_scheduler(app)
     app.run(debug=debug, port=5000)

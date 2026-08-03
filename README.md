@@ -934,6 +934,26 @@ training rows, and the current blend `alpha`.
 Without a trained model, `calculate_ranking_score()` falls back to the
 coverage-based heuristic above, so the app works identically either way.
 
+#### Auto-retrain (background job)
+
+`backend/retrain_scheduler.py` starts a daemon thread (alongside the
+interview-reminder scheduler) that retrains the model automatically, so no
+manual `POST /api/ml/ranking/train` calls are needed:
+
+- **Nightly** — once the UTC clock passes 3 AM and at least a day has passed
+  since the last successful training.
+- **New recruiter feedback** — when the count of shortlisted/rejected
+  applications grows since the last sweep (even a single shortlist/reject
+  triggers a retrain, since those statuses teach the model preferences).
+- **First run** — attempts once on boot if no model has ever trained
+  (no-ops until enough ranked pairs exist).
+
+All attempts are rate-limited to **one per hour**, and state (last attempt,
+last successful train, feedback count) is persisted to
+`ml_artifacts/retrain_state.json` (gitignored) so triggers survive restarts.
+If training fails the model keeps the previous artifact; scoring falls back
+silently to the heuristic if the artifact is missing or corrupt.
+
 ---
 
 ## 9. Rate Limiting Rules
