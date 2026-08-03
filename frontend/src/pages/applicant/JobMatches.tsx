@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, Clock, Briefcase, Send, Loader2, UploadCloud, SlidersHorizontal, X, DollarSign, TrendingUp, FilterX, Bookmark, BookmarkCheck, Eye, GraduationCap, Ban, CheckCircle2 } from "lucide-react";
+import { Search, MapPin, Clock, Briefcase, Send, Loader2, UploadCloud, SlidersHorizontal, X, Banknote, TrendingUp, FilterX, Bookmark, BookmarkCheck, Eye, GraduationCap, Ban, CheckCircle2 } from "lucide-react";
 import { Link } from "react-router";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
@@ -123,6 +123,7 @@ export default function ApplicantJobMatches() {
   const formatSalary = (job: any) => {
     if (job.salary_min && job.salary_max) return `NPR ${Math.round(job.salary_min)} - ${Math.round(job.salary_max)} LPA`;
     if (job.salary_min) return `NPR ${Math.round(job.salary_min)}+ LPA`;
+    if (job.salary_max) return `Up to NPR ${Math.round(job.salary_max)} LPA`;
     return null;
   };
 
@@ -337,7 +338,7 @@ export default function ApplicantJobMatches() {
               {/* Salary Range */}
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
-                  <DollarSign className="h-3 w-3" /> Salary (LPA)
+                  <Banknote className="h-3 w-3" /> Salary (LPA)
                 </Label>
                 <div className="flex items-center gap-2">
                   <Input
@@ -575,7 +576,7 @@ export default function ApplicantJobMatches() {
                   )}
                   {formatSalary(selectedJob) && (
                     <div className="flex items-center text-xs text-slate-500 gap-1 bg-slate-50 px-2.5 py-1.5 rounded-md">
-                      <DollarSign className="h-3.5 w-3.5" /> {formatSalary(selectedJob)}
+                      <Banknote className="h-3.5 w-3.5" /> {formatSalary(selectedJob)}
                     </div>
                   )}
                 </div>

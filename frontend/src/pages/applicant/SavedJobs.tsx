@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, Briefcase, Send, Loader2, BookmarkCheck, Bookmark, Trash2, Heart, Eye, DollarSign, GraduationCap, Ban, CheckCircle2 } from "lucide-react";
+import { MapPin, Clock, Briefcase, Send, Loader2, BookmarkCheck, Bookmark, Trash2, Heart, Eye, Banknote, GraduationCap, Ban, CheckCircle2 } from "lucide-react";
 import { Link } from "react-router";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
@@ -108,6 +108,7 @@ export default function ApplicantSavedJobs() {
   const formatSalary = (job: any) => {
     if (job.salary_min && job.salary_max) return `NPR ${Math.round(job.salary_min)} - ${Math.round(job.salary_max)} LPA`;
     if (job.salary_min) return `NPR ${Math.round(job.salary_min)}+ LPA`;
+    if (job.salary_max) return `Up to NPR ${Math.round(job.salary_max)} LPA`;
     return null;
   };
 
@@ -294,7 +295,7 @@ export default function ApplicantSavedJobs() {
                   )}
                   {formatSalary(selectedJob) && (
                     <div className="flex items-center text-xs text-slate-500 gap-1 bg-slate-50 px-2.5 py-1.5 rounded-md">
-                      <DollarSign className="h-3.5 w-3.5" /> {formatSalary(selectedJob)}
+                      <Banknote className="h-3.5 w-3.5" /> {formatSalary(selectedJob)}
                     </div>
                   )}
                 </div>

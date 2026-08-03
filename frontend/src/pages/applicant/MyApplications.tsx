@@ -14,7 +14,7 @@ import {
   Search,
   Ban,
   GraduationCap,
-  DollarSign,
+  Banknote,
 } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -396,9 +396,14 @@ export default function ApplicantMyApplications() {
                       <GraduationCap className="h-3.5 w-3.5" /> {selectedJob.experience_level}
                     </div>
                   )}
-                  {selectedJob.salary_min && selectedJob.salary_max && (
+                  {(selectedJob.salary_min || selectedJob.salary_max) && (
                     <div className="flex items-center text-xs text-slate-500 gap-1 bg-slate-50 px-2.5 py-1.5 rounded-md">
-                      <DollarSign className="h-3.5 w-3.5" /> NPR {Math.round(selectedJob.salary_min)} - {Math.round(selectedJob.salary_max)} LPA
+                      <Banknote className="h-3.5 w-3.5" />{" "}
+                      {selectedJob.salary_min && selectedJob.salary_max
+                        ? `NPR ${Math.round(selectedJob.salary_min)} - ${Math.round(selectedJob.salary_max)} LPA`
+                        : selectedJob.salary_min
+                        ? `NPR ${Math.round(selectedJob.salary_min)}+ LPA`
+                        : `Up to NPR ${Math.round(selectedJob.salary_max)} LPA`}
                     </div>
                   )}
                 </div>

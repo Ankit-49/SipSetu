@@ -32,7 +32,7 @@ import {
   Briefcase,
   MapPin,
   Clock,
-  DollarSign,
+  Banknote,
   Pencil,
   Trash2,
   Loader2,
@@ -374,7 +374,7 @@ export default function RecruiterManageJobs() {
               <p className="text-2xl font-bold text-slate-900">{stats.withSalary}</p>
             </div>
             <div className="h-10 w-10 rounded-full bg-green-50 flex items-center justify-center">
-              <DollarSign className="h-5 w-5 text-green-600" />
+              <Banknote className="h-5 w-5 text-green-600" />
             </div>
           </CardContent>
         </Card>
@@ -517,14 +517,11 @@ export default function RecruiterManageJobs() {
                           variant="secondary"
                           className="bg-green-50 text-green-700 border-green-200 text-xs whitespace-nowrap"
                         >
-                          NPR
-                          {job.salary_min
-                            ? ` ${Number(job.salary_min).toLocaleString()}`
-                            : " 0"}
-                          {job.salary_max
-                            ? ` - ${Number(job.salary_max).toLocaleString()}`
-                            : ""}
-                          {" LPA"}
+                          {job.salary_min && job.salary_max
+                            ? `NPR ${Math.round(job.salary_min)} - ${Math.round(job.salary_max)} LPA`
+                            : job.salary_min
+                            ? `NPR ${Math.round(job.salary_min)}+ LPA`
+                            : `Up to NPR ${Math.round(job.salary_max)} LPA`}
                         </Badge>
                       )}
                       <div className="flex items-center gap-2">
