@@ -108,14 +108,42 @@ def calculate_experience_score(candidate_years, target_years):
 
 
 def calculate_ranking_score(resume, job):
-    try:
-        from ranking_ml import predict_ranking_score
+    """Coverage-based match score between a resume and a job (0-100).
 
-        return predict_ranking_score(resume, job)
-    except Exception:
-        from ranking_ml import _heuristic_score
+    Deterministic heuristic: skill coverage (70%) + experience fit (15%)
+    + text-content similarity (15%), matching the bulk-screening formula.
+    Replaces the retired ML ranking model.
+    """
+    resume_skills = [s.skill_name for s in resume.skills]
+    job_skills = [s.skill_name for s in job.skills]
 
-        return _heuristic_score(resume, job)
+    if not job_skills or not resume_skills:
+        return 0.0
+
+    skills_score = calculate_match_score(resume_skills, job_skills)
+
+    experience_years = extract_experience_years(resume.raw_text or "")
+    target_experience_years = experience_level_to_years(job.experience_level)
+    experience_score = calculate_experience_score(experience_years, target_experience_years)
+
+    content_score = 0.0
+    resume_text = (resume.raw_text or "").strip() or " ".join(resume_skills)
+    job_text = " ".join(filter(None, [job.title or "", job.description or "", " ".join(job_skills)]))
+    if resume_text and job_text:
+        try:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            from sklearn.metrics.pairwise import cosine_similarity
+
+            matrix = TfidfVectorizer().fit_transform([resume_text, job_text]).toarray()
+            content_score = float(cosine_similarity(matrix[0:1], matrix[1:2])[0, 0]) * 100
+        except ValueError:
+            pass
+
+    if skills_score == 100.0 and experience_score >= 100.0 and content_score >= 99.0:
+        return 100.0
+
+    combined = (skills_score * 0.70) + (experience_score * 0.15) + (content_score * 0.15)
+    return min(round(combined, 2), 99.99)
 
 
 def create_rankings_for_job(job_id):

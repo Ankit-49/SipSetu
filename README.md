@@ -29,10 +29,9 @@ SipSetu is an AI-powered recruitment platform that bridges job seekers and recru
    - [6.5 Styling](#65-styling)
 7. [Complete API Reference](#7-complete-api-reference)
 8. [Scoring Algorithm](#8-scoring-algorithm)
-9. [ML Model Training](#9-ml-model-training)
-10. [Rate Limiting Rules](#10-rate-limiting-rules)
-11. [Known Limitations](#11-known-limitations)
-12. [Future Roadmap](#12-future-roadmap)
+9. [Rate Limiting Rules](#9-rate-limiting-rules)
+10. [Known Limitations](#10-known-limitations)
+11. [Future Roadmap](#11-future-roadmap)
 
 ---
 
@@ -50,16 +49,12 @@ graph TB
         Routes["routes.py<br/>Blueprint /api/*"]
         Auth["auth_middleware.py<br/>JWT Validation"]
         RateLimit["rate_limiter.py<br/>Sliding Window"]
-        Scoring["ranking_ml.py<br/>Heuristic / ML"]
+        Scoring["routes_common.py<br/>Coverage-based scoring"]
         Email("utils/email.py<br/>SMTP Sender")
     end
 
     subgraph Database["PostgreSQL"]
         DB["&#40;sipsetu&#41;<br/>15 tables"]
-    end
-
-    subgraph ML["ML Pipeline"]
-        Model["&#40;candidate_ranker.joblib&#41;<br/>Random Forest"]
     end
 
     React --> Axios
@@ -95,7 +90,7 @@ Authentication is stateless via JWT tokens stored in `localStorage`. File upload
 | SQLAlchemy | 2.0.29 | Database toolkit |
 | psycopg2-binary | 2.9.9 | PostgreSQL driver |
 | PyJWT | 2.8.0 | JWT encode/decode |
-| scikit-learn | 1.3.2 | ML ranking model |
+| scikit-learn | 1.3.2 | TF-IDF content similarity in scoring |
 | numpy | 1.24.3 | Numerical operations |
 | PyMuPDF (fitz) | 1.22.0 | PDF text extraction |
 | python-dotenv | 1.2.2 | Environment variables |
@@ -130,12 +125,10 @@ SipSetu/
 │   ├── models.py               # SQLAlchemy ORM models (15 tables)
 │   ├── routes.py               # All API endpoints (auth, jobs, resumes, etc.)
 │   ├── routes_common.py        # Shared helpers: scoring, formatting, ranking
-│   ├── ranking_ml.py           # ML model: heuristic scorer, training, prediction
 │   ├── auth_middleware.py      # JWT creation, decoding, require_auth/role decorators
 │   ├── rate_limiter.py         # In-memory sliding-window rate limiter decorator
 │   ├── utils/
 │   │   └── email.py            # SMTP email sender (dev fallback to console)
-│   ├── ml_artifacts/           # Trained model files (candidate_ranker.joblib)
 │   ├── requirements.txt        # Python dependencies
 │   └── .env.example            # Environment variable template
 │
@@ -460,13 +453,6 @@ All routes are registered under the `api` Blueprint with prefix `/api`. The file
 | PATCH | `/interviews/<id>/status` | Owner | Update status |
 | GET | `/interviews/<user_id>` | Ownership | List interviews |
 
-#### ML / Admin
-
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| GET | `/ml/ranking/status` | — | Model status & metrics |
-| POST | `/ml/ranking/train` | — | Train model from historical rankings |
-
 #### Public
 
 | Method | Path | Auth | Description |
@@ -476,7 +462,7 @@ All routes are registered under the `api` Blueprint with prefix `/api`. The file
 
 ### 5.6 Scoring & Ranking Pipeline
 
-**Files:** `backend/routes_common.py` (shared helpers), `backend/ranking_ml.py` (ML model)
+**Files:** `backend/routes_common.py` (shared helpers)
 
 #### Scoring Flow
 
@@ -484,29 +470,22 @@ All routes are registered under the `api` Blueprint with prefix `/api`. The file
 flowchart LR
     A["Resume Upload"] --> B["extract_skills_from_text"]
     B --> C["create_rankings_for_resume"]
-    C --> D{"calculate_ranking_score"}
-    D --> E["predict_ranking_score"]
-    E --> F{"Model exists?"}
-    F -->|"Yes + ≥15 rows"| G["Random Forest Predict<br/>11 features"]
-    F -->|"No"| H["_heuristic_score<br/>Deterministic formula"]
-    H --> I["Coverage score<br/>matched / job_skills × 100"]
-    H --> J["Experience score<br/>from regex parsing"]
-    H --> K["Content similarity<br/>TF-IDF cosine × 100"]
-    I --> L["70% × skills + 15% × exp + 15% × content"]
+    C --> D["calculate_ranking_score"]
+    D --> H["Coverage score<br/>matched / job_skills × 100"]
+    D --> J["Experience score<br/>from regex parsing"]
+    D --> K["Content similarity<br/>TF-IDF cosine × 100"]
+    H --> L["70% × skills + 15% × exp + 15% × content"]
     J --> L
     K --> L
-    G --> M["Clip 0–100"]
-    L --> M
+    L --> M["Clip 0–100"]
     M --> N["Store in rankings table"]
 ```
 
 1. An applicant uploads a resume or applies to a job
 2. `create_rankings_for_job()` or `create_rankings_for_resume()` is called
 3. These call `calculate_ranking_score(resume, job)`
-4. `calculate_ranking_score()` calls `predict_ranking_score()` from `ranking_ml.py`
-5. `predict_ranking_score()` either:
-   - Uses a trained ML model (Random Forest) if one exists with ≥15 training rows
-   - Falls back to `_heuristic_score()` otherwise
+4. `calculate_ranking_score()` computes the deterministic heuristic (skills coverage, experience, content similarity)
+
 
 #### Registration Flow
 
@@ -568,14 +547,6 @@ Experience years are extracted from resume text using regex patterns. Compared a
 - `5+` → 5
 
 If the candidate has more years than required, they score 100 on experience.
-
-#### ML Model (Optional)
-
-- Algorithm: `RandomForestRegressor` (300 estimators, max_depth=10, min_samples_leaf=2)
-- Features: 11 engineered features (skill overlap, Jaccard, counts, experience gap, text length, content similarity)
-- Training protected by `MIN_TRAINING_ROWS = 15` guard — won't train on fewer rows
-- Model file stored at `backend/ml_artifacts/candidate_ranker.joblib`
-- Old/small models auto-deleted on load (belt-and-suspenders check)
 
 #### Bulk Screening
 
@@ -936,34 +907,7 @@ Even with zero experience and zero text similarity.
 
 ---
 
-## 9. ML Model Training
-
-### Heuristic vs ML
-
-The system starts with the deterministic heuristic (always available). Once enough rankings exist (≥15 rows), the ML model can be trained to potentially improve accuracy.
-
-### Training Trigger
-
-Call `POST /api/ml/ranking/train` or run `python backend/recalculate_and_train.py`.
-
-### Training Process
-
-1. Fetches all `Ranking` rows with non-null `matching_score`
-2. Builds TF-IDF vectorizer from resume + job text corpus
-3. Constructs 11 features per pair (skill overlap, counts, experience, text length, content similarity)
-4. Trains a `RandomForestRegressor` (300 trees, max_depth=10)
-5. Evaluates on a hold-out test set (RMSE, MAE, R², NDCG@5, precision@5, recall@5, MRR@5)
-6. Dumps model + vectorizer + metadata to `ml_artifacts/candidate_ranker.joblib`
-
-### Model Guard
-
-- `MIN_TRAINING_ROWS = 15` — training is blocked below this threshold
-- On model load, if `row_count < MIN_TRAINING_ROWS`, the file is auto-deleted and the heuristic is used
-- Old `@lru_cache` was removed to prevent serving a stale in-memory model after file deletion
-
----
-
-## 10. Rate Limiting Rules
+## 9. Rate Limiting Rules
 
 | Endpoint | Limit | Window | Key | Effect |
 |---|---|---|---|---|
@@ -981,20 +925,19 @@ All return `429 Too Many Requests`:
 
 ---
 
-## 11. Known Limitations
+## 10. Known Limitations
 
 1. **No test suite** — No automated tests exist for backend or frontend.
-2. **ML is bootstrapped from ranking scores** — The model learns from heuristic-based `matching_score` values. For production, replace with recruiter feedback (hire/shortlist labels).
-3. **In-memory rate limiter** — Must be swapped to Redis for multi-worker deployments.
-4. **Email sending** — Falls back to console in development. Requires SMTP config for production.
-5. **Single-process backend** — Flask dev server is synchronous. For production, use Gunicorn + gevent.
+2. **In-memory rate limiter** — Must be swapped to Redis for multi-worker deployments.
+3. **Email sending** — Falls back to console in development. Requires SMTP config for production.
+4. **Single-process backend** — Flask dev server is synchronous. For production, use Gunicorn + gevent.
 6. **No pagination on bulk screening** — The bulk screen endpoint processes all files synchronously in-memory.
 7. **Profile images** — Stored as base64/URL text in the database, not on object storage.
 8. **No file size validation** — PDF uploads have no explicit size limit beyond the server's request body limit.
 
 ---
 
-## 12. Future Roadmap
+## 11. Future Roadmap
 
 ### Short-term (1–3 months)
 
@@ -1008,7 +951,7 @@ All return `429 Too Many Requests`:
 - [ ] **Redis-backed rate limiter** — Replace in-memory store
 - [ ] **Production WSGI server** — Gunicorn + gevent for concurrency
 - [ ] **Object storage for resumes** — S3/MinIO instead of DB text
-- [ ] **Recruiter feedback loop** — Allow recruiters to accept/reject ranks, feeding into ML training
+- [ ] **Recruiter feedback loop** — Allow recruiters to accept/reject ranks
 - [ ] **Email template system** — Move HTML emails to templates
 - [ ] **Admin dashboard** — User management, job moderation, analytics
 
@@ -1018,7 +961,6 @@ All return `429 Too Many Requests`:
 - [ ] **Real-time notifications** — WebSocket for live updates
 - [ ] **Multi-language support** — i18n for international users
 - [ ] **Calendar integration** — Google/Outlook calendar sync for interviews
-- [ ] **Automatic model retraining** — Scheduled job (Celery beat or cron)
 - [ ] **Performance optimization** — Database indexing audit, query profiling, CDN for static assets
 
 ---
