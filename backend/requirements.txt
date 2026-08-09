@@ -6,7 +6,7 @@ psycopg2-binary>=2.9.9
 python-dotenv>=1.2.2
 sqlalchemy>=2.0.29
 werkzeug>=3.0.2
-bcrypt>=4.1.2
+bcrypt>=5.0.0
 PyJWT>=2.8.0
 
 # ML & Data
