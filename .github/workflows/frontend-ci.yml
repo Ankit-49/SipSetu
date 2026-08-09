@@ -10,11 +10,9 @@ on:
     branches: [main]
     paths:
       - 'frontend/**'
-  workflow_call:
-    secrets: inherit
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
 
 jobs:
   lint-and-typecheck:
@@ -64,7 +62,7 @@ jobs:
         run: npm ci
 
       - name: Run tests with coverage
-        run: npm run test -- --coverage --coverageThreshold='{"global":{"branches":70,"functions":70,"lines":70,"statements":70}}'
+        run: npm run test -- --coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

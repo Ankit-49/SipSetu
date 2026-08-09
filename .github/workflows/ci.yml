@@ -8,7 +8,7 @@ on:
 
 env:
   PYTHON_VERSION: '3.11'
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sipsetu_test
   JWT_SECRET_KEY: test-secret-key-for-ci
   FRONTEND_URL: http://localhost:5173
