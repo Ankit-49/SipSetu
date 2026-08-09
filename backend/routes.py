@@ -30,6 +30,7 @@ from ranking_ml import (
 from auth_middleware import create_token, require_auth, require_role
 from rate_limiter import rate_limit
 from utils.email import send_password_reset_otp, send_verification_otp
+from utils.storage import get_storage
 from config import Config
 import secrets
 import random
@@ -893,6 +894,14 @@ def upload_resume_pdf():
     if not file.filename.lower().endswith('.pdf'):
         return jsonify({"error": "Only PDF files are supported"}), 400
 
+    # File size validation (10MB max)
+    max_size = 10 * 1024 * 1024  # 10MB
+    file.seek(0, 2)  # Seek to end
+    file_size = file.tell()
+    file.seek(0)  # Reset to beginning
+    if file_size > max_size:
+        return jsonify({"error": f"File size exceeds maximum allowed (10MB)"}), 400
+
     try:
         file_bytes = file.read()
         doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -903,6 +912,15 @@ def upload_resume_pdf():
 
         extracted_skills = extract_skills_from_text(text)
 
+        # Upload to storage (S3/MinIO/local)
+        storage = get_storage()
+        upload_result = storage.upload_file(
+            file_bytes if isinstance(file_bytes, bytes) else file_bytes,
+            file.filename,
+            content_type='application/pdf',
+            prefix='resumes'
+        )
+
         # Keep only the latest resume per applicant
         for old in Resume.query.filter_by(applicant_id=applicant_id).all():
             db.session.delete(old)
@@ -911,7 +929,7 @@ def upload_resume_pdf():
         new_resume = Resume(
             applicant_id=applicant_id,
             raw_text=text,
-            file_path=file.filename
+            file_path=upload_result.get('key', file.filename)  # Store storage key
         )
         for skill_name in extracted_skills:
             skill = Skill.query.filter_by(skill_name=skill_name.lower()).first()
@@ -932,6 +950,8 @@ def upload_resume_pdf():
             "uploaded_at": new_resume.uploaded_at.isoformat(),
             "skills_extracted": extracted_skills,
             "skill_count": len(extracted_skills),
+            "file_url": upload_result.get('url'),
+            "storage_provider": upload_result.get('provider'),
         }), 201
     except Exception as e:
         db.session.rollback()

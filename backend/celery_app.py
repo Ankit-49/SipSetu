@@ -4,15 +4,15 @@ import os
 from celery import Celery
 from celery.schedules import crontab
 
-from app import create_app
+from config import settings
 
 # Create Flask app context for Celery
 flask_app = create_app()
 
 celery_app = Celery(
     "sipsetu",
-    broker=os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
-    backend=os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
+    broker=settings.CELERY_BROKER_URL or settings.REDIS_URL or "redis://localhost:6379/0",
+    backend=settings.CELERY_RESULT_BACKEND or settings.REDIS_URL or "redis://localhost:6379/0",
     include=[
         "tasks.email_tasks",
         "tasks.ml_tasks",
