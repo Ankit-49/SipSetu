@@ -107,19 +107,18 @@ def calculate_experience_score(candidate_years, target_years):
     return round(max(0.0, (candidate_years / target_years) * 100.0), 2)
 
 
-def calculate_heuristic_score(resume, job):
-    """Coverage-based match score between a resume and a job (0-100).
+def heuristic_breakdown(resume, job):
+    """Return the three sub-scores that compose the deterministic heuristic.
 
-    Deterministic heuristic: skill coverage (70%) + experience fit (15%)
-    + text-content similarity (15%), matching the bulk-screening formula.
-    This is the safety anchor for the ML ranking model and the fallback
-    when no trained model exists.
+    Skills coverage (70%), experience fit (15%), text-content similarity
+    (15%). Used both by ``calculate_heuristic_score`` and by the ML
+    explanation endpoint to explain scores when no model exists.
     """
     resume_skills = [s.skill_name for s in resume.skills]
     job_skills = [s.skill_name for s in job.skills]
 
     if not job_skills or not resume_skills:
-        return 0.0
+        return {"skills_score": 0.0, "experience_score": 0.0, "content_score": 0.0}
 
     skills_score = calculate_match_score(resume_skills, job_skills)
 
@@ -139,6 +138,26 @@ def calculate_heuristic_score(resume, job):
             content_score = float(cosine_similarity(matrix[0:1], matrix[1:2])[0, 0]) * 100
         except ValueError:
             pass
+
+    return {
+        "skills_score": round(skills_score, 2),
+        "experience_score": round(experience_score, 2),
+        "content_score": round(content_score, 2),
+    }
+
+
+def calculate_heuristic_score(resume, job):
+    """Coverage-based match score between a resume and a job (0-100).
+
+    Deterministic heuristic: skill coverage (70%) + experience fit (15%)
+    + text-content similarity (15%), matching the bulk-screening formula.
+    This is the safety anchor for the ML ranking model and the fallback
+    when no trained model exists.
+    """
+    breakdown = heuristic_breakdown(resume, job)
+    skills_score = breakdown["skills_score"]
+    experience_score = breakdown["experience_score"]
+    content_score = breakdown["content_score"]
 
     if skills_score == 100.0 and experience_score >= 100.0 and content_score >= 99.0:
         return 100.0

@@ -13,10 +13,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { MapPin, Briefcase, Mail, Loader2, Star, X, RotateCcw, Calendar, Clock, Video, CheckCircle2 } from "lucide-react";
+import { MapPin, Briefcase, Mail, Loader2, Star, X, RotateCcw, Calendar, Clock, Video, CheckCircle2, BarChart3 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import { useAuth } from "@/app/context/AuthContext";
+import ScoreExplanation from "@/components/ScoreExplanation";
 
 type Candidate = {
   ranking_id: string;
@@ -47,6 +48,26 @@ export default function RecruiterCandidates() {
   const [jobs, setJobs] = useState<{ job_id: string; title: string }[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [shortlisting, setShortlisting] = useState<string | null>(null);
+
+  // Score explanation modal state
+  const [explainCandidate, setExplainCandidate] = useState<Candidate | null>(null);
+  const [explanation, setExplanation] = useState<any>(null);
+  const [explainLoading, setExplainLoading] = useState(false);
+
+  const openExplanation = async (candidate: Candidate) => {
+    setExplainCandidate(candidate);
+    setExplanation(null);
+    setExplainLoading(true);
+    try {
+      const response = await api.get(`/rankings/${candidate.ranking_id}/explain`);
+      setExplanation(response.data);
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || "Failed to load score explanation";
+      setExplanation({ available: false, error: msg });
+    } finally {
+      setExplainLoading(false);
+    }
+  };
 
   // Interview modal state
   const [interviewCandidate, setInterviewCandidate] = useState<Candidate | null>(null);
@@ -362,6 +383,14 @@ export default function RecruiterCandidates() {
                       </div>
                     </div>
                     <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1.5">Match</div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-[10px] text-[#1E3A5F] hover:text-[#F97316] gap-1 px-1 mt-1.5"
+                      onClick={() => openExplanation(candidate)}
+                    >
+                      <BarChart3 className="h-3 w-3" /> Why this score?
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -369,6 +398,31 @@ export default function RecruiterCandidates() {
           })}
         </div>
       </div>
+
+      {/* Score Explanation Modal */}
+      <Dialog open={!!explainCandidate} onOpenChange={() => setExplainCandidate(null)}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-[#1E3A5F]" /> Why this score?
+            </DialogTitle>
+            <DialogDescription>
+              How the ranking model scored <span className="font-semibold">{explainCandidate?.applicant_name}</span> for{" "}
+              <span className="font-semibold">{explainCandidate?.job_title}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            {explainLoading ? (
+              <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                <Loader2 className="h-6 w-6 animate-spin text-[#F97316] mb-3" />
+                <span className="text-sm">Analyzing features...</span>
+              </div>
+            ) : (
+              <ScoreExplanation explanation={explanation} />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Schedule Interview Modal */}
       <Dialog open={!!interviewCandidate} onOpenChange={() => setInterviewCandidate(null)}>

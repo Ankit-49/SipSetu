@@ -66,6 +66,28 @@ EDUCATION_KEYWORDS = [
     "degree", "university", "college",
 ]
 
+# Human-readable labels + descriptions for the 17 features, used by the
+# per-candidate explanation endpoint.
+FEATURE_LABELS: dict[str, tuple[str, str]] = {
+    "skills_coverage": ("Skill coverage", "Share of the job's required skills present on the resume"),
+    "skills_jaccard": ("Skill similarity", "Overlap between resume and job skills (Jaccard index)"),
+    "matched_skill_count": ("Matched skills", "Number of required skills the candidate has"),
+    "missing_skill_count": ("Missing skills", "Required skills the candidate lacks"),
+    "job_skill_count": ("Job skill count", "Total number of skills the job requires"),
+    "resume_skill_count": ("Resume skill count", "Number of skills extracted from the resume"),
+    "skill_specificity": ("Skill specificity", "Rare/technical skills weigh more than generic ones (IDF)"),
+    "experience_years": ("Experience years", "Years of experience detected on the resume"),
+    "target_experience_years": ("Target experience", "Years of experience the job asks for"),
+    "experience_gap": ("Experience gap", "Absolute difference between candidate and target experience"),
+    "experience_score": ("Experience fit", "How well the candidate's experience matches the job requirement"),
+    "content_similarity": ("Content similarity", "Semantic overlap between resume and job description text"),
+    "title_similarity": ("Title match", "Job-title keywords that appear in the resume"),
+    "keyword_density": ("Keyword density", "Job-description keywords found in the resume"),
+    "resume_word_count": ("Resume length", "Total word count of the resume text"),
+    "seniority_hits": ("Seniority signals", "Senior/lead/manager keywords found in the resume"),
+    "education_hits": ("Education signals", "Degree/university keywords found in the resume"),
+}
+
 _train_lock = threading.Lock()
 
 
@@ -80,6 +102,7 @@ class RankingBundle:
     job_count: int
     alpha: float
     n_features: int
+    feature_means: list[float] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -442,6 +465,10 @@ def train_ranking_model(random_state: int = 42) -> dict[str, Any]:
         alpha = round(min(MAX_ALPHA, max(0.1, len(rankings) / ALPHA_RAMP_ROWS)), 2)
         n_jobs = len({str(r.job_id) for r in rankings})
 
+        # Training-set feature means, used by the explanation endpoint as the
+        # "average candidate" baseline for per-feature attribution.
+        feature_means = [float(np.mean(X[:, i])) for i in range(X.shape[1])]
+
         joblib.dump(
             {
                 "model": model,
@@ -452,6 +479,7 @@ def train_ranking_model(random_state: int = 42) -> dict[str, Any]:
                 "row_count": len(rankings),
                 "job_count": n_jobs,
                 "alpha": alpha,
+                "feature_means": feature_means,
                 "model_version": MODEL_VERSION,
             },
             MODEL_PATH,
@@ -486,6 +514,7 @@ def load_ranking_bundle() -> RankingBundle | None:
         if int(payload.get("row_count", 0)) < MIN_TRAINING_ROWS:
             MODEL_PATH.unlink(missing_ok=True)
             return None
+        means = payload.get("feature_means")
         return RankingBundle(
             model=payload["model"],
             vectorizer=payload.get("vectorizer"),
@@ -496,6 +525,11 @@ def load_ranking_bundle() -> RankingBundle | None:
             job_count=int(payload.get("job_count", 0)),
             alpha=float(payload.get("alpha", 0.5)),
             n_features=len(payload["feature_names"]),
+            feature_means=(
+                [float(v) for v in means]
+                if isinstance(means, list) and len(means) == len(payload["feature_names"])
+                else None
+            ),
         )
     except Exception:
         # A corrupt/partial artifact (e.g. interrupted dump mid-write) would
@@ -519,6 +553,128 @@ def get_ranking_model_status() -> dict[str, Any]:
         "metrics": bundle.metrics if bundle else {},
         "min_training_rows": MIN_TRAINING_ROWS,
     }
+
+
+def explain_ranking_score(resume: Resume, job: Job) -> dict[str, Any]:
+    """Per-feature attribution for a (resume, job) pair.
+
+    Uses mean-shift attribution: for each of the 17 features, the model's
+    prediction with the candidate's actual value is compared against the
+    prediction with that feature replaced by its training-set mean (the
+    "average candidate" baseline). A positive contribution means the
+    feature pushed the score up; a negative one dragged it down.
+
+    Falls back to the deterministic heuristic sub-scores (skills /
+    experience / content) when no trained model exists, so the UI can
+    still explain the score in every case.
+    """
+    bundle = load_ranking_bundle()
+
+    heuristic: dict[str, float] = {}
+    try:
+        from routes_common import heuristic_breakdown
+
+        heuristic = heuristic_breakdown(resume, job)
+    except Exception:
+        pass
+
+    if not bundle:
+        return {
+            "available": False,
+            "model_score": None,
+            "blended_score": None,
+            "alpha": None,
+            "heuristic": heuristic,
+            "contributions": [],
+        }
+
+    try:
+        idf = _skill_idf_weights()
+        feature_dict = build_feature_dict(resume, job, bundle.vectorizer, idf)
+        names = bundle.feature_names
+        means = bundle.feature_means
+        values = np.array([[feature_dict.get(n, 0.0) for n in names]], dtype=float)
+        base_pred = float(bundle.model.predict(values)[0])
+
+        contributions = []
+        for i, name in enumerate(names):
+            variant = values.copy()
+            variant[0, i] = means[i] if means and i < len(means) else 0.0
+            variant_pred = float(bundle.model.predict(variant)[0])
+            delta = base_pred - variant_pred  # positive → pushed score up
+            label, desc = FEATURE_LABELS.get(name, (name, ""))
+            contributions.append({
+                "feature": name,
+                "label": label,
+                "description": desc,
+                "value": round(feature_dict.get(name, 0.0), 2),
+                "baseline": round(means[i], 2) if means and i < len(means) else 0.0,
+                "contribution": round(delta, 2),
+                "direction": "up" if delta > 0.5 else ("down" if delta < -0.5 else "neutral"),
+            })
+
+        contributions.sort(key=lambda c: abs(c["contribution"]), reverse=True)
+
+        try:
+            from routes_common import calculate_heuristic_score
+
+            heuristic_score = float(calculate_heuristic_score(resume, job) or 0.0)
+        except Exception:
+            heuristic_score = (
+                heuristic.get("skills_score", 0.0) * 0.70
+                + heuristic.get("experience_score", 0.0) * 0.15
+                + heuristic.get("content_score", 0.0) * 0.15
+            )
+
+        blended = (bundle.alpha * base_pred) + ((1.0 - bundle.alpha) * heuristic_score)
+
+        return {
+            "available": True,
+            "model_score": round(float(np.clip(base_pred, 0.0, 100.0)), 2),
+            "blended_score": round(float(np.clip(blended, 0.0, 100.0)), 2),
+            "alpha": bundle.alpha,
+            "heuristic": heuristic,
+            "contributions": contributions,
+        }
+    except Exception as exc:
+        return {
+            "available": False,
+            "model_score": None,
+            "blended_score": None,
+            "alpha": None,
+            "heuristic": heuristic,
+            "contributions": [],
+            "error": str(exc),
+        }
+
+
+def explain_bulk_resume(
+    raw_text: str,
+    resume_skills: list[str],
+    job_title: str,
+    job_skills: list[str],
+    job_description: str = "",
+    job_experience_level: str | None = None,
+) -> dict[str, Any]:
+    """Explain a score for an ad-hoc resume (bulk screening).
+
+    Bulk screening parses PDFs in-memory without creating DB rows, so a
+    lightweight stand-in object is built from the extracted text/skills to
+    reuse the same feature pipeline as persisted resumes.
+    """
+    from types import SimpleNamespace
+
+    resume = SimpleNamespace(
+        raw_text=raw_text,
+        skills=[SimpleNamespace(skill_name=s) for s in resume_skills],
+    )
+    job = SimpleNamespace(
+        title=job_title,
+        description=job_description,
+        skills=[SimpleNamespace(skill_name=s) for s in job_skills],
+        experience_level=job_experience_level,
+    )
+    return explain_ranking_score(resume, job)
 
 
 def predict_ranking_score(resume: Resume, job: Job) -> float:

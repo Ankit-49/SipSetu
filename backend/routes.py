@@ -21,7 +21,12 @@ from routes_common import (
     format_candidate_preview,
     format_job,
 )
-from ranking_ml import get_ranking_model_status, train_ranking_model
+from ranking_ml import (
+    explain_bulk_resume,
+    explain_ranking_score,
+    get_ranking_model_status,
+    train_ranking_model,
+)
 from auth_middleware import create_token, require_auth, require_role
 from rate_limiter import rate_limit
 from utils.email import send_password_reset_otp, send_verification_otp
@@ -1644,6 +1649,21 @@ def bulk_screen():
             combined = 100.0 if (skills_score == 100.0 and experience_score >= 100.0) else \
                 min(round((skills_score * 0.70) + (experience_score * 0.15) + (content_score * 0.15), 2), 99.99)
 
+            # Per-candidate "why this score" explanation (best-effort; the UI
+            # falls back to the heuristic sub-scores when no model is trained).
+            explanation = None
+            try:
+                explanation = explain_bulk_resume(
+                    raw_text=text,
+                    resume_skills=resume_skills,
+                    job_title=job_title,
+                    job_skills=job_skills_list,
+                    job_description=job_desc,
+                    job_experience_level=job.experience_level if job_id and job else None,
+                )
+            except Exception:
+                pass
+
             results.append({
                 "filename": filename, "candidate_name": candidate_name,
                 "match_score": combined, "skills_score": round(skills_score, 2),
@@ -1653,6 +1673,7 @@ def bulk_screen():
                 "missing_skills": list(set(job_skills_list) - set(resume_skills)),
                 "text_snippet": text[:250] + "..." if len(text) > 250 else text,
                 "raw_text": text,
+                "explanation": explanation,
             })
         except Exception as e:
             results.append({
@@ -1668,6 +1689,35 @@ def bulk_screen():
         "job_title": job_title, "job_skills": job_skills_list,
         "total_screened": len(uploaded_files), "results": results,
     }), 200
+
+
+@api.route('/rankings/<ranking_id>/explain', methods=['GET'])
+@require_auth
+def explain_ranking(ranking_id):
+    """Return per-feature attribution for a candidate's match score.
+
+    The caller must be either the recruiter who owns the job or the
+    applicant who owns the resume behind the ranking.
+    """
+    ranking = Ranking.query.get(ranking_id)
+    if not ranking:
+        return jsonify({"error": "Ranking not found"}), 404
+
+    resume = Resume.query.get(ranking.resume_id)
+    job = Job.query.get(ranking.job_id)
+    if not resume or not job:
+        return jsonify({"error": "Resume or job missing for this ranking"}), 404
+
+    is_recruiter_owner = str(job.recruiter_id) == g.current_user_id
+    is_applicant_owner = str(resume.applicant_id) == g.current_user_id
+    if not (is_recruiter_owner or is_applicant_owner):
+        return jsonify({"error": "You can only view explanations for your own data"}), 403
+
+    explanation = explain_ranking_score(resume, job)
+    explanation["ranking_id"] = str(ranking_id)
+    explanation["applicant_id"] = str(resume.applicant_id)
+    explanation["job_id"] = str(job.job_id)
+    return jsonify(explanation), 200
 
 
 @api.route('/rankings/<ranking_id>', methods=['PUT'])

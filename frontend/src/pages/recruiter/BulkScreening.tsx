@@ -19,10 +19,12 @@ import {
   Briefcase,
   AlertTriangle,
   UserCheck,
-  RefreshCw
+  RefreshCw,
+  BarChart3
 } from "lucide-react";
 import api, { API_BASE } from "@/lib/api";
 import confetti from "canvas-confetti";
+import ScoreExplanation from "@/components/ScoreExplanation";
 
 interface CandidateResult {
   filename: string;
@@ -35,6 +37,7 @@ interface CandidateResult {
   missing_skills: string[];
   text_snippet: string;
   raw_text: string;
+  explanation?: any;
   error?: string;
 }
 
@@ -855,6 +858,18 @@ export default function RecruiterBulkScreening() {
                   </div>
                 )}
               </div>
+
+              {/* Score Explanation Block */}
+              {selectedCandidate.explanation && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <BarChart3 className="h-4 w-4 text-violet-500" /> Why This Score
+                  </h4>
+                  <div className="p-4 border border-slate-100 rounded-xl bg-white">
+                    <ScoreExplanation explanation={selectedCandidate.explanation} />
+                  </div>
+                </div>
+              )}
 
               {/* Parsed Text Viewer Block */}
               <div className="space-y-3">

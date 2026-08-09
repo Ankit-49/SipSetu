@@ -26,6 +26,9 @@ import {
   Award,
   Search,
   BarChart3,
+  Brain,
+  AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect } from "react";
@@ -79,6 +82,27 @@ export default function ApplicantDashboardHome() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [showStrengthBreakdown, setShowStrengthBreakdown] = useState(false);
+
+  const [modelStatus, setModelStatus] = useState<any>(null);
+  const [modelLoading, setModelLoading] = useState(true);
+
+  const fetchModelStatus = async () => {
+    setModelLoading(true);
+    try {
+      const response = await api.get("/ml/ranking/status");
+      setModelStatus(response.data);
+    } catch (err) {
+      console.error("Failed to fetch model status", err);
+      setModelStatus(null);
+    } finally {
+      setModelLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    fetchModelStatus();
+  }, [user]);
 
   const fetchDashboard = async () => {
     if (!user) return;
@@ -540,6 +564,79 @@ export default function ApplicantDashboardHome() {
                   View Full Analysis <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </Link>
+            </CardContent>
+          </Card>
+
+          {/* How Match Scores Work */}
+          <Card className="group border-0 shadow-md hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between gap-3">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                  <Brain className="h-4 w-4 text-white" />
+                </div>
+                How Match Scores Work
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 text-slate-400 hover:text-[#1E3A5F] transition-colors"
+                onClick={fetchModelStatus}
+                disabled={modelLoading}
+                aria-label="Refresh model status"
+              >
+                <RefreshCw className={`h-4 w-4 ${modelLoading ? "animate-spin" : ""}`} />
+              </Button>
+            </CardHeader>
+            <CardContent className="p-4 pt-4 space-y-3">
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Your match scores compare the skills on your resume against each job's requirements, then an AI
+                ranking model refines the order based on recruiter preferences.
+              </p>
+
+              <div className="flex items-center justify-between rounded-xl bg-slate-50 p-3">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">AI Ranking Model</span>
+                {modelLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                ) : modelStatus?.available ? (
+                  <Badge className="bg-green-50 text-green-700 border-green-200 gap-1">
+                    <CheckCircle2 className="h-3 w-3" /> Active
+                  </Badge>
+                ) : (
+                  <Badge className="bg-amber-50 text-amber-700 border-amber-200 gap-1">
+                    <AlertTriangle className="h-3 w-3" /> Learning
+                  </Badge>
+                )}
+              </div>
+
+              {modelStatus?.available ? (
+                <>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: "RMSE", value: modelStatus.metrics?.rmse, fmt: (v: number) => v.toFixed(2) },
+                      { label: "NDCG@5", value: modelStatus.metrics?.ndcg_at_5, fmt: (v: number) => v.toFixed(3) },
+                      { label: "R²", value: modelStatus.metrics?.r2, fmt: (v: number) => v.toFixed(2) },
+                    ].map((m) => (
+                      <div key={m.label} className="rounded-xl bg-slate-50 p-2.5 text-center group-hover:bg-slate-100/70 transition-colors">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{m.label}</p>
+                        <p className="text-base font-bold text-slate-900 mt-0.5">
+                          {m.value != null ? m.fmt(Number(m.value)) : "—"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                    <Clock className="h-3 w-3 shrink-0" /> Model last trained{" "}
+                    {modelStatus.trained_at
+                      ? new Date(modelStatus.trained_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+                      : "—"}
+                  </p>
+                </>
+              ) : (
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  The AI model trains in the background as more matches are created. Until then, scores use a
+                  deterministic coverage formula — your top matches below are still accurate.
+                </p>
+              )}
             </CardContent>
           </Card>
 
