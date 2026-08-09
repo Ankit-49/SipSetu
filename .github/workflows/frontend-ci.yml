@@ -10,6 +10,8 @@ on:
     branches: [main]
     paths:
       - 'frontend/**'
+  workflow_call:
+    secrets: inherit
 
 env:
   NODE_VERSION: '20'
