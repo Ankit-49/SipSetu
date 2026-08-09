@@ -11,7 +11,7 @@ PyJWT>=2.8.0
 
 # ML & Data
 scikit-learn>=1.3.2
-numpy>=1.24.3
+numpy>=2.5.1
 joblib>=1.3.2
 
 # Document Processing
