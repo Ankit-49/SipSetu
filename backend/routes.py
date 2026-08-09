@@ -1,13 +1,41 @@
-from flask import Blueprint, Flask, request, jsonify, g
-from models import db, User, Applicant, Recruiter, Job, JobApplication, Resume, Skill, Ranking, Notification, PasswordResetToken, EmailVerificationToken, Interview, SavedJob, SkillProgress
-from werkzeug.security import generate_password_hash, check_password_hash
+import os
+import random
+import secrets
+from datetime import datetime, timedelta
+from functools import wraps
+
+import fitz  # PyMuPDF
+from flask import Blueprint, g, jsonify, request
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sqlalchemy import func, or_
-from functools import wraps
-import fitz  # PyMuPDF
-import os
+from werkzeug.security import check_password_hash, generate_password_hash
 
+from auth_middleware import create_token, require_auth, require_role
+from models import (
+    Applicant,
+    EmailVerificationToken,
+    Interview,
+    Job,
+    JobApplication,
+    Notification,
+    PasswordResetToken,
+    Ranking,
+    Recruiter,
+    Resume,
+    SavedJob,
+    Skill,
+    SkillProgress,
+    User,
+    db,
+)
+from ranking_ml import (
+    explain_bulk_resume,
+    explain_ranking_score,
+    get_ranking_model_status,
+    train_ranking_model,
+)
+from rate_limiter import rate_limit
 from routes_common import (
     calculate_experience_score,
     calculate_match_score,
@@ -21,20 +49,8 @@ from routes_common import (
     format_candidate_preview,
     format_job,
 )
-from ranking_ml import (
-    explain_bulk_resume,
-    explain_ranking_score,
-    get_ranking_model_status,
-    train_ranking_model,
-)
-from auth_middleware import create_token, require_auth, require_role
-from rate_limiter import rate_limit
 from utils.email import send_password_reset_otp, send_verification_otp
 from utils.storage import get_storage
-from config import Config
-import secrets
-import random
-from datetime import datetime, timedelta
 
 api = Blueprint('api', __name__)
 
@@ -900,7 +916,7 @@ def upload_resume_pdf():
     file_size = file.tell()
     file.seek(0)  # Reset to beginning
     if file_size > max_size:
-        return jsonify({"error": f"File size exceeds maximum allowed (10MB)"}), 400
+        return jsonify({"error": "File size exceeds maximum allowed (10MB)"}), 400
 
     try:
         file_bytes = file.read()
@@ -955,7 +971,7 @@ def upload_resume_pdf():
         }), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": f"Error parsing PDF: {str(e)}"}), 500
+        return jsonify({"error": f"Error parsing PDF: {e!s}"}), 500
 
 
 def _compute_job_match_score(resume, job):
@@ -1698,7 +1714,7 @@ def bulk_screen():
         except Exception as e:
             results.append({
                 "filename": filename, "candidate_name": filename,
-                "match_score": 0.0, "error": f"Error parsing PDF: {str(e)}",
+                "match_score": 0.0, "error": f"Error parsing PDF: {e!s}",
             })
 
     results.sort(key=lambda x: (x.get('skills_score', 0), x.get('experience_years') or -1,

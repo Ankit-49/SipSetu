@@ -2,18 +2,27 @@
 
 import os
 import sys
-import pytest
-from datetime import datetime, timedelta
-from uuid import uuid4
-from unittest.mock import sys
 from pathlib import Path
+from unittest.mock import sys
+from uuid import uuid4
+
+import pytest
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app import create_app
-from models import db, User, Applicant, Recruiter, Job, Resume, Skill, JobApplication, Ranking
 from werkzeug.security import generate_password_hash
+
+from app import create_app
+from models import (
+    Applicant,
+    Job,
+    Recruiter,
+    Resume,
+    Skill,
+    User,
+    db,
+)
 
 
 @pytest.fixture(scope="session")

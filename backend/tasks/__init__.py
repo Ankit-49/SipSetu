@@ -1,20 +1,20 @@
 """Tasks package for Celery background jobs."""
 
 from .email_tasks import (
+    send_generic_email_task,
+    send_interview_reminder_task,
     send_password_reset_otp_task,
     send_verification_otp_task,
-    send_interview_reminder_task,
-    send_generic_email_task,
 )
-from .ml_tasks import retrain_ranking_model, explain_ranking_task
+from .ml_tasks import explain_ranking_task, retrain_ranking_model
 from .reminder_tasks import send_due_reminders
 
 __all__ = [
+    "explain_ranking_task",
+    "retrain_ranking_model",
+    "send_due_reminders",
+    "send_generic_email_task",
+    "send_interview_reminder_task",
     "send_password_reset_otp_task",
     "send_verification_otp_task",
-    "send_interview_reminder_task",
-    "send_generic_email_task",
-    "retrain_ranking_model",
-    "explain_ranking_task",
-    "send_due_reminders",
 ]

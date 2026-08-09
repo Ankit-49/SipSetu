@@ -1,10 +1,11 @@
 import os
-import sys
+
+from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from dotenv import load_dotenv
+
+from config import Config, settings
 from models import db
-from config import settings, Config
 
 load_dotenv()
 
@@ -29,7 +30,7 @@ except ImportError:
     HAS_REDIS = False
 
 # Logging
-from logging_config import setup_logging, log_request_middleware
+from logging_config import log_request_middleware, setup_logging
 
 
 def create_app():

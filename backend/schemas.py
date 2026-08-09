@@ -1,11 +1,10 @@
 """Pydantic schemas for request/response validation."""
 
 from datetime import datetime
-from typing import Optional, List
-from uuid import UUID
-from pydantic import BaseModel, EmailStr, Field, validator, HttpUrl
 from enum import Enum
+from uuid import UUID
 
+from pydantic import BaseModel, EmailStr, Field, HttpUrl, validator
 
 # =============================================================================
 # Enums
@@ -103,25 +102,25 @@ class AuthResponse(BaseModel):
     token: str
     user_id: UUID
     role: UserRole
-    name: Optional[str] = None
+    name: str | None = None
     email: EmailStr
     email_verified: bool = False
-    profile_image: Optional[str] = None
-    company: Optional[str] = None
-    job_title: Optional[str] = None
+    profile_image: str | None = None
+    company: str | None = None
+    job_title: str | None = None
 
 
 class MeResponse(BaseModel):
     user_id: UUID
     email: EmailStr
-    name: Optional[str] = None
+    name: str | None = None
     role: UserRole
-    phone: Optional[str] = None
-    location: Optional[str] = None
-    profile_image: Optional[str] = None
+    phone: str | None = None
+    location: str | None = None
+    profile_image: str | None = None
     email_verified: bool = False
-    company: Optional[str] = None
-    job_title: Optional[str] = None
+    company: str | None = None
+    job_title: str | None = None
 
 
 # =============================================================================
@@ -129,9 +128,9 @@ class MeResponse(BaseModel):
 # =============================================================================
 
 class ProfileUpdateRequest(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-    phone: Optional[str] = Field(None, max_length=20)
-    location: Optional[str] = Field(None, max_length=255)
+    name: str | None = Field(None, min_length=1, max_length=255)
+    phone: str | None = Field(None, max_length=20)
+    location: str | None = Field(None, max_length=255)
 
     @validator('name')
     def name_not_empty(cls, v):
@@ -141,21 +140,21 @@ class ProfileUpdateRequest(BaseModel):
 
 
 class RecruiterProfileUpdateRequest(ProfileUpdateRequest):
-    company: Optional[str] = Field(None, max_length=255)
-    job_title: Optional[str] = Field(None, max_length=255)
+    company: str | None = Field(None, max_length=255)
+    job_title: str | None = Field(None, max_length=255)
 
 
 class ProfileResponse(BaseModel):
     user_id: UUID
     email: EmailStr
-    name: Optional[str] = None
+    name: str | None = None
     role: UserRole
-    phone: Optional[str] = None
-    location: Optional[str] = None
-    profile_image: Optional[str] = None
+    phone: str | None = None
+    location: str | None = None
+    profile_image: str | None = None
     email_verified: bool
-    company: Optional[str] = None
-    job_title: Optional[str] = None
+    company: str | None = None
+    job_title: str | None = None
 
 
 # =============================================================================
@@ -164,13 +163,13 @@ class ProfileResponse(BaseModel):
 
 class JobBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
-    location: Optional[str] = Field(None, max_length=255)
-    job_type: Optional[JobType] = None
-    experience_level: Optional[ExperienceLevel] = None
-    salary_min: Optional[float] = Field(None, ge=0)
-    salary_max: Optional[float] = Field(None, ge=0)
-    skills: List[str] = Field(default_factory=list)
+    description: str | None = None
+    location: str | None = Field(None, max_length=255)
+    job_type: JobType | None = None
+    experience_level: ExperienceLevel | None = None
+    salary_min: float | None = Field(None, ge=0)
+    salary_max: float | None = Field(None, ge=0)
+    skills: list[str] = Field(default_factory=list)
 
     @validator('salary_max')
     def salary_max_gte_min(cls, v, values):
@@ -185,14 +184,14 @@ class JobCreateRequest(JobBase):
 
 
 class JobUpdateRequest(BaseModel):
-    title: Optional[str] = Field(None, min_length=1, max_length=255)
-    description: Optional[str] = None
-    location: Optional[str] = Field(None, max_length=255)
-    job_type: Optional[JobType] = None
-    experience_level: Optional[ExperienceLevel] = None
-    salary_min: Optional[float] = Field(None, ge=0)
-    salary_max: Optional[float] = Field(None, ge=0)
-    skills: Optional[List[str]] = None
+    title: str | None = Field(None, min_length=1, max_length=255)
+    description: str | None = None
+    location: str | None = Field(None, max_length=255)
+    job_type: JobType | None = None
+    experience_level: ExperienceLevel | None = None
+    salary_min: float | None = Field(None, ge=0)
+    salary_max: float | None = Field(None, ge=0)
+    skills: list[str] | None = None
 
 
 class JobSkill(BaseModel):
@@ -203,12 +202,12 @@ class JobSkill(BaseModel):
 class JobResponse(JobBase):
     job_id: UUID
     recruiter_id: UUID
-    recruiter_name: Optional[str] = None
-    recruiter_company: Optional[str] = None
-    recruiter_profile_image: Optional[str] = None
+    recruiter_name: str | None = None
+    recruiter_company: str | None = None
+    recruiter_profile_image: str | None = None
     created_at: datetime
-    skills: List[str] = []
-    salary: Optional[str] = None
+    skills: list[str] = []
+    salary: str | None = None
 
     class Config:
         from_attributes = True
@@ -219,7 +218,7 @@ class JobListResponse(BaseModel):
     page: int
     per_page: int
     pages: int
-    jobs: List[JobResponse]
+    jobs: list[JobResponse]
 
 
 # =============================================================================
@@ -230,8 +229,8 @@ class ResumeResponse(BaseModel):
     resume_id: UUID
     uploaded_at: datetime
     file_path: str
-    file_url: Optional[str] = None
-    skills: List[str] = []
+    file_url: str | None = None
+    skills: list[str] = []
     skill_count: int
 
     class Config:
@@ -243,10 +242,10 @@ class ResumeUploadResponse(BaseModel):
     resume_id: UUID
     filename: str
     uploaded_at: datetime
-    skills_extracted: List[str]
+    skills_extracted: list[str]
     skill_count: int
-    file_url: Optional[str] = None
-    storage_provider: Optional[str] = None
+    file_url: str | None = None
+    storage_provider: str | None = None
 
 
 # =============================================================================
@@ -259,7 +258,7 @@ class JobApplicationResponse(BaseModel):
     applicant_id: UUID
     applied_at: datetime
     status: ApplicationStatus
-    matching_score: Optional[float] = None
+    matching_score: float | None = None
 
     class Config:
         from_attributes = True
@@ -276,7 +275,7 @@ class ApplicationStatusUpdate(BaseModel):
 class MatchedJobResponse(JobResponse):
     matching_score: float
     applied: bool
-    application_id: Optional[UUID] = None
+    application_id: UUID | None = None
 
 
 class MatchedJobsResponse(BaseModel):
@@ -285,7 +284,7 @@ class MatchedJobsResponse(BaseModel):
     per_page: int
     pages: int
     resume_id: UUID
-    matched_jobs: List[MatchedJobResponse]
+    matched_jobs: list[MatchedJobResponse]
 
 
 class CandidatePreview(BaseModel):
@@ -297,7 +296,7 @@ class CandidatePreview(BaseModel):
     applicant_email: str
     applicant_location: str
     matching_score: float
-    resume_skills: List[str]
+    resume_skills: list[str]
 
 
 class CandidateListResponse(BaseModel):
@@ -305,7 +304,7 @@ class CandidateListResponse(BaseModel):
     page: int
     per_page: int
     pages: int
-    candidates: List[CandidatePreview]
+    candidates: list[CandidatePreview]
 
 
 # =============================================================================
@@ -320,8 +319,8 @@ class MissingSkill(BaseModel):
 
 class SkillGapResponse(BaseModel):
     resume_id: UUID
-    resume_skills: List[str]
-    missing_skills: List[MissingSkill]
+    resume_skills: list[str]
+    missing_skills: list[MissingSkill]
     readiness_score: float
 
 
@@ -334,8 +333,8 @@ class InterviewCreateRequest(BaseModel):
     applicant_id: UUID
     scheduled_at: datetime
     duration_minutes: int = Field(default=60, ge=15, le=480)
-    notes: Optional[str] = None
-    meeting_link: Optional[HttpUrl] = None
+    notes: str | None = None
+    meeting_link: HttpUrl | None = None
 
 
 class InterviewStatusUpdate(BaseModel):
@@ -350,11 +349,11 @@ class InterviewResponse(BaseModel):
     scheduled_at: datetime
     duration_minutes: int
     status: InterviewStatus
-    notes: Optional[str] = None
-    meeting_link: Optional[str] = None
-    job_title: Optional[str] = None
-    applicant_name: Optional[str] = None
-    recruiter_name: Optional[str] = None
+    notes: str | None = None
+    meeting_link: str | None = None
+    job_title: str | None = None
+    applicant_name: str | None = None
+    recruiter_name: str | None = None
     created_at: datetime
 
     class Config:
@@ -362,7 +361,7 @@ class InterviewResponse(BaseModel):
 
 
 class InterviewListResponse(BaseModel):
-    interviews: List[InterviewResponse]
+    interviews: list[InterviewResponse]
 
 
 # =============================================================================
@@ -375,7 +374,7 @@ class NotificationResponse(BaseModel):
     message: str
     type: NotificationType
     is_read: bool
-    related_job_id: Optional[UUID] = None
+    related_job_id: UUID | None = None
     created_at: datetime
 
     class Config:
@@ -383,7 +382,7 @@ class NotificationResponse(BaseModel):
 
 
 class NotificationListResponse(BaseModel):
-    notifications: List[NotificationResponse]
+    notifications: list[NotificationResponse]
 
 
 # =============================================================================
@@ -391,24 +390,24 @@ class NotificationListResponse(BaseModel):
 # =============================================================================
 
 class BulkScreeningRequest(BaseModel):
-    job_id: Optional[UUID] = None
-    custom_title: Optional[str] = Field(None, max_length=255)
-    custom_skills: Optional[List[str]] = None
-    custom_description: Optional[str] = None
+    job_id: UUID | None = None
+    custom_title: str | None = Field(None, max_length=255)
+    custom_skills: list[str] | None = None
+    custom_description: str | None = None
 
 
 class BulkScreeningResult(BaseModel):
     filename: str
     matching_score: float
-    matched_skills: List[str]
-    missing_skills: List[str]
+    matched_skills: list[str]
+    missing_skills: list[str]
     text_snippet: str
 
 
 class BulkScreeningResponse(BaseModel):
-    results: List[BulkScreeningResult]
-    job_id: Optional[UUID] = None
-    custom_skills: List[str] = []
+    results: list[BulkScreeningResult]
+    job_id: UUID | None = None
+    custom_skills: list[str] = []
 
 
 # =============================================================================
@@ -427,23 +426,23 @@ class FeatureContribution(BaseModel):
 
 class RankingExplanationResponse(BaseModel):
     available: bool
-    model_score: Optional[float] = None
-    blended_score: Optional[float] = None
-    alpha: Optional[float] = None
+    model_score: float | None = None
+    blended_score: float | None = None
+    alpha: float | None = None
     heuristic: dict
-    contributions: List[FeatureContribution]
-    error: Optional[str] = None
+    contributions: list[FeatureContribution]
+    error: str | None = None
 
 
 class ModelStatusResponse(BaseModel):
     available: bool
-    model_version: Optional[str] = None
-    model_path: Optional[str] = None
-    trained_at: Optional[str] = None
+    model_version: str | None = None
+    model_path: str | None = None
+    trained_at: str | None = None
     row_count: int
     job_count: int
-    alpha: Optional[float] = None
-    n_features: Optional[int] = None
+    alpha: float | None = None
+    n_features: int | None = None
     metrics: dict
     min_training_rows: int
 
@@ -453,11 +452,11 @@ class TrainModelResponse(BaseModel):
     message: str
     row_count: int = 0
     job_count: int = 0
-    model_version: Optional[str] = None
-    model_path: Optional[str] = None
-    alpha: Optional[float] = None
-    n_features: Optional[int] = None
-    evaluation: Optional[str] = None
+    model_version: str | None = None
+    model_path: str | None = None
+    alpha: float | None = None
+    n_features: int | None = None
+    evaluation: str | None = None
     metrics: dict = {}
 
 
@@ -471,25 +470,25 @@ class PaginationParams(BaseModel):
 
 
 class JobFilterParams(PaginationParams):
-    search: Optional[str] = None
-    job_type: Optional[JobType] = None
-    experience_level: Optional[ExperienceLevel] = None
-    location: Optional[str] = None
-    salary_min: Optional[float] = Field(None, ge=0)
-    salary_max: Optional[float] = Field(None, ge=0)
-    skill: Optional[str] = None
-    recruiter_id: Optional[UUID] = None
+    search: str | None = None
+    job_type: JobType | None = None
+    experience_level: ExperienceLevel | None = None
+    location: str | None = None
+    salary_min: float | None = Field(None, ge=0)
+    salary_max: float | None = Field(None, ge=0)
+    skill: str | None = None
+    recruiter_id: UUID | None = None
 
 
 class MatchedJobFilterParams(PaginationParams):
-    min_score: Optional[float] = Field(None, ge=0, le=100)
-    search: Optional[str] = None
-    location: Optional[str] = None
-    job_type: Optional[JobType] = None
-    experience_level: Optional[ExperienceLevel] = None
-    salary_min: Optional[float] = Field(None, ge=0)
-    salary_max: Optional[float] = Field(None, ge=0)
-    skill: Optional[str] = None
+    min_score: float | None = Field(None, ge=0, le=100)
+    search: str | None = None
+    location: str | None = None
+    job_type: JobType | None = None
+    experience_level: ExperienceLevel | None = None
+    salary_min: float | None = Field(None, ge=0)
+    salary_max: float | None = Field(None, ge=0)
+    skill: str | None = None
 
 
 # =============================================================================

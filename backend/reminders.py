@@ -17,7 +17,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-from models import db, Interview
+from models import Interview, db
 from utils.email import send_interview_reminder
 
 logger = logging.getLogger(__name__)

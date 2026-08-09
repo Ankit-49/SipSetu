@@ -1,12 +1,14 @@
 """Unit tests for authentication and utility functions."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from auth_middleware import create_token, decode_token
-from utils.parser import extract_text
-from utils.email import send_email
-from rate_limiter import rate_limit
 from flask import Flask, request
-from unittest.mock import patch, MagicMock
+
+from auth_middleware import create_token, decode_token
+from rate_limiter import rate_limit
+from utils.email import send_email
+from utils.parser import extract_text
 
 
 class TestAuthMiddleware:
@@ -29,8 +31,9 @@ class TestAuthMiddleware:
             decode_token("invalid.token.string")
 
     def test_decode_expired_token(self):
-        import jwt
         import time
+
+        import jwt
         payload = {"user_id": "user-123", "role": "applicant", "exp": int(time.time()) - 3600}
         token = jwt.encode(payload, "test-secret", algorithm="HS256")
         with pytest.raises(Exception):
@@ -66,7 +69,6 @@ class TestRateLimiter:
             test_route()  # 2nd request
 
             # 3rd request should be blocked
-            from flask import jsonify
             result = test_route()
             assert result[1] == 429
 

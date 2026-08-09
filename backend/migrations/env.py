@@ -27,6 +27,7 @@ target_metadata = db.metadata
 def get_database_url() -> str:
     """Get database URL from environment or config."""
     import os
+
     from dotenv import load_dotenv
 
     load_dotenv()

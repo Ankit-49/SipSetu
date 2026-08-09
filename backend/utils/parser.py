@@ -1,6 +1,8 @@
-import fitz  # PyMuPDF
-import docx
 import os
+
+import docx
+import fitz  # PyMuPDF
+
 
 def extract_text(file_path: str) -> str:
     """Extract text from a PDF or DOCX file."""
@@ -16,7 +18,7 @@ def extract_text(file_path: str) -> str:
             doc.close()
             return text.strip()
         except Exception as e:
-            raise Exception(f"Error parsing PDF: {str(e)}")
+            raise Exception(f"Error parsing PDF: {e!s}")
             
     elif file_path.lower().endswith('.docx'):
         try:
@@ -24,7 +26,7 @@ def extract_text(file_path: str) -> str:
             text = "\n".join([para.text for para in doc.paragraphs])
             return text.strip()
         except Exception as e:
-            raise Exception(f"Error parsing DOCX: {str(e)}")
+            raise Exception(f"Error parsing DOCX: {e!s}")
             
     else:
         raise ValueError(f"Unsupported file type: {os.path.splitext(file_path)[1]}. Supported types are .pdf and .docx")

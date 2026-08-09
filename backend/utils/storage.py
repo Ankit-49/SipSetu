@@ -2,9 +2,8 @@
 
 import os
 import uuid
-from datetime import datetime, timedelta
-from typing import Optional, BinaryIO
-from urllib.parse import urlparse
+from datetime import datetime
+from typing import BinaryIO
 
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
@@ -176,7 +175,7 @@ class StorageService:
 
 
 # Global instance
-_storage_service: Optional[StorageService] = None
+_storage_service: StorageService | None = None
 
 
 def get_storage() -> StorageService:

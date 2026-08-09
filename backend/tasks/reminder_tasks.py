@@ -8,8 +8,9 @@ from tasks.email_tasks import send_interview_reminder_task
 def send_due_reminders(self):
     """Send due interview reminders - called by Celery Beat every minute."""
     try:
-        from models import db, Interview
         from datetime import datetime, timedelta
+
+        from models import Interview, db
 
         now = datetime.utcnow()
         horizon = now + timedelta(hours=24, minutes=30)

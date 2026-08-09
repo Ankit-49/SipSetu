@@ -1,6 +1,6 @@
 import os
+
 from pydantic_settings import BaseSettings
-from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -28,16 +28,16 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE: int = 300
     
     # Redis
-    REDIS_URL: Optional[str] = os.environ.get('REDIS_URL')
+    REDIS_URL: str | None = os.environ.get('REDIS_URL')
     
     # CORS
     FRONTEND_URL: str = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
     
     # Email (SMTP)
-    SMTP_HOST: Optional[str] = os.environ.get('SMTP_HOST')
-    SMTP_PORT: Optional[int] = None
-    SMTP_USER: Optional[str] = os.environ.get('SMTP_USER')
-    SMTP_PASSWORD: Optional[str] = os.environ.get('SMTP_PASSWORD')
+    SMTP_HOST: str | None = os.environ.get('SMTP_HOST')
+    SMTP_PORT: int | None = None
+    SMTP_USER: str | None = os.environ.get('SMTP_USER')
+    SMTP_PASSWORD: str | None = os.environ.get('SMTP_PASSWORD')
     SMTP_USE_TLS: bool = True
     SMTP_FROM: str = os.environ.get('SMTP_FROM', 'noreply@sipsetu.com')
     
@@ -45,9 +45,9 @@ class Settings(BaseSettings):
     STORAGE_PROVIDER: str = os.environ.get('STORAGE_PROVIDER', 'local')  # local, s3, minio
     STORAGE_BUCKET: str = os.environ.get('STORAGE_BUCKET', 'sipsetu-uploads')
     STORAGE_REGION: str = os.environ.get('STORAGE_REGION', 'us-east-1')
-    STORAGE_ENDPOINT_URL: Optional[str] = os.environ.get('STORAGE_ENDPOINT_URL')
-    STORAGE_ACCESS_KEY: Optional[str] = os.environ.get('STORAGE_ACCESS_KEY')
-    STORAGE_SECRET_KEY: Optional[str] = os.environ.get('STORAGE_SECRET_KEY')
+    STORAGE_ENDPOINT_URL: str | None = os.environ.get('STORAGE_ENDPOINT_URL')
+    STORAGE_ACCESS_KEY: str | None = os.environ.get('STORAGE_ACCESS_KEY')
+    STORAGE_SECRET_KEY: str | None = os.environ.get('STORAGE_SECRET_KEY')
     LOCAL_STORAGE_PATH: str = os.environ.get('LOCAL_STORAGE_PATH', '/tmp/sipsetu-uploads')
     
     # Rate Limiting
@@ -64,13 +64,13 @@ class Settings(BaseSettings):
     ALLOWED_FILE_EXTENSIONS: list = ['.pdf', '.docx', '.txt']
     
     # Monitoring
-    SENTRY_DSN: Optional[str] = os.environ.get('SENTRY_DSN')
+    SENTRY_DSN: str | None = os.environ.get('SENTRY_DSN')
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "json"  # json, text
     
     # Celery
-    CELERY_BROKER_URL: Optional[str] = None
-    CELERY_RESULT_BACKEND: Optional[str] = None
+    CELERY_BROKER_URL: str | None = None
+    CELERY_RESULT_BACKEND: str | None = None
     
     class Config:
         env_file = ".env"

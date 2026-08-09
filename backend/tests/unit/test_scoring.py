@@ -1,16 +1,15 @@
 """Unit tests for scoring and ranking functions."""
 
-import pytest
+from models import Job, Resume, Skill
 from routes_common import (
-    calculate_match_score,
     calculate_experience_score,
+    calculate_heuristic_score,
+    calculate_match_score,
     experience_level_to_years,
     extract_experience_years,
     extract_skills_from_text,
     heuristic_breakdown,
-    calculate_heuristic_score,
 )
-from models import Resume, Job, Skill
 
 
 class TestSkillExtraction:

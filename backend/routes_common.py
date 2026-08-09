@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from models import db, Job, JobApplication, Ranking, Resume, Skill
+from models import Job, JobApplication, Ranking, Resume, db
 
 EXPERIENCE_LEVEL_TO_YEARS = {
     "fresher": 0.0,

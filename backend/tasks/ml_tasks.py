@@ -19,7 +19,7 @@ def retrain_ranking_model(self):
 def explain_ranking_task(self, resume_id: str, job_id: str):
     """Generate ranking explanation asynchronously."""
     try:
-        from models import db, Resume, Job
+        from models import Job, Resume
         from ranking_ml import explain_ranking_score
 
         resume = Resume.query.get(resume_id)

@@ -1,18 +1,18 @@
 """Structured logging configuration for SipSetu."""
 
 import logging
-import sys
-import json
-from datetime import datetime
-from typing import Any, Dict
-from pythonjsonlogger import jsonlogger
 import os
+import sys
+from datetime import datetime
+from typing import Any
+
+from pythonjsonlogger import jsonlogger
 
 
 class CustomJsonFormatter(jsonlogger.JsonFormatter):
     """Custom JSON formatter with additional fields."""
     
-    def add_fields(self, log_record: Dict[str, Any], record: logging.LogRecord, message_dict: Dict[str, Any]):
+    def add_fields(self, log_record: dict[str, Any], record: logging.LogRecord, message_dict: dict[str, Any]):
         super().add_fields(log_record, record, message_dict)
         
         # Add standard fields
@@ -22,7 +22,7 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         
         # Add request context if available
         try:
-            from flask import request, g, has_request_context
+            from flask import g, has_request_context, request
             if has_request_context():
                 log_record['request_id'] = getattr(g, 'request_id', getattr(request, 'request_id', None))
                 log_record['method'] = request.method
@@ -50,7 +50,7 @@ class TextFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         # Add request context if available
         try:
-            from flask import request, g, has_request_context
+            from flask import g, has_request_context, request
             if has_request_context():
                 request_id = getattr(g, 'request_id', getattr(request, 'request_id', 'no-request-id'))
                 user_info = ""
@@ -118,9 +118,10 @@ def log_request_middleware(app):
     
     @app.before_request
     def log_request():
-        from flask import request, g
         import time
         import uuid
+
+        from flask import g, request
         
         # Generate request ID
         request_id = request.headers.get('X-Request-ID', str(uuid.uuid4()))
@@ -145,8 +146,9 @@ def log_request_middleware(app):
     
     @app.after_request
     def log_response(response):
-        from flask import request, g
         import time
+
+        from flask import g, request
         
         # Calculate duration
         start_time = getattr(g, 'request_start_time', time.time())

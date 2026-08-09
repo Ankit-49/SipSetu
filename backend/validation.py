@@ -1,15 +1,17 @@
 """Request validation middleware using Pydantic schemas."""
 
-from functools import wraps
-from flask import request, jsonify, g
-from pydantic import ValidationError
-from typing import Type, Optional, Callable, Any
 import logging
+from collections.abc import Callable
+from functools import wraps
+from typing import Any
+
+from flask import g, jsonify, request
+from pydantic import ValidationError
 
 logger = logging.getLogger(__name__)
 
 
-def validate_json(schema_class: Type[Any]) -> Callable:
+def validate_json(schema_class: type[Any]) -> Callable:
     """Decorator to validate request JSON body against a Pydantic schema."""
     def decorator(f):
         @wraps(f)
@@ -33,14 +35,14 @@ def validate_json(schema_class: Type[Any]) -> Callable:
                 return jsonify({"error": "Validation failed", "details": errors}), 400
             except Exception as e:
                 logger.exception("Validation error")
-                return jsonify({"error": f"Validation error: {str(e)}"}), 400
+                return jsonify({"error": f"Validation error: {e!s}"}), 400
             
             return f(*args, **kwargs)
         return wrapper
     return decorator
 
 
-def validate_query(schema_class: Type[Any]) -> Callable:
+def validate_query(schema_class: type[Any]) -> Callable:
     """Decorator to validate query parameters against a Pydantic schema."""
     def decorator(f):
         @wraps(f)
@@ -143,6 +145,6 @@ def validate_file_upload(
     return decorator
 
 
-def get_validated_file() -> Optional[dict]:
+def get_validated_file() -> dict | None:
     """Get validated file info from Flask g object."""
     return getattr(g, 'validated_file', None)

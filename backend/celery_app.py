@@ -6,7 +6,11 @@ from celery.schedules import crontab
 
 from config import settings
 
+# Import create_app to create Flask app context
+from app import create_app
+
 # Create Flask app context for Celery
+flask_app = create_app()
 flask_app = create_app()
 
 celery_app = Celery(

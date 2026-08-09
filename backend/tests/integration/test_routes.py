@@ -1,7 +1,5 @@
 """Integration tests for API routes."""
 
-import pytest
-import json
 
 
 class TestAuthRoutes:
@@ -207,8 +205,9 @@ class TestMatchingRoutes:
 
     def test_recruiter_candidates(self, client, recruiter_auth_headers, test_recruiter, test_job, test_resume):
         # First apply to create ranking
-        from models import db, JobApplication
         from flask import current_app
+
+        from models import JobApplication, db
         with current_app.app_context():
             application = JobApplication(
                 job_id=test_job.job_id,

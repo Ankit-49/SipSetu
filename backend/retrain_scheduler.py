@@ -29,7 +29,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-from models import db, JobApplication
+from models import JobApplication, db
 from ranking_ml import MODEL_DIR, train_ranking_model
 
 logger = logging.getLogger(__name__)

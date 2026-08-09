@@ -1,7 +1,12 @@
 """Email tasks for Celery."""
 
 from celery_app import celery_app
-from utils.email import send_email, send_password_reset_otp, send_verification_otp, send_interview_reminder
+from utils.email import (
+    send_email,
+    send_interview_reminder,
+    send_password_reset_otp,
+    send_verification_otp,
+)
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)

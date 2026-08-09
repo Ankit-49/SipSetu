@@ -4,18 +4,17 @@ Uses SMTP when configured (via .env), otherwise falls back to logging
 the email content to the console for local development.
 """
 
-import os
-import sys
-import smtplib
 import logging
-from email.message import EmailMessage
+import os
+import smtplib
+import sys
 from datetime import datetime
-from typing import Optional
+from email.message import EmailMessage
 
 logger = logging.getLogger(__name__)
 
 
-def _smtp_config() -> Optional[dict]:
+def _smtp_config() -> dict | None:
     """Read SMTP settings from environment."""
     host = os.environ.get("SMTP_HOST")
     port = os.environ.get("SMTP_PORT")
@@ -40,7 +39,7 @@ def send_email(
     to: str,
     subject: str,
     html_body: str,
-    text_body: Optional[str] = None,
+    text_body: str | None = None,
 ) -> bool:
     """Send an email. Falls back to console logging in development."""
     config = _smtp_config()
@@ -237,7 +236,7 @@ def send_interview_reminder(
             f"The interview is scheduled for <strong>{when}</strong> and should last about "
             f"{duration_minutes} minutes."
         )
-        cta = f"Join the interview on time and review the candidate's resume beforehand."
+        cta = "Join the interview on time and review the candidate's resume beforehand."
     else:
         subject = f"Interview reminder: {job_title} at {company} {time_label}"
         greeting = (

@@ -6,13 +6,13 @@ Supports both single-process development (in-memory) and multi-worker production
 
 from __future__ import annotations
 
-import time
 import os
+import time
 from collections import defaultdict
+from collections.abc import Callable
 from functools import wraps
-from typing import Callable, Optional
 
-from flask import jsonify, request, current_app, g
+from flask import current_app, g, jsonify, request
 
 # Try to import Redis
 try:
@@ -38,9 +38,9 @@ class RateLimiter:
     
     def __init__(self, app=None):
         self.app = app
-        self.redis_client: Optional[redis.Redis] = None
+        self.redis_client: redis.Redis | None = None
         self.use_redis = False
-        self.flask_limiter: Optional[Limiter] = None
+        self.flask_limiter: Limiter | None = None
         
         if app:
             self.init_app(app)
@@ -196,7 +196,6 @@ def _key_by_email() -> str:
 
 
 def _key_by_user_id() -> str:
-    from flask import g
     return str(getattr(g, "current_user_id", "anonymous"))
 
 
@@ -208,7 +207,7 @@ _BUILTIN_KEY_RESOLVERS: dict[str, Callable[[], str]] = {
 
 
 # Global instance for backward compatibility
-_limiter_instance: Optional[RateLimiter] = None
+_limiter_instance: RateLimiter | None = None
 
 
 def get_limiter() -> RateLimiter:
