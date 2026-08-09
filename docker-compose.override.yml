@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # Override backend for development - use Flask dev server with hot reload
+  backend:
+    build:
+      target: base
+    command: python app.py
+    environment:
+      FLASK_ENV: development
+      FLASK_DEBUG: "true"
+    volumes:
+      - ./backend:/app
+      - backend_ml_artifacts:/app/ml_artifacts
+    ports:
+      - "5000:5000"
+
+  # Frontend uses Vite dev server (defined in main compose)
+  frontend:
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+
+  # Disable production services in development
+  frontend-prod:
+    deploy:
+      replicas: 0
+
+  celery-worker:
+    deploy:
+      replicas: 0
+
+  celery-beat:
+    deploy:
+      replicas: 0

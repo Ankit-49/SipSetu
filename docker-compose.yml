@@ -1,0 +1,172 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: sipsetu-postgres
+    environment:
+      POSTGRES_DB: sipsetu
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sipsetu"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sipsetu-network
+
+  # Redis for caching, rate limiting, Celery
+  redis:
+    image: redis:7-alpine
+    container_name: sipsetu-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sipsetu-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sipsetu-backend
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/sipsetu
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-sipsetu-dev-jwt-secret-change-in-production}
+      FRONTEND_URL: http://localhost:5173
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      SMTP_FROM: ${SMTP_FROM:-noreply@sipsetu.com}
+      FLASK_ENV: development
+    volumes:
+      - ./backend:/app
+      - backend_ml_artifacts:/app/ml_artifacts
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sipsetu-network
+    restart: unless-stopped
+
+  # Frontend (Vite dev server for development)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: builder
+    container_name: sipsetu-frontend-dev
+    environment:
+      VITE_API_URL: http://localhost:5000/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    command: npm run dev -- --host 0.0.0.0
+    depends_on:
+      - backend
+    networks:
+      - sipsetu-network
+
+  # Frontend production (Nginx)
+  frontend-prod:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: sipsetu-frontend-prod
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - sipsetu-network
+    profiles:
+      - production
+
+  # Celery worker for background tasks
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sipsetu-celery-worker
+    command: celery -A celery_app worker --loglevel=info --concurrency=4
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/sipsetu
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-sipsetu-dev-jwt-secret-change-in-production}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      SMTP_FROM: ${SMTP_FROM:-noreply@sipsetu.com}
+    volumes:
+      - ./backend:/app
+      - backend_ml_artifacts:/app/ml_artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sipsetu-network
+    profiles:
+      - production
+      - worker
+
+  # Celery beat for periodic tasks
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sipsetu-celery-beat
+    command: celery -A celery_app beat --loglevel=info --scheduler celery.beat:PersistentScheduler
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/sipsetu
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+      - backend_ml_artifacts:/app/ml_artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sipsetu-network
+    profiles:
+      - production
+      - worker
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_ml_artifacts:
+
+networks:
+  sipsetu-network:
+    driver: bridge

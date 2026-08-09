@@ -1,0 +1,98 @@
+version: 2
+updates:
+  # Backend Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "backend"
+    commit-message:
+      prefix: "deps(backend)"
+    groups:
+      ml-dependencies:
+        patterns:
+          - "scikit-learn*"
+          - "numpy*"
+          - "joblib*"
+        update-types:
+          - "minor"
+          - "patch"
+      web-dependencies:
+        patterns:
+          - "Flask*"
+          - "Werkzeug*"
+        update-types:
+          - "minor"
+          - "patch"
+      db-dependencies:
+        patterns:
+          - "SQLAlchemy*"
+          - "psycopg2*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Frontend Node.js dependencies
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 15
+    labels:
+      - "dependencies"
+      - "frontend"
+    commit-message:
+      prefix: "deps(frontend)"
+    groups:
+      react-ecosystem:
+        patterns:
+          - "react*"
+          - "@types/react*"
+        update-types:
+          - "minor"
+          - "patch"
+      ui-components:
+        patterns:
+          - "@radix-ui/*"
+          - "@emotion/*"
+          - "@mui/*"
+        update-types:
+          - "minor"
+          - "patch"
+      build-tools:
+        patterns:
+          - "vite*"
+          - "tailwindcss*"
+          - "@vitejs/plugin-react*"
+        update-types:
+          - "minor"
+          - "patch"
+      testing:
+        patterns:
+          - "vitest*"
+          - "@testing-library/*"
+          - "playwright*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "deps(ci)"
