@@ -1,6 +1,7 @@
 """Unit tests for scoring and ranking functions."""
 
-from models import Job, Resume, Skill
+from uuid import uuid4
+from models import Job, Recruiter, Resume, Skill
 from routes_common import (
     calculate_experience_score,
     calculate_heuristic_score,
@@ -138,7 +139,32 @@ class TestHeuristicBreakdown:
 
     def test_heuristic_breakdown_perfect_match(self, app):
         with app.app_context():
-            from models import db
+            from models import db, Recruiter, Applicant
+            from werkzeug.security import generate_password_hash
+
+            # Create recruiter (requires User fields)
+            recruiter = Recruiter(
+                user_id=uuid4(),
+                email="recruiter@test.com",
+                name="Test Recruiter",
+                password_hash=generate_password_hash("password123"),
+                role="recruiter",
+                company="Test Corp",
+                job_title="HR"
+            )
+            db.session.add(recruiter)
+            db.session.flush()
+
+            # Create applicant for resume
+            applicant = Applicant(
+                user_id=uuid4(),
+                email="applicant@test.com",
+                name="Test Applicant",
+                password_hash=generate_password_hash("password123"),
+                role="applicant"
+            )
+            db.session.add(applicant)
+            db.session.flush()
 
             # Create skills
             skills = []
@@ -149,13 +175,13 @@ class TestHeuristicBreakdown:
             db.session.commit()
 
             # Create job with skills
-            job = Job(title="Developer", description="Python React SQL")
+            job = Job(title="Developer", description="Python React SQL", recruiter_id=recruiter.user_id)
             job.skills = skills
             db.session.add(job)
             db.session.commit()
 
             # Create resume with matching skills
-            resume = Resume(raw_text="Python React SQL expert", skills=skills)
+            resume = Resume(raw_text="Python React SQL expert", skills=skills, applicant_id=applicant.user_id)
             db.session.add(resume)
             db.session.commit()
 
@@ -170,15 +196,38 @@ class TestHeuristicScore:
 
     def test_heuristic_score_range(self, app):
         with app.app_context():
-            from models import db
+            from models import db, Recruiter, Applicant
+            from werkzeug.security import generate_password_hash
 
-            skills = [Skill(skill_name=n) for n in ["python", "react"]]
+            recruiter = Recruiter(
+                user_id=uuid4(),
+                email=f"recruiter_{uuid4()}@test.com",
+                name="Test Recruiter",
+                password_hash=generate_password_hash("password123"),
+                role="recruiter",
+                company="Test Corp",
+                job_title="HR"
+            )
+            db.session.add(recruiter)
+            db.session.flush()
+
+            applicant = Applicant(
+                user_id=uuid4(),
+                email=f"applicant_{uuid4()}@test.com",
+                name="Test Applicant",
+                password_hash=generate_password_hash("password123"),
+                role="applicant"
+            )
+            db.session.add(applicant)
+            db.session.flush()
+
+            skills = [Skill(skill_name=f"python_{uuid4()}"), Skill(skill_name=f"react_{uuid4()}")]
             for s in skills:
                 db.session.add(s)
             db.session.commit()
 
-            job = Job(title="Dev", description="Python React", skills=skills[:1])
-            resume = Resume(raw_text="Python developer", skills=skills[:1])
+            job = Job(title="Dev", description="Python React", skills=skills[:1], recruiter_id=recruiter.user_id)
+            resume = Resume(raw_text="Python developer", skills=skills[:1], applicant_id=applicant.user_id)
 
             db.session.add_all([job, resume])
             db.session.commit()
@@ -188,14 +237,37 @@ class TestHeuristicScore:
 
     def test_heuristic_score_perfect(self, app):
         with app.app_context():
-            from models import db
+            from models import db, Recruiter, Applicant
+            from werkzeug.security import generate_password_hash
 
-            skill = Skill(skill_name="python")
+            recruiter = Recruiter(
+                user_id=uuid4(),
+                email=f"recruiter_{uuid4()}@test.com",
+                name="Test Recruiter",
+                password_hash=generate_password_hash("password123"),
+                role="recruiter",
+                company="Test Corp",
+                job_title="HR"
+            )
+            db.session.add(recruiter)
+            db.session.flush()
+
+            applicant = Applicant(
+                user_id=uuid4(),
+                email=f"applicant_{uuid4()}@test.com",
+                name="Test Applicant",
+                password_hash=generate_password_hash("password123"),
+                role="applicant"
+            )
+            db.session.add(applicant)
+            db.session.flush()
+
+            skill = Skill(skill_name=f"python_{uuid4()}")
             db.session.add(skill)
             db.session.commit()
 
-            job = Job(title="Python Dev", description="Python", skills=[skill], experience_level="fresher")
-            resume = Resume(raw_text="5 years python experience", skills=[skill])
+            job = Job(title="Python Dev", description="Python", skills=[skill], experience_level="fresher", recruiter_id=recruiter.user_id)
+            resume = Resume(raw_text="5 years python experience", skills=[skill], applicant_id=applicant.user_id)
 
             db.session.add_all([job, resume])
             db.session.commit()

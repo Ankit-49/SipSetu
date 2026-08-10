@@ -76,19 +76,23 @@ export function NotificationBell() {
 
   const markAllRead = async () => {
     if (!userId) return;
-    try {
-      await api.patch(`/notifications/read-all/${userId}`);
-      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    } catch {}
+try {
+        await api.patch(`/notifications/read-all/${userId}`);
+        setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      } catch {
+        // Silently fail - user will see stale state on next refresh
+      }
   };
 
   const markRead = async (id: string) => {
-    try {
-      await api.patch(`/notifications/${id}/read`);
-      setNotifications((prev) =>
-        prev.map((n) => (n.notification_id === id ? { ...n, is_read: true } : n))
-      );
-    } catch {}
+try {
+        await api.patch(`/notifications/${id}/read`);
+        setNotifications((prev) =>
+          prev.map((n) => (n.notification_id === id ? { ...n, is_read: true } : n))
+        );
+      } catch {
+        // Silently fail - user will see stale state on next refresh
+      }
   };
 
   return (

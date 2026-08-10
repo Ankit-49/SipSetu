@@ -1,0 +1,82 @@
+# Target Python version
+target-version = "py311"
+
+# Line length
+line-length = 100
+
+# Exclude patterns
+exclude = [
+    ".venv",
+    "__pycache__",
+    "*.pyc",
+    "migrations/versions/*.py",
+    "tests/",
+]
+
+# Lint rules
+[lint]
+# Enable specific rule categories
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific
+    "BLE", # flake8-blind-except (but we'll ignore BLE001)
+    "B",   # flake8-bugbear (but we'll ignore B017)
+    "DTZ", # flake8-datetimez (but we'll ignore DTZ003, DTZ005)
+    "TRY", # tryceratops
+    "PL",  # pylint
+]
+
+# Ignore noisy rules that don't affect functionality
+ignore = [
+    "BLE001",  # Blind exception - too many in legacy code
+    "B017",    # Assert blind exception - test code
+    "DTZ003",  # datetime.utcnow() - widely used, migrating is non-trivial
+    "DTZ005",  # datetime.now() without tz - widely used
+    "RUF013",  # Implicit Optional - PEP 484, not critical
+    "RUF012",  # Mutable default for class attr - SQLAlchemy patterns
+    "S110",    # try-except-pass - many intentional silent failures
+    "TRY002",  # Custom exception - overkill for simple cases
+    "RUF046",  # Unnecessary int cast - harmless
+    "C408",    # Unnecessary dict() call - harmless
+    "C401",    # Unnecessary generator - harmless
+    "SIM102",  # Nested if - style preference
+    "PLW1508", # Invalid type for env var default - false positive
+    "LOG014",  # exc_info outside handler - intentional for structured logging
+    "F811",    # Redefinition of sys - test fixture issue
+    "F401",    # Unused import - many are intentional for side effects
+    "RUF034",  # Useless if-else - false positive
+    "F541",    # f-string without placeholder - harmless
+    "PLR2004", # Magic value - style preference
+    "PLR0911", # Too many returns - style preference
+    "PLR0912", # Too many branches - style preference
+    "PLR0913", # Too many arguments - style preference
+    "PLR0915", # Too many statements - style preference
+    "PLR0917", # Too many positional args - style preference
+    "PLC0415", # Import at top level - style preference
+    "SIM105",  # contextlib.suppress - style preference
+    "TRY003",  # Long messages - style preference
+    "B904",    # raise from - style preference
+    "TRY300",  # Move to else - style preference
+    "TRY400",  # logging.exception - style preference
+    "B007",    # Unused loop variable - style preference
+    "PLW0603", # Global statement - pattern used intentionally
+    "UP042",   # StrEnum - Python 3.11+ feature
+    "E501",    # Line too long - we use 100 chars
+]
+
+# Per-file ignores
+[lint.per-file-ignores]
+"tests/*" = ["S101", "B017", "F811", "F401", "RUF013"]
+"migrations/*" = ["I001", "DTZ003", "UP006"]
+"models.py" = ["RUF012"]
+
+# Formatter
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false

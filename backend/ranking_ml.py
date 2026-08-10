@@ -205,7 +205,7 @@ def _keyword_density(resume_text: str, job: Job) -> float:
     desc = _clean_text(job.description)
     if not desc:
         return 0.0
-    job_words = {w for w in re.findall(r"[a-z0-9]{3,}", desc.lower())}
+    job_words = set(re.findall(r"[a-z0-9]{3,}", desc.lower()))
     if not job_words:
         return 0.0
     resume_lower = resume_text.lower()

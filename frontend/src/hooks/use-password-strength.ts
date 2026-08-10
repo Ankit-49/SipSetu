@@ -17,7 +17,7 @@ const CHECKS: { label: string; test: (pw: string) => boolean }[] = [
   { label: "Contains uppercase letter", test: (pw) => /[A-Z]/.test(pw) },
   { label: "Contains lowercase letter", test: (pw) => /[a-z]/.test(pw) },
   { label: "Contains a number", test: (pw) => /\d/.test(pw) },
-  { label: "Contains a special character", test: (pw) => /[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;'`~]/.test(pw) },
+  { label: "Contains a special character", test: (pw) => /[!@#$%^&*(),.?":{}|<>_\-+=\];'`~]/.test(pw) },
 ];
 
 const LABELS = ["Weak", "Fair", "Good", "Strong", "Very Strong"];

@@ -1,13 +1,11 @@
 """Celery configuration for SipSetu background tasks."""
 
-import os
 from celery import Celery
 from celery.schedules import crontab
 
-from config import settings
-
 # Import create_app to create Flask app context
 from app import create_app
+from config import settings
 
 # Create Flask app context for Celery
 flask_app = create_app()

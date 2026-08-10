@@ -5,9 +5,10 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from config import Config, settings
-from models import db
 
-load_dotenv()
+# Logging
+from logging_config import log_request_middleware, setup_logging
+from models import db
 
 # Optional imports for production features
 try:
@@ -29,8 +30,7 @@ try:
 except ImportError:
     HAS_REDIS = False
 
-# Logging
-from logging_config import log_request_middleware, setup_logging
+load_dotenv()
 
 
 def create_app():

@@ -122,7 +122,7 @@ def test_job(db_session, test_recruiter):
             db_session.add(skill)
         job.skills.append(skill)
 
-    db_session.commit()
+    db_session.flush()
     return job
 
 
@@ -149,7 +149,7 @@ def test_resume(db_session, test_user):
             db_session.add(skill)
         resume.skills.append(skill)
 
-    db_session.commit()
+    db_session.flush()
     return resume
 
 

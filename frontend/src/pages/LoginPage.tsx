@@ -104,7 +104,7 @@ export default function LoginPage() {
                     </div>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="h-11 pl-10 pr-10 bg-slate-50 border-slate-200 focus:bg-white transition-all" />
+                      <Input id="password" data-testid="password-input" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="h-11 pl-10 pr-10 bg-slate-50 border-slate-200 focus:bg-white transition-all" />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}

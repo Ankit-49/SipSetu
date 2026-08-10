@@ -1,6 +1,26 @@
 import '@testing-library/jest-dom'
 import { vi } from 'vitest'
 
+// Mock lottie-react which requires canvas
+vi.mock('lottie-react', () => {
+  const React = require('react')
+  return {
+    default: (props: any) => React.createElement('div', { 'data-testid': 'lottie-mock', ...props }),
+  }
+})
+
+// Mock lottie-web which requires canvas
+vi.mock('lottie-web', () => ({
+  loadAnimation: vi.fn(() => ({
+    play: vi.fn(),
+    stop: vi.fn(),
+    pause: vi.fn(),
+    destroy: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  })),
+}))
+
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
