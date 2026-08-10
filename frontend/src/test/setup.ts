@@ -1,13 +1,11 @@
 import '@testing-library/jest-dom'
 import { vi } from 'vitest'
+import React from 'react'
 
 // Mock lottie-react which requires canvas
-vi.mock('lottie-react', () => {
-  const React = require('react')
-  return {
-    default: (props: any) => React.createElement('div', { 'data-testid': 'lottie-mock', ...props }),
-  }
-})
+vi.mock('lottie-react', () => ({
+  default: (props: any) => React.createElement('div', { 'data-testid': 'lottie-mock', ...props }),
+}))
 
 // Mock lottie-web which requires canvas
 vi.mock('lottie-web', () => ({

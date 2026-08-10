@@ -146,16 +146,16 @@ describe('RegisterPage', () => {
 
 describe('AuthContext', () => {
   it('provides login function', () => {
-    let authValue: any
+    let authValue: ReturnType<typeof useAuth> | null = null
     const TestComponent = () => {
       authValue = useAuth()
       return null
     }
 
     renderWithProviders(<TestComponent />)
-    expect(authValue.login).toBeDefined()
-    expect(authValue.register).toBeDefined()
-    expect(authValue.logout).toBeDefined()
-    expect(authValue.isAuthenticated).toBe(false)
+    expect(authValue?.login).toBeDefined()
+    expect(authValue?.register).toBeDefined()
+    expect(authValue?.logout).toBeDefined()
+    expect(authValue?.isAuthenticated).toBe(false)
   })
 })
