@@ -14,6 +14,14 @@ import { usePasswordStrength } from "@/hooks/use-password-strength";
 import { PasswordStrengthIndicator } from "@/components/PasswordStrengthIndicator";
 import api from "@/lib/api";
 
+interface ApiError {
+  response?: {
+    data?: {
+      error?: string
+    }
+  }
+}
+
 type Step = "email" | "otp" | "password" | "done";
 
 export default function ForgotPasswordPage() {
@@ -46,8 +54,9 @@ export default function ForgotPasswordPage() {
         const first = document.getElementById("otp-0");
         first?.focus();
       }, 100);
-    } catch (err: any) {
-      setError(err.response?.data?.error || "Something went wrong.");
+    } catch (err) {
+      const error = err as ApiError
+      setError(error.response?.data?.error || "Something went wrong.");
     } finally {
       setSubmitting(false);
     }
@@ -65,8 +74,9 @@ export default function ForgotPasswordPage() {
       const res = await api.post("/auth/verify-reset-otp", { email, otp: otpValue });
       setResetToken(res.data.reset_token);
       setStep("password");
-    } catch (err: any) {
-      setError(err.response?.data?.error || "Invalid OTP. Please try again.");
+    } catch (err) {
+      const error = err as ApiError
+      setError(error.response?.data?.error || "Invalid OTP. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -83,8 +93,9 @@ export default function ForgotPasswordPage() {
     try {
       await api.post("/auth/reset-password", { token: resetToken, email, password });
       setStep("done");
-    } catch (err: any) {
-      setError(err.response?.data?.error || "Failed to reset password.");
+    } catch (err) {
+      const error = err as ApiError
+      setError(error.response?.data?.error || "Failed to reset password.");
     } finally {
       setSubmitting(false);
     }
@@ -132,8 +143,9 @@ export default function ForgotPasswordPage() {
     try {
       await api.post("/auth/forgot-password", { email });
       setOtp(["", "", "", "", "", ""]);
-    } catch (err: any) {
-      setError(err.response?.data?.error || "Failed to resend OTP.");
+    } catch (err) {
+      const error = err as ApiError
+      setError(error.response?.data?.error || "Failed to resend OTP.");
     } finally {
       setSubmitting(false);
     }
