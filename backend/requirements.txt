@@ -25,7 +25,7 @@ gevent>=23.9.0
 
 # Redis & Celery (for background tasks)
 redis>=5.0.0
-celery>=5.3.0
+celery>=5.6.3
 
 # Rate Limiting (Redis-backed)
 flask-limiter>=3.5.0
