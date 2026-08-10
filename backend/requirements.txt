@@ -38,7 +38,7 @@ python-json-logger>=2.0.0
 flask-talisman>=1.1.0
 
 # Validation
-pydantic>=2.5.0
+pydantic>=2.13.4
 pydantic-settings>=2.1.0
 
 # Storage
