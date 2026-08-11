@@ -50,12 +50,16 @@ def create_app():
     db_url = settings.DATABASE_URL
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_pre_ping': True,
-        'pool_recycle': settings.DB_POOL_RECYCLE,
-        'pool_size': settings.DB_POOL_SIZE,
-        'max_overflow': settings.DB_MAX_OVERFLOW,
-    }
+    if db_url.startswith('sqlite'):
+        # SQLite (tests) does not support pool_size/max_overflow
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {}
+    else:
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_pre_ping': True,
+            'pool_recycle': settings.DB_POOL_RECYCLE,
+            'pool_size': settings.DB_POOL_SIZE,
+            'max_overflow': settings.DB_MAX_OVERFLOW,
+        }
 
     db.init_app(app)
 

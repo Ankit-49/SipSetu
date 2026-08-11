@@ -3,10 +3,16 @@
 import os
 import sys
 from pathlib import Path
-from unittest.mock import sys
 from uuid import uuid4
 
 import pytest
+
+# Configure test environment BEFORE importing the app so that Settings
+# (instantiated at module import time in config.py) picks up these values.
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ["JWT_SECRET_KEY"] = "test-secret-key"
+os.environ["FRONTEND_URL"] = "http://localhost:5173"
+os.environ.pop("REDIS_URL", None)
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -28,13 +34,13 @@ from models import (
 @pytest.fixture(scope="session")
 def app():
     """Create application for testing."""
-    os.environ["DATABASE_URL"] = "sqlite:///:memory:"
-    os.environ["JWT_SECRET_KEY"] = "test-secret-key"
-    os.environ["FRONTEND_URL"] = "http://localhost:5173"
-
     app = create_app()
     app.config["TESTING"] = True
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "poolclass": __import__("sqlalchemy").pool.StaticPool,
+        "connect_args": {"check_same_thread": False},
+    }
 
     with app.app_context():
         db.create_all()

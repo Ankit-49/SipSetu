@@ -57,7 +57,7 @@ describe('LoginPage', () => {
   })
 
   it('calls API on valid submit', async () => {
-    api.post.mockResolvedValueOnce({
+    vi.mocked(api.post).mockResolvedValueOnce({
       data: {
         token: 'test-token',
         user_id: '123',
@@ -116,7 +116,7 @@ describe('RegisterPage', () => {
   })
 
   it('calls API on valid submit', async () => {
-    api.post.mockResolvedValueOnce({
+    vi.mocked(api.post).mockResolvedValueOnce({
       data: {
         token: 'test-token',
         user_id: '123',
@@ -153,9 +153,9 @@ describe('AuthContext', () => {
     }
 
     renderWithProviders(<TestComponent />)
-    expect(authValue?.login).toBeDefined()
-    expect(authValue?.register).toBeDefined()
-    expect(authValue?.logout).toBeDefined()
-    expect(authValue?.isAuthenticated).toBe(false)
+    expect(authValue!.login).toBeDefined()
+    expect(authValue!.register).toBeDefined()
+    expect(authValue!.logout).toBeDefined()
+    expect(authValue!.isAuthenticated).toBe(false)
   })
 })

@@ -190,7 +190,6 @@ export default function VerifyEmailPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-9"
                     required
-                    disabled={state === "loading"}
                   />
                 </div>
               </div>
@@ -210,7 +209,6 @@ export default function VerifyEmailPage() {
                       onChange={(e) => handleOtpChange(i, e.target.value)}
                       onKeyDown={(e) => handleOtpKeyDown(i, e)}
                       className="w-11 h-12 text-center text-lg font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      disabled={state === "loading"}
                       autoFocus={i === 0}
                     />
                   ))}
@@ -253,13 +251,9 @@ export default function VerifyEmailPage() {
               <Button
                 type="submit"
                 className="w-full bg-[#F97316] hover:bg-[#e8630e] text-white gap-2"
-                disabled={state === "loading" || expired}
+                disabled={expired}
               >
-                {state === "loading" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
+                <CheckCircle2 className="h-4 w-4" />
                 Verify Email
               </Button>
 

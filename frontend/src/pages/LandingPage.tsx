@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Target, TrendingUp, Award, ArrowRight, User, Briefcase, Sparkles, Loader2, ChevronDown, Star, Zap, Shield, BarChart3 } from "lucide-react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform, type Variants } from "framer-motion";
 import { VisualBackground } from "@/components/VisualBackground";
 import { SipSetuLogo } from "@/components/SipSetuLogo";
 
@@ -35,12 +35,6 @@ interface PreviewCandidate {
   matching_score: number;
   resume_skills: string[];
 }
-
-const formatStat = (n: number | undefined): string => {
-  if (n === undefined || n === null) return "0";
-  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K+`;
-  return `${n}+`;
-};
 
 // Animated counter component
 function AnimatedCounter({ value, label, color = "text-[#1E3A5F]", icon: Icon }: { value: number; label: string; color?: string; icon?: any }) {
@@ -86,7 +80,7 @@ function AnimatedCounter({ value, label, color = "text-[#1E3A5F]", icon: Icon }:
   );
 }
 
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -94,7 +88,7 @@ const containerVariants = {
   }
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
 };

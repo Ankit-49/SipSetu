@@ -31,6 +31,7 @@ interface CandidateResult {
   candidate_name: string;
   match_score: number;
   skills_score: number;
+  experience_score: number;
   content_score: number;
   extracted_skills: string[];
   matched_skills: string[];

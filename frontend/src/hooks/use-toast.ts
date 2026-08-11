@@ -13,6 +13,14 @@ interface ToastInput {
   duration?: number;
 }
 
+export interface ToasterToast {
+  id: string;
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  action?: React.ReactNode;
+  variant?: ToastVariant;
+}
+
 function nodeToString(node: React.ReactNode): string | undefined {
   if (node == null || node === false) return undefined;
   if (typeof node === "string" || typeof node === "number") return String(node);
@@ -39,7 +47,7 @@ function useToast() {
   return {
     toast: toToast,
     dismiss: (id?: string | number) => sonnerToast.dismiss(id),
-    toasts: [],
+    toasts: [] as ToasterToast[],
   };
 }
 

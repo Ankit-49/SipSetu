@@ -14,23 +14,23 @@ from utils.parser import extract_text
 class TestAuthMiddleware:
     """Tests for JWT token creation and validation."""
 
-    def test_create_token(self):
+    def test_create_token(self, app):
         token = create_token("user-123", "applicant")
         assert token is not None
         assert isinstance(token, str)
         assert len(token) > 0
 
-    def test_decode_valid_token(self):
+    def test_decode_valid_token(self, app):
         token = create_token("user-123", "applicant")
         payload = decode_token(token)
         assert payload["user_id"] == "user-123"
         assert payload["role"] == "applicant"
 
-    def test_decode_invalid_token(self):
+    def test_decode_invalid_token(self, app):
         with pytest.raises(Exception):
             decode_token("invalid.token.string")
 
-    def test_decode_expired_token(self):
+    def test_decode_expired_token(self, app):
         import time
 
         import jwt
