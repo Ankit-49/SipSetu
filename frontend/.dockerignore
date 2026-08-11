@@ -21,7 +21,6 @@ Thumbs.db
 .gitignore
 docker-compose*.yml
 Dockerfile*
-nginx.conf
 README.md
 *.md
 !README.md
