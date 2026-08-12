@@ -41,7 +41,25 @@ load_dotenv()
 
 def create_app():
     app = Flask(__name__)
-    
+
+    # Sentry error tracking (only when SENTRY_DSN is configured)
+    if settings.SENTRY_DSN:
+        try:
+            import sentry_sdk
+            from sentry_sdk.integrations.flask import FlaskIntegration
+
+            sentry_sdk.init(
+                dsn=settings.SENTRY_DSN,
+                integrations=[FlaskIntegration()],
+                environment=settings.ENVIRONMENT,
+                release=f"{settings.APP_NAME}@{settings.APP_VERSION}",
+                traces_sample_rate=0.1,
+                profiles_sample_rate=0.0,
+                send_default_pii=False,
+            )
+        except Exception as e:
+            app.logger.warning(f"Failed to initialize Sentry: {e}")
+
     # Configure logging first
     setup_logging(app)
     log_request_middleware(app)
