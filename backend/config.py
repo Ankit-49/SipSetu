@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     SENTRY_DSN: str | None = os.environ.get('SENTRY_DSN')
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "json"  # json, text
+    METRICS_ENABLED: bool = os.environ.get('METRICS_ENABLED', 'true').lower() in ('1', 'true', 'yes')
     
     # Celery
     CELERY_BROKER_URL: str | None = None

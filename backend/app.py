@@ -30,6 +30,12 @@ try:
 except ImportError:
     HAS_REDIS = False
 
+try:
+    from prometheus_flask_exporter import PrometheusMetrics
+    HAS_METRICS = True
+except ImportError:
+    HAS_METRICS = False
+
 load_dotenv()
 
 
@@ -105,6 +111,22 @@ def create_app():
     # Register routes
     from routes import api
     app.register_blueprint(api, url_prefix='/api')
+
+    # Prometheus metrics (exposes /metrics)
+    if HAS_METRICS and settings.METRICS_ENABLED:
+        try:
+            metrics = PrometheusMetrics(
+                app,
+                metrics_decorator=None,
+                default_labels={
+                    'app': settings.APP_NAME,
+                    'version': settings.APP_VERSION,
+                },
+                group_by='endpoint',
+            )
+            app.metrics = metrics
+        except Exception as e:
+            app.logger.warning(f"Failed to initialize Prometheus metrics: {e}")
 
     # Initialize database and run migrations
     with app.app_context():

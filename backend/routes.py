@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 import fitz  # PyMuPDF
-from flask import Blueprint, g, jsonify, request
+from flask import Blueprint, current_app, g, jsonify, request
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sqlalchemy import func, or_
@@ -245,6 +245,14 @@ def register():
     )
     db.session.add(verification)
     db.session.commit()
+
+    from metrics import increment
+    increment(
+        current_app._get_current_object(),
+        "sipsetu_registrations_total",
+        "Total user registrations by role",
+        {"role": role},
+    )
 
     send_verification_otp(to=email, otp=otp, name=name or email.split('@')[0])
 
@@ -632,6 +640,15 @@ def apply_for_job(job_id):
 
     create_rankings_for_job(job_id)
     db.session.commit()
+
+    if created:
+        from metrics import increment
+        increment(
+            current_app._get_current_object(),
+            "sipsetu_applications_total",
+            "Total job applications submitted by job type",
+            {"job_type": job.job_type or "unspecified"},
+        )
 
     latest_resume = Resume.query.filter_by(applicant_id=applicant_id)\
         .order_by(Resume.uploaded_at.desc()).first()
