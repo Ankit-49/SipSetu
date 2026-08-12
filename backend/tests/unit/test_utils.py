@@ -101,7 +101,7 @@ class TestEmailUtils:
         assert result is True
 
         captured = capsys.readouterr()
-        assert "DEV EMAIL TO: to@test.com" in captured.err
+        assert "EMAIL TO: to@test.com" in captured.err
         assert "Test" in captured.err
 
 

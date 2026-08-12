@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; margin: 0; padding: 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="480" cellpadding="0" cellspacing="0" style="background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
+          <tr>
+            <td style="background: #1E3A5F; padding: 32px 24px; text-align: center;">
+              <h1 style="color: #ffffff; font-size: 24px; margin: 0; letter-spacing: -0.5px;">SipSetu</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px 24px;">
+              {% block content %}{% endblock %}
+            </td>
+          </tr>
+          <tr>
+            <td style="background: #f1f5f9; padding: 16px 24px; text-align: center;">
+              <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+                {% block footer %}{% endblock %}<br>
+                &copy; {{ year }} SipSetu
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

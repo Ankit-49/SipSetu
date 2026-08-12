@@ -4,6 +4,7 @@
 
 [![Backend CI](https://github.com/Ankit-49/SipSetu/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/Ankit-49/SipSetu/actions/workflows/backend-ci.yml)
 [![Frontend CI](https://github.com/Ankit-49/SipSetu/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/Ankit-49/SipSetu/actions/workflows/frontend-ci.yml)
+[![Codecov](https://codecov.io/gh/Ankit-49/SipSetu/branch/main/graph/badge.svg)](https://codecov.io/gh/Ankit-49/SipSetu)
 
 SipSetu is an AI-powered recruitment platform that bridges job seekers and recruiters. It uses skill-based matching, resume analysis, and intelligent candidate ranking to connect talent with opportunity.
 

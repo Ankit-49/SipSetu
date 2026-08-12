@@ -46,6 +46,10 @@ jobs:
         working-directory: ./backend
         run: mypy --strict --ignore-missing-imports . || echo "MyPy warnings found (non-blocking)"
 
+      - name: Check dependencies for known vulnerabilities (non-blocking)
+        working-directory: ./backend
+        run: pip install pip-audit && pip-audit || echo "Vulnerability scan found issues (non-blocking)"
+
   test:
     name: Tests
     runs-on: ubuntu-latest
@@ -94,6 +98,10 @@ jobs:
         working-directory: ./backend
         run: |
           alembic upgrade head
+
+      - name: Check for model/schema drift (non-blocking)
+        working-directory: ./backend
+        run: alembic check || echo "Schema drift detected (non-blocking)"
 
       - name: Run unit tests with coverage
         working-directory: ./backend
