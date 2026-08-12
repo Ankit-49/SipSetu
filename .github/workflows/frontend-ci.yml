@@ -127,7 +127,7 @@ jobs:
 
       - name: Test Docker image
         run: |
-          docker run --rm -d --name frontend-test -p 8080:80 sipsetu-frontend:${{ github.sha }}
+          docker run --rm -d --name frontend-test --add-host backend:127.0.0.1 -p 8080:80 sipsetu-frontend:${{ github.sha }}
           sleep 5
           curl -f http://localhost:8080/health || exit 1
           docker stop frontend-test
