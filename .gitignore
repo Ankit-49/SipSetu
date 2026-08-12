@@ -7,3 +7,12 @@ __pycache__/
 .freebuff/
 backend/ml_artifacts/
 
+# Test & coverage artifacts
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+

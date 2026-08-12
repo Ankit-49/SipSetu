@@ -2,6 +2,9 @@
 
 **Tagline:** No skill left behind.
 
+[![Backend CI](https://github.com/Ankit-49/SipSetu/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/Ankit-49/SipSetu/actions/workflows/backend-ci.yml)
+[![Frontend CI](https://github.com/Ankit-49/SipSetu/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/Ankit-49/SipSetu/actions/workflows/frontend-ci.yml)
+
 SipSetu is an AI-powered recruitment platform that bridges job seekers and recruiters. It uses skill-based matching, resume analysis, and intelligent candidate ranking to connect talent with opportunity.
 
 ---
@@ -83,36 +86,60 @@ Authentication is stateless via JWT tokens stored in `localStorage`. File upload
 
 | Technology | Version | Purpose |
 |---|---|---|
-| Python | 3.10+ | Runtime |
+| Python | 3.11+ | Runtime (CI uses 3.11) |
 | Flask | 3.0.3 | Web framework |
 | Flask-SQLAlchemy | 3.1.1 | ORM |
 | Flask-CORS | 4.0.0 | Cross-origin requests |
 | SQLAlchemy | 2.0.29 | Database toolkit |
+| Alembic | 1.12+ | Versioned database migrations |
 | psycopg2-binary | 2.9.9 | PostgreSQL driver |
 | PyJWT | 2.8.0 | JWT encode/decode |
+| bcrypt | 4.1+ | Password hashing |
 | scikit-learn | 1.3.2 | Candidate ranking model + TF-IDF content similarity |
 | numpy | 1.24.3 | Numerical operations |
 | joblib | 1.3.2 | Model persistence (ml_artifacts) |
 | PyMuPDF (fitz) | 1.22.0 | PDF text extraction |
+| python-docx | 1.0+ | DOCX text extraction |
+| fpdf2 | 2.8+ | PDF generation |
 | python-dotenv | 1.2.2 | Environment variables |
-| Werkzeug | 3.0.2 | Password hashing |
+| Werkzeug | 3.0.2 | Password hashing / security |
+| gunicorn | 21.2+ | Production WSGI server |
+| gevent | 23.9+ | Gunicorn async workers |
+| redis | 5.0+ | Cache / rate-limit / Celery broker |
+| celery | 5.3+ | Background task queue |
+| flask-limiter | 3.5+ | Redis-backed rate limiting |
+| flask-talisman | 1.1+ | Security headers (production only) |
+| pydantic | 2.5+ | Request/response schema validation |
+| pydantic-settings | 2.1+ | Typed settings from env |
+| boto3 | 1.34+ | S3/MinIO object storage |
+| prometheus-flask-exporter | 0.23+ | Prometheus `/metrics` endpoint |
+| python-json-logger | 2.0+ | Structured JSON logging |
+| pytest | 7.4+ | Unit/integration tests |
+| pytest-cov | 4.1+ | Test coverage |
 
 ### Frontend
 
 | Technology | Version | Purpose |
 |---|---|---|
 | React | 18.3.1 | UI framework |
-| TypeScript | — | Type safety |
+| TypeScript | 5.4+ | Type safety |
+| Node.js | 22+ | Runtime (engines requirement) |
 | Vite | 6.3.5 | Build tool |
 | Tailwind CSS | 4.1.12 | Utility-first CSS |
-| React Router | 7.13.0 | Client-side routing |
-| Framer Motion (motion) | 12.23.24 | Animations |
+| React Router | 7.18.2 | Client-side routing |
+| motion (Framer Motion) | 12.23.24 | Animations |
 | Axios | 1.16.0 | HTTP client |
 | shadcn/ui | — | Primitive UI components (Radix-based) |
 | Lucide React | 0.487.0 | Icon library |
 | Recharts | 2.15.2 | Charts |
 | react-hook-form | 7.55.0 | Form management |
 | Sonner | 2.0.3 | Toast notifications |
+| react-day-picker | 8.10.1 | Date/calendar picker (v8 API) |
+| cmdk | 1.1.1 | Command palette |
+| input-otp | 1.4.2 | OTP input |
+| canvas-confetti | 1.9.4 | Celebration effects |
+| Vitest | 1.4+ | Unit/component tests |
+| React Testing Library | 14.2+ | Component test utilities |
 
 ---
 
@@ -120,16 +147,38 @@ Authentication is stateless via JWT tokens stored in `localStorage`. File upload
 
 ```
 SipSetu/
+├── .github/
+│   └── workflows/
+│       ├── backend-ci.yml             # Backend CI: ruff, mypy, pytest, docker build
+│       └── frontend-ci.yml            # Frontend CI: eslint, tsc, vitest, build, docker
+│   └── dependabot.yml                 # Weekly dependency updates
+│
 ├── backend/
-│   ├── app.py                  # Flask app factory, CORS, startup migrations
-│   ├── config.py               # Configuration class (DB, JWT, etc.)
+│   ├── app.py                  # Flask app factory, CORS, logging, rate limiter, Talisman, health
+│   ├── config.py               # Typed configuration class (pydantic-settings)
 │   ├── models.py               # SQLAlchemy ORM models (15 tables)
 │   ├── routes.py               # All API endpoints (auth, jobs, resumes, etc.)
 │   ├── routes_common.py        # Shared helpers: scoring, formatting, ranking
 │   ├── auth_middleware.py      # JWT creation, decoding, require_auth/role decorators
-│   ├── rate_limiter.py         # In-memory sliding-window rate limiter decorator
+│   ├── rate_limiter.py         # Redis-backed rate limiter with in-memory fallback
+│   ├── ranking_ml.py           # Optional gradient-boosted ML ranking model
+│   ├── retrain_scheduler.py    # Background auto-retrain daemon thread
+│   ├── reminders.py            # Interview reminder scheduler
+│   ├── logging_config.py       # JSON logging setup + request logging middleware
+│   ├── validation.py           # File upload validation (size, MIME, extension)
+│   ├── schemas.py              # Pydantic request/response schemas
+│   ├── celery_app.py           # Celery application (broker/result backend config)
+│   ├── tasks/                  # Celery tasks: email, ML, reminders
 │   ├── utils/
-│   │   └── email.py            # SMTP email sender (dev fallback to console)
+│   │   ├── email.py            # SMTP email sender (dev fallback to console)
+│   │   ├── parser.py           # Resume text parsing helpers
+│   │   └── storage.py          # Local / S3 / MinIO file storage abstraction
+│   ├── migrations/             # Alembic migration versions
+│   ├── tests/                  # pytest: conftest, unit/, integration/
+│   ├── alembic.ini             # Alembic config
+│   ├── pytest.ini              # pytest + coverage config
+│   ├── ruff.toml               # Ruff linter config
+│   ├── Dockerfile              # Multi-stage (base → production gunicorn)
 │   ├── requirements.txt        # Python dependencies
 │   └── .env.example            # Environment variable template
 │
@@ -182,19 +231,26 @@ SipSetu/
 │   │   │   ├── use-toast.ts    # Sonner toast wrapper
 │   │   │   ├── use-mobile.tsx  # Mobile detection hook
 │   │   │   └── use-password-strength.ts
-│   │   └── lib/
-│   │       ├── api.ts          # Axios instance with JWT interceptors
-│   │       └── utils.ts        # cn() utility (clsx + tailwind-merge)
+│   │   ├── lib/
+│   │   │   ├── api.ts          # Axios instance with JWT interceptors
+│   │   │   └── utils.ts        # cn() utility (clsx + tailwind-merge)
+│   │   └── test/setup.ts       # Vitest global setup (ResizeObserver, etc.)
 │   ├── index.html
 │   ├── vite.config.ts
 │   ├── package.json
+│   ├── nginx.conf              # Production Nginx config (SPA + API proxy)
+│   ├── Dockerfile              # Multi-stage (builder → nginx production)
+│   ├── .dockerignore
 │   └── components.json         # shadcn/ui configuration
 │
 ├── migrations/
-│   └── 001_tables.sql          # Complete PostgreSQL schema
+│   └── 001_tables.sql          # Original PostgreSQL schema (baseline)
 │
-├── DOCUMENTATION.md            # This file
-├── README.md                   # Quick-start guide
+├── docker-compose.yml          # Postgres, Redis, backend, frontend, celery (prod profile)
+├── docker-compose.override.yml # Dev overrides (hot-reload, dev servers)
+├── Readme.md                   # This file
+├── ROADMAP.md                  # Long-term enhancement roadmap
+├── Smart_Resume_Analyzer_Complete_Guide.md  # Detailed guide
 └── tsconfig.json
 ```
 
@@ -204,12 +260,28 @@ SipSetu/
 
 ### Prerequisites
 
-- Python 3.10+
-- Node.js 18+
+- Python 3.11+
+- Node.js 22+
 - PostgreSQL 15+
 - npm or pnpm
+- Docker + Docker Compose (optional, for containerized setup)
 
-### Backend
+### Option A — Docker Compose (recommended)
+
+```bash
+# Development (Postgres + Redis + backend + frontend hot-reload)
+docker compose up
+
+# Production (Nginx-served frontend + gunicorn backend + celery worker/beat)
+docker compose --profile production up
+```
+
+The `docker-compose.override.yml` automatically wires development overrides
+(hot-reload servers, dev database).
+
+### Option B — Manual setup
+
+#### Backend
 
 ```bash
 cd backend
@@ -220,17 +292,21 @@ pip install -r requirements.txt
 cp .env.example .env   # Edit with your credentials
 ```
 
-### Database
+#### Database
 
 ```bash
 # Create the database
 psql -U postgres -c "CREATE DATABASE sipsetu;"
 
-# Run the schema migration
+# Run the baseline schema
 psql -d sipsetu -U postgres -f migrations/001_tables.sql
+
+# OR use versioned Alembic migrations (preferred for schema changes)
+cd backend
+alembic upgrade head
 ```
 
-### Start
+#### Start
 
 ```bash
 # Terminal 1: Backend
@@ -243,6 +319,24 @@ npm install
 npm run dev      # Starts on http://localhost:5173
 ```
 
+### Testing
+
+```bash
+# Backend (38 unit tests, sqlite in-memory)
+cd backend
+pytest tests/unit --cov=. --cov-fail-under=30
+
+# Frontend (14 tests)
+cd frontend
+npm run test
+
+# Lint / type checks
+cd backend && ruff check .            # backend
+cd backend && mypy --strict --ignore-missing-imports .  # non-blocking
+cd frontend && npm run lint           # eslint
+cd frontend && npx tsc --noEmit       # TypeScript
+```
+
 ### Environment Variables (`backend/.env`)
 
 | Variable | Default | Required |
@@ -250,12 +344,19 @@ npm run dev      # Starts on http://localhost:5173
 | `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/sipsetu` | Yes |
 | `JWT_SECRET_KEY` | `sipsetu-dev-jwt-secret-change-in-production` | Yes |
 | `FRONTEND_URL` | `http://localhost:5173` | Yes (CORS) |
+| `REDIS_URL` | `redis://localhost:6379/0` | For rate limiter / Celery |
+| `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_RECYCLE` | `10` / `20` / `300` | Pool tuning |
+| `ENVIRONMENT` | `development` | Enables Talisman only in `production` |
 | `SMTP_HOST` | — | For email sending |
 | `SMTP_PORT` | — | For email sending |
 | `SMTP_USER` | — | For email sending |
 | `SMTP_PASSWORD` | — | For email sending |
 | `SMTP_USE_TLS` | `true` | For email sending |
 | `SMTP_FROM` | `noreply@sipsetu.com` | For email sending |
+| `STORAGE_PROVIDER` | `local` | `local`, `s3`, or `minio` |
+| `SENTRY_DSN` | — | Error tracking (optional) |
+| `LOG_LEVEL` / `LOG_FORMAT` | `INFO` / `json` | Logging config |
+| `ML_MODEL_DIR` / `ML_MIN_TRAINING_ROWS` / `ML_MAX_ALPHA` | `ml_artifacts` / `15` / `0.8` | ML ranking tuning |
 
 ---
 
@@ -269,15 +370,19 @@ The `create_app()` factory function:
 
 1. Loads `.env` via `python-dotenv`
 2. Configures Flask with `Config` class + `DATABASE_URL` override from env
-3. Initialises SQLAlchemy (`db.init_app(app)`)
-4. Registers the `api` blueprint under `/api`
-5. Runs `db.create_all()` to create any missing tables
-6. Runs safe `ALTER TABLE ADD COLUMN IF NOT EXISTS` migrations for columns added after the initial schema (status, profile_image, email_verified, phone, location)
-7. Registers a `/api/health` endpoint
+3. Initialises structured JSON logging and request-logging middleware (with request IDs)
+4. Configures CORS with explicit origins from `FRONTEND_URL`
+5. Initialises SQLAlchemy (`db.init_app(app)`) with Postgres pool options (skipped for SQLite)
+6. Enables Flask-Talisman security headers (CSP, HSTS, secure cookies) when `ENVIRONMENT=production`
+7. Initialises the Redis-backed rate limiter (flask-limiter), falling back to the in-memory limiter if Redis is unavailable
+8. Registers the `api` blueprint under `/api`
+9. Runs `db.create_all()` to create any missing tables, plus safe `ALTER TABLE ADD COLUMN IF NOT EXISTS` migrations for late-added columns (status, profile_image, email_verified, phone, location, reminders_sent)
+10. Registers a `/api/health` endpoint that verifies DB and Redis connectivity
+11. Attaches request-ID generation and `X-Request-ID` response headers
 
 **File:** `backend/config.py`
 
-Simple config class reading from environment variables with sensible dev defaults. The `DATABASE_URL` default is `postgresql://postgres:postgres@localhost:5432/sipsetu`.
+Typed settings class (pydantic-settings) reading from environment variables with sensible dev defaults. The `DATABASE_URL` default is `postgresql://postgres:postgres@localhost:5432/sipsetu`.
 
 ### 5.2 Database Models
 
@@ -383,7 +488,7 @@ All routes are registered under the `api` Blueprint with prefix `/api`. The file
 | POST | `/auth/register` | — | Register user, sends verification OTP |
 | POST | `/auth/login` | — | Authenticate, returns JWT |
 | POST | `/auth/logout` | — | Placeholder (stateless) |
-| POST | `/auth/me` | `@require_auth` | Current user profile |
+| GET | `/auth/me` | `@require_auth` | Current user profile |
 | POST | `/auth/verify-email` | — | Verify email with OTP (6-digit) |
 | POST | `/auth/resend-verification` | `@require_auth` | Resend verification OTP |
 | POST | `/auth/forgot-password` | — | Send password reset OTP |
@@ -427,6 +532,7 @@ All routes are registered under the `api` Blueprint with prefix `/api`. The file
 | GET | `/applicants/<id>/saved-jobs` | Ownership | Saved jobs with scores |
 | GET | `/applicants/<id>/saved-job-ids` | Ownership | Just IDs (for bookmark state) |
 | GET | `/applicants/<id>/skill-gap` | Ownership | Missing skills analysis |
+| PUT | `/applicants/<id>/skill-progress` | Ownership | Update tracked skill progress |
 
 #### Recruiter
 
@@ -437,6 +543,27 @@ All routes are registered under the `api` Blueprint with prefix `/api`. The file
 | GET | `/jobs/<job_id>/candidates` | Owner | Candidates for one job |
 | POST | `/recruiters/bulk-screen` | Recruiter | Upload up to 50 PDFs, score vs job |
 | PATCH | `/applications/<id>/status` | Recruiter | Update application status |
+| GET | `/jobs/<job_id>/application-status/<applicant_id>` | Owner | Application status for one job |
+
+#### Rankings
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/rankings/<id>/explain` | Owner | Feature contribution breakdown for a score |
+| PUT | `/rankings/<id>` | Recruiter | Manually adjust a candidate ranking/score |
+
+#### ML Ranking
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/ml/ranking/train` | Authenticated | Train/retrain the ML ranking model |
+| GET | `/ml/ranking/status` | Authenticated | Model availability, metrics, blend alpha |
+
+#### Applications
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| DELETE | `/applications/<id>` | Owner | Withdraw/delete an application |
 
 #### Notifications
 
@@ -452,6 +579,8 @@ All routes are registered under the `api` Blueprint with prefix `/api`. The file
 |---|---|---|---|
 | POST | `/interviews` | Recruiter | Propose interview |
 | PATCH | `/interviews/<id>/status` | Owner | Update status |
+| PATCH | `/interviews/<id>/respond` | Applicant | Accept/decline interview |
+| PATCH | `/interviews/<id>/cancel` | Owner | Cancel interview |
 | GET | `/interviews/<user_id>` | Ownership | List interviews |
 
 #### Public
@@ -555,9 +684,9 @@ The `/recruiters/bulk-screen` endpoint follows the same scoring formula (coverag
 
 ### 5.7 Rate Limiting
 
-**File:** `backend/rate_limiter.py`
+**File:** `backend/rate_limiter.py` (+ `app.py` for Flask-Limiter init)
 
-A lightweight in-memory sliding-window rate limiter implemented as a Flask decorator.
+A rate limiter that is **Redis-backed when available** (via Flask-Limiter with a sliding-window strategy) and **falls back to an in-memory store** for single-process development or when Redis is unavailable. Fail-open: if Redis connection fails, the limiter logs a warning and falls back rather than blocking requests.
 
 | Endpoint | Limit | Window | Keyed By |
 |---|---|---|---|
@@ -566,7 +695,7 @@ A lightweight in-memory sliding-window rate limiter implemented as a Flask decor
 | `POST /auth/resend-verification` | 3 | 15 minutes | User ID |
 | `POST /auth/forgot-password` | 3 | 15 minutes | Email |
 
-Returns `429 Too Many Requests` with a `retry_after` message when exceeded. The in-memory store is process-local — suitable for single-worker development but must be replaced with Redis for production.
+Returns `429 Too Many Requests` with a `retry_after` message when exceeded. A global default limit (`RATE_LIMIT_DEFAULT`, e.g. `200 per minute`) applies via Flask-Limiter in production.
 
 ### 5.8 Email Utilities
 
@@ -970,47 +1099,65 @@ All return `429 Too Many Requests`:
 { "error": "Too many requests. Please try again in 47 seconds." }
 ```
 
-**Note:** The rate limiter is in-memory (process-local). It works for the single-process dev server. For multi-worker production, replace with Redis.
+**Note:** The rate limiter is **Redis-backed** (Flask-Limiter) for multi-worker production, with an automatic **in-memory fallback** for single-process development. It fails open if Redis is unavailable.
 
 ---
 
 ## 10. Known Limitations
 
-1. **No test suite** — No automated tests exist for backend or frontend.
-2. **In-memory rate limiter** — Must be swapped to Redis for multi-worker deployments.
+1. **Partial test coverage** — 38 backend unit tests (routes_common, auth, rate limiter) and 14 frontend tests exist, but backend coverage is ~33% and integration tests are excluded from CI. Coverage thresholds: backend 30%, frontend via Vitest.
+2. **Mypy non-strict** — `mypy --strict` reports warnings and is non-blocking in CI. Full strict typing is a known debt item.
 3. **Email sending** — Falls back to console in development. Requires SMTP config for production.
-4. **Single-process backend** — Flask dev server is synchronous. For production, use Gunicorn + gevent.
-6. **No pagination on bulk screening** — The bulk screen endpoint processes all files synchronously in-memory.
-7. **Profile images** — Stored as base64/URL text in the database, not on object storage.
-8. **No file size validation** — PDF uploads have no explicit size limit beyond the server's request body limit.
+4. **Single-process default** — The dev server is synchronous; production uses Gunicorn + gevent (Dockerfile default).
+5. **Bulk screening is synchronous** — Processes all files in-memory on the request thread; Celery offload is planned.
+6. **Profile images** — Stored as base64/URL text in the database, not on object storage.
+7. **File upload size validation** — Size/MIME/extension checks exist (`validation.py`), but no virus scanning (ClamAV).
+8. **Redis hard dependency for production features** — Rate limiting, Celery, and health checks degrade gracefully to dev fallbacks, but require Redis for production behavior.
 
 ---
 
 ## 11. Future Roadmap
 
-### Short-term (1–3 months)
+### Done (Phase 1 — Foundation & Phase 2 — Hardening)
 
-- [ ] **Docker Compose** — One-command setup with `docker compose up`
-- [ ] **Alembic migrations** — Versioned schema changes instead of raw SQL
-- [ ] **Test suite** — pytest for backend, Vitest + Playwright for frontend
-- [ ] **CI pipeline** — GitHub Actions for lint, typecheck, test, build
+- [x] **Docker Compose** — One-command `docker compose up` (Postgres, Redis, backend, frontend; production profile with Nginx + gunicorn + celery)
+- [x] **Alembic migrations** — Versioned schema migrations (`backend/migrations/`)
+- [x] **Test suite** — pytest (backend, 38 unit tests) + Vitest/RTL (frontend, 14 tests)
+- [x] **CI pipeline** — GitHub Actions for lint, typecheck, test, build, Docker (path-filtered `backend-ci.yml` / `frontend-ci.yml`)
+- [x] **Redis-backed rate limiting** — Flask-Limiter with in-memory fallback
+- [x] **Production WSGI server** — Gunicorn + gevent
+- [x] **Object storage abstraction** — Local / S3 / MinIO via `utils/storage.py`
+- [x] **Request validation** — Pydantic schemas, file upload hardening
+- [x] **Security headers** — Flask-Talisman (CSP, HSTS) in production
+- [x] **Background jobs** — Celery worker/beat for email, ML retraining, reminders
+- [x] **Structured logging** — JSON logs, request-ID middleware
+
+### Short-term (next — Observability & Operations)
+
+- [ ] **Prometheus metrics** — Wire `prometheus-flask-exporter` `/metrics` endpoint
+- [ ] **Error tracking** — Sentry (backend + frontend) with source maps
+- [ ] **Email templates** — Jinja2 templates for verification/reset emails
+- [ ] **Dependency scanning in CI** — `pip-audit` + `npm audit` (non-blocking)
+- [ ] **Migration drift check** — `alembic check` in CI
+- [ ] **Codecov badge** — Upload + display coverage badge
+- [ ] **Coverage raise** — Push backend coverage from ~33% toward 50%+
 
 ### Medium-term (3–6 months)
 
-- [ ] **Redis-backed rate limiter** — Replace in-memory store
-- [ ] **Production WSGI server** — Gunicorn + gevent for concurrency
-- [ ] **Object storage for resumes** — S3/MinIO instead of DB text
-- [ ] **Recruiter feedback loop** — Allow recruiters to accept/reject ranks
-- [ ] **Email template system** — Move HTML emails to templates
+- [ ] **API versioning** — `/api/v1/` with deprecation policy
+- [ ] **OpenAPI/Swagger docs** — Auto-generated from routes
+- [ ] **Cursor pagination** — Replace offset/limit for large datasets
+- [ ] **Real-time notifications** — WebSocket / SSE with Redis pub/sub
 - [ ] **Admin dashboard** — User management, job moderation, analytics
 
 ### Long-term (6–12 months)
 
-- [ ] **Resume parsing improvements** — Use NLP (spaCy, LLM) instead of keyword matching
-- [ ] **Real-time notifications** — WebSocket for live updates
+- [ ] **Resume parsing improvements** — NLP / LLM-based extraction (structured JSON)
+- [ ] **Semantic search** — Vector embeddings (pgvector) for matching
 - [ ] **Multi-language support** — i18n for international users
-- [ ] **Calendar integration** — Google/Outlook calendar sync for interviews
-- [ ] **Performance optimization** — Database indexing audit, query profiling, CDN for static assets
+- [ ] **Calendar integration** — Google/Outlook sync for interviews
+- [ ] **Multi-tenancy / organizations** — Recruiter teams, role-based access
+- [ ] **Performance optimization** — Index audit, connection pooling, CDN
 
 ---
 
