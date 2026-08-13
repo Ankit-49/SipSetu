@@ -6,7 +6,10 @@ from functools import wraps
 from typing import Any
 
 from flask import g, jsonify, request
-from pydantic import ValidationError
+from pydantic import ValidationError as PydanticValidationError
+
+# pydantic's ValidationError is aliased above so the custom ValidationError
+# class defined below doesn't shadow it in the decorators' except clauses.
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +26,7 @@ def validate_json(schema_class: type[Any]) -> Callable:
                 data = request.get_json()
                 validated = schema_class(**data)
                 g.validated_data = validated
-            except ValidationError as e:
+            except PydanticValidationError as e:
                 errors = []
                 for error in e.errors():
                     field = ".".join(str(loc) for loc in error["loc"])
@@ -60,7 +63,7 @@ def validate_query(schema_class: type[Any]) -> Callable:
                 
                 validated = schema_class(**query_dict)
                 g.validated_query = validated
-            except ValidationError as e:
+            except PydanticValidationError as e:
                 errors = []
                 for error in e.errors():
                     field = ".".join(str(loc) for loc in error["loc"])
