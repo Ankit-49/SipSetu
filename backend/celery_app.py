@@ -3,13 +3,7 @@
 from celery import Celery
 from celery.schedules import crontab
 
-# Import create_app to create Flask app context
-from app import create_app
 from config import settings
-
-# Create Flask app context for Celery
-flask_app = create_app()
-flask_app = create_app()
 
 celery_app = Celery(
     "sipsetu",
@@ -19,6 +13,7 @@ celery_app = Celery(
         "tasks.email_tasks",
         "tasks.ml_tasks",
         "tasks.reminder_tasks",
+        "tasks.bulk_screen_tasks",
     ],
 )
 
@@ -35,6 +30,9 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=100,
     result_expires=3600,
+    # Fail fast when the broker is unreachable so the API can fall back to
+    # processing inline instead of blocking the request thread.
+    broker_connection_timeout=3,
     beat_schedule={
         # Nightly model retraining at 3 AM UTC
         "retrain-ranking-model-nightly": {
@@ -49,11 +47,27 @@ celery_app.conf.update(
     },
 )
 
-# Flask app context for tasks
+# Flask app context for tasks. Created lazily so that importing this module
+# from the API process (e.g. to enqueue a task) does not spin up a second
+# Flask app. Only the worker actually executes tasks.
+_flask_app = None
+
+
+def get_flask_app():
+    """Return the Flask app used to wrap Celery task execution."""
+    global _flask_app
+    if _flask_app is None:
+        from app import create_app
+
+        _flask_app = create_app()
+    return _flask_app
+
+
 class FlaskTask(celery_app.Task):
     def __call__(self, *args, **kwargs):
-        with flask_app.app_context():
+        with get_flask_app().app_context():
             return self.run(*args, **kwargs)
+
 
 celery_app.Task = FlaskTask
 
