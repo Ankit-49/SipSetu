@@ -417,6 +417,7 @@ Uses SQLAlchemy ORM with **single-table inheritance** for users. There are 15 ta
 | Model | Table | Key Fields | Notes |
 |---|---|---|---|
 | `User` | `users` | user_id (UUID PK), email, name, password_hash, role, phone, location, profile_image, email_verified, created_at | Base table; `role` drives polymorphic inheritance |
+| `BulkScreenJob` | `bulk_screen_jobs` | job_id (UUID PK), recruiter_id, status (queued/running/completed/failed), total_files, processed_files, file_paths, job_title, job_skills, results, error | Async bulk resume screening (Celery); results stored as JSON text |
 | `Applicant` | `applicants` | user_id (FK → users CASCADE) | Child of User; has resumes |
 | `Recruiter` | `recruiters` | user_id (FK → users CASCADE), company, job_title | Child of User; has jobs |
 | `Skill` | `skills` | skill_id (UUID PK), skill_name (unique) | Shared vocabulary across jobs and resumes |
@@ -565,7 +566,8 @@ All routes are registered under the `api` Blueprint with prefix `/api`. The file
 | GET | `/recruiters/<id>/dashboard` | Ownership | Stats, top candidates, interviews |
 | GET | `/recruiters/<id>/candidates` | Ownership | All candidates across jobs |
 | GET | `/jobs/<job_id>/candidates` | Owner | Candidates for one job |
-| POST | `/recruiters/bulk-screen` | Recruiter | Upload up to 50 PDFs, score vs job |
+| POST | `/recruiters/bulk-screen` | Recruiter | Upload up to 50 PDFs, score vs job (queues a Celery job) |
+| GET | `/recruiters/bulk-screen/<job_id>` | Owner | Poll bulk-screen job status/progress/results |
 | PATCH | `/applications/<id>/status` | Recruiter | Update application status |
 | GET | `/jobs/<job_id>/application-status/<applicant_id>` | Owner | Application status for one job |
 
@@ -1139,7 +1141,7 @@ All return `429 Too Many Requests`:
 2. **Mypy non-strict** — `mypy --strict` reports warnings and is non-blocking in CI. Full strict typing is a known debt item.
 3. **Email sending** — Falls back to console in development. Requires SMTP config for production.
 4. **Single-process default** — The dev server is synchronous; production uses Gunicorn + gevent (Dockerfile default).
-5. **Bulk screening is synchronous** — Processes all files in-memory on the request thread; Celery offload is planned.
+5. **Bulk screening is async** — `/recruiters/bulk-screen` queues a Celery job (`tasks/bulk_screen_tasks.py`) and the UI polls `GET /recruiters/bulk-screen/<job_id>`. Falls back to synchronous processing when no broker is configured.
 6. **Profile images** — Stored as base64/URL text in the database, not on object storage.
 7. **File upload size validation** — Size/MIME/extension checks exist (`validation.py`), but no virus scanning (ClamAV).
 8. **Redis hard dependency for production features** — Rate limiting, Celery, and health checks degrade gracefully to dev fallbacks, but require Redis for production behavior.

@@ -122,9 +122,9 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 - [ ] **Response envelope** — `{ data: [], meta: { pagination, totals } }`
 
 ### 4.3 Background Job Infrastructure
-- [ ] **Celery + Redis** — Move bulk screening, email sending, ML training off request thread
-- [ ] **Task priorities** — High (email), Low (retrain)
-- [ ] **Retry/backoff** — Exponential with dead-letter queue
+- [x] **Celery + Redis** — Bulk screening moved off the request thread (`tasks/bulk_screen_tasks.py` + `GET /recruiters/bulk-screen/<job_id>` status endpoint; sync fallback without a broker). Email tasks (`tasks/email_tasks.py`) and ML retraining (`tasks/ml_tasks.py`) were already queued.
+- [ ] **Task priorities** — High (email), Low (retrain) via `task_routes` queues
+- [x] **Retry/backoff** — Exponential backoff on email and bulk-screen tasks (`self.retry(countdown=60 * 2**retries)`); dead-letter queue pending
 - [ ] **Flower monitoring** — Celery dashboard
 
 ### 4.4 Database Optimization
