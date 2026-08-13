@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 
 from models import Job, JobApplication, Ranking, Resume, db
@@ -274,6 +275,117 @@ def create_rankings_for_resume(resume_id, applicant_id):
             db.session.delete(r)
 
     db.session.commit()
+
+
+def screen_resume_file(
+    file_bytes: bytes,
+    filename: str,
+    job_skills_list: list,
+    job_title: str = "",
+    job_desc: str = "",
+    target_experience_years: float | None = None,
+    job_experience_level: str | None = None,
+):
+    """Score a single resume PDF against a target profile (0-100).
+
+    Shared by the bulk-screen endpoint's synchronous fallback and the
+    Celery worker task (Phase 4.3), so both produce identical per-file
+    results: skills coverage (70%), experience fit (15%), TF-IDF content
+    similarity (15%), plus an optional ML explanation.
+    """
+    import fitz
+
+    if not filename.lower().endswith(".pdf"):
+        return {
+            "filename": filename, "candidate_name": filename,
+            "match_score": 0.0, "error": "Only PDF files are supported",
+        }
+
+    try:
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        text = "".join(page.get_text() for page in doc).strip()
+        doc.close()
+    except Exception as e:
+        return {
+            "filename": filename, "candidate_name": filename,
+            "match_score": 0.0, "error": f"Error parsing PDF: {e!s}",
+        }
+
+    if not text:
+        return {
+            "filename": filename, "candidate_name": filename,
+            "match_score": 0.0, "error": "The PDF file has no readable text",
+        }
+
+    base_name, _ = os.path.splitext(filename)
+    cleaned_name = base_name.replace("_", " ").replace("-", " ")
+    words = cleaned_name.split()
+    cleaned_words = [
+        w for w in words if w.lower()
+        not in {"resume", "cv", "final", "pdf", "job", "application",
+                "2026", "2025", "2024", "updated"}
+    ]
+    candidate_name = " ".join(cleaned_words).title() if cleaned_words else cleaned_name.title()
+
+    resume_skills = extract_skills_from_text(text)
+    skills_score = calculate_match_score(resume_skills, job_skills_list)
+    experience_years = extract_experience_years(text)
+    experience_score = calculate_experience_score(experience_years, target_experience_years)
+
+    content_score = 0.0
+    if job_desc and text:
+        try:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            from sklearn.metrics.pairwise import cosine_similarity
+
+            v = TfidfVectorizer(stop_words="english")
+            tfidf = v.fit_transform([job_desc, text])
+            content_score = float(cosine_similarity(tfidf[0:1], tfidf[1:2])[0][0]) * 100
+        except Exception:
+            pass
+
+    combined = 100.0 if (skills_score == 100.0 and experience_score >= 100.0) else \
+        min(round((skills_score * 0.70) + (experience_score * 0.15) + (content_score * 0.15), 2), 99.99)
+
+    # Per-candidate "why this score" explanation (best-effort; the UI falls
+    # back to the heuristic sub-scores when no model is trained).
+    explanation = None
+    try:
+        from ranking_ml import explain_bulk_resume
+
+        explanation = explain_bulk_resume(
+            raw_text=text,
+            resume_skills=resume_skills,
+            job_title=job_title,
+            job_skills=job_skills_list,
+            job_description=job_desc,
+            job_experience_level=job_experience_level,
+        )
+    except Exception:
+        pass
+
+    return {
+        "filename": filename, "candidate_name": candidate_name,
+        "match_score": combined, "skills_score": round(skills_score, 2),
+        "experience_years": experience_years, "experience_score": round(experience_score, 2),
+        "content_score": round(content_score, 2), "extracted_skills": resume_skills,
+        "matched_skills": list(set(resume_skills) & set(job_skills_list)),
+        "missing_skills": list(set(job_skills_list) - set(resume_skills)),
+        "text_snippet": text[:250] + "..." if len(text) > 250 else text,
+        "raw_text": text,
+        "explanation": explanation,
+    }
+
+
+def bulk_screen_job_dir(job_id) -> str:
+    """Temp directory holding the uploaded PDFs for a bulk screening job.
+
+    Shared by the API route (writes the files) and the Celery worker task
+    (reads them back), so they must agree on the location.
+    """
+    from config import settings
+
+    return os.path.join(settings.BULK_SCREEN_TMP_DIR, str(job_id))
 
 
 def format_job(job):
