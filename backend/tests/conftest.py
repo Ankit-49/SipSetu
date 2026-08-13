@@ -65,7 +65,11 @@ def db_session(app):
 @pytest.fixture
 def test_user(db_session):
     """Create a test applicant user."""
-    user = User(
+    # Construct the polymorphic subclass directly so the flush writes one
+    # coherent users row instead of a base + subclass double-insert that
+    # violates NOT NULL constraints on the base columns. The yield-based
+    # teardown deletes the row so the fixed email is reusable across tests.
+    applicant = Applicant(
         user_id=uuid4(),
         email="test@example.com",
         name="Test User",
@@ -73,31 +77,31 @@ def test_user(db_session):
         role="applicant",
         email_verified=True,
     )
-    db_session.add(user)
-
-    applicant = Applicant(user_id=user.user_id)
     db_session.add(applicant)
     db_session.commit()
-    return user
+    yield applicant
+    db_session.delete(applicant)
+    db_session.commit()
 
 
 @pytest.fixture
 def test_recruiter(db_session):
     """Create a test recruiter user."""
-    user = User(
+    recruiter = Recruiter(
         user_id=uuid4(),
         email="recruiter@example.com",
         name="Test Recruiter",
         password_hash=generate_password_hash("password123"),
         role="recruiter",
         email_verified=True,
+        company="Test Corp",
+        job_title="HR Manager",
     )
-    db_session.add(user)
-
-    recruiter = Recruiter(user_id=user.user_id, company="Test Corp", job_title="HR Manager")
     db_session.add(recruiter)
     db_session.commit()
-    return user
+    yield recruiter
+    db_session.delete(recruiter)
+    db_session.commit()
 
 
 @pytest.fixture
