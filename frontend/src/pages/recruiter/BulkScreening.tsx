@@ -65,6 +65,16 @@ export default function RecruiterBulkScreening() {
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Async job polling (Phase 4.3)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const simulatedProgressRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Clean up polling on unmount
+  useEffect(() => () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    if (simulatedProgressRef.current) clearInterval(simulatedProgressRef.current);
+  }, []);
+
   // Analysis / Process state
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -209,11 +219,12 @@ export default function RecruiterBulkScreening() {
       formData.append("custom_description", customDescription);
     }
 
-    // Simulate progressive load to look premium and give state feedback
-    const progressInterval = setInterval(() => {
+    // Simulated progressive load for UI feedback while the job is queued/processing
+    if (simulatedProgressRef.current) clearInterval(simulatedProgressRef.current);
+    simulatedProgressRef.current = setInterval(() => {
       setProgress(prev => {
         if (prev >= 85) {
-          clearInterval(progressInterval);
+          clearSimulatedProgress();
           return 85;
         }
         
@@ -236,31 +247,22 @@ export default function RecruiterBulkScreening() {
           "Content-Type": "multipart/form-data"
         }
       });
+      const data = response.data;
 
-      clearInterval(progressInterval);
-      setProgress(100);
-      setProgressText("Screening complete!");
-      
-      setTimeout(() => {
-        setResults(response.data.results);
-        setJobTitleResult(response.data.job_title);
-        setJobSkillsResult(response.data.job_skills);
+      if (data.job_id && data.status !== "completed") {
+        // Async path — the worker is processing; poll until it finishes.
+        pollJobStatus(data.job_id);
+      } else if (data.results) {
+        // Sync fallback (no Celery broker configured) — results are inline.
+        clearSimulatedProgress();
+        finishWithResults(data);
+      } else {
+        clearSimulatedProgress();
         setIsProcessing(false);
-        setShowResults(true);
-        
-        // Trigger celebratory confetti if we have successful high matches (>75%)
-        const topScore = response.data.results[0]?.match_score || 0;
-        if (topScore >= 70) {
-          confetti({
-            particleCount: 80,
-            spread: 60,
-            origin: { y: 0.6 }
-          });
-        }
-      }, 500);
-
+        setError(data.error || "Unexpected response from the server.");
+      }
     } catch (err: any) {
-      clearInterval(progressInterval);
+      clearSimulatedProgress();
       setIsProcessing(false);
       const errMsg = err.response?.data?.error || "Failed to screen resumes. Please make sure files are valid PDFs and the backend is running.";
       setError(errMsg);
@@ -268,7 +270,78 @@ export default function RecruiterBulkScreening() {
     }
   };
 
+  const clearSimulatedProgress = () => {
+    if (simulatedProgressRef.current) {
+      clearInterval(simulatedProgressRef.current);
+      simulatedProgressRef.current = null;
+    }
+  };
+
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  };
+
+  const finishWithResults = (data: any) => {
+    setProgress(100);
+    setProgressText("Screening complete!");
+    
+    setTimeout(() => {
+      setResults(data.results);
+      setJobTitleResult(data.job_title);
+      setJobSkillsResult(data.job_skills);
+      setIsProcessing(false);
+      setShowResults(true);
+      
+      // Trigger celebratory confetti if we have successful high matches (>=70%)
+      const topScore = data.results[0]?.match_score || 0;
+      if (topScore >= 70) {
+        confetti({
+          particleCount: 80,
+          spread: 60,
+          origin: { y: 0.6 }
+        });
+      }
+    }, 500);
+  };
+
+  const pollJobStatus = (id: string) => {
+    const poll = async () => {
+      try {
+        const resp = await api.get(`/recruiters/bulk-screen/${id}`);
+        const data = resp.data;
+
+        if (data.total_files > 0 && data.processed_files !== undefined) {
+          const real = Math.round((data.processed_files / data.total_files) * 100);
+          setProgress(prev => Math.min(99, Math.max(prev, real)));
+        }
+
+        if (data.status === "completed") {
+          stopPolling();
+          clearSimulatedProgress();
+          finishWithResults(data);
+        } else if (data.status === "failed") {
+          stopPolling();
+          clearSimulatedProgress();
+          setIsProcessing(false);
+          setError(data.error || "Screening failed on the server. Please try again.");
+        } else {
+          setProgressText(`Screening in progress (${data.processed_files ?? 0}/${data.total_files ?? 0})...`);
+        }
+      } catch (err) {
+        // Transient network error — keep polling.
+      }
+    };
+
+    poll();
+    if (!pollRef.current) pollRef.current = setInterval(poll, 1500);
+  };
+
   const handleReset = () => {
+    stopPolling();
+    clearSimulatedProgress();
     setFiles([]);
     setResults([]);
     setShowResults(false);
