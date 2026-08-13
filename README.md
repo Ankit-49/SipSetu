@@ -166,6 +166,7 @@ SipSetu/
 │   ├── retrain_scheduler.py    # Background auto-retrain daemon thread
 │   ├── reminders.py            # Interview reminder scheduler
 │   ├── logging_config.py       # JSON logging setup + request logging middleware
+│   ├── tracing.py              # Optional OpenTelemetry setup (OTEL_ENABLED=true)
 │   ├── validation.py           # File upload validation (size, MIME, extension)
 │   ├── schemas.py              # Pydantic request/response schemas
 │   ├── celery_app.py           # Celery application (broker/result backend config)
@@ -247,7 +248,14 @@ SipSetu/
 ├── migrations/
 │   └── 001_tables.sql          # Original PostgreSQL schema (baseline)
 │
-├── docker-compose.yml          # Postgres, Redis, backend, frontend, celery (prod profile)
+├── monitoring/                 # Observability stack (Phase 3)
+│   ├── prometheus/             #   prometheus.yml + alerts.yml
+│   ├── alertmanager/           #   alertmanager.yml (Slack routing)
+│   ├── grafana/                #   provisioning + dashboards/sipsetu-overview.json
+│   ├── loki/                   #   loki-config.yml (log aggregation)
+│   ├── promtail/               #   promtail-config.yml (docker log shipping)
+│   └── otel-collector/         #   OpenTelemetry collector config
+├── docker-compose.yml          # Postgres, Redis, backend, frontend, celery; observability profile
 ├── docker-compose.override.yml # Dev overrides (hot-reload, dev servers)
 ├── Readme.md                   # This file
 ├── ROADMAP.md                  # Long-term enhancement roadmap
@@ -275,7 +283,22 @@ docker compose up
 
 # Production (Nginx-served frontend + gunicorn backend + celery worker/beat)
 docker compose --profile production up
+
+# Observability stack (Prometheus, Grafana, Alertmanager, Loki, Promtail, OTel collector)
+docker compose --profile observability up
 ```
+
+With the observability profile running:
+
+| Tool | URL | Notes |
+|---|---|---|
+| Prometheus | `http://localhost:9090` | Scrapes `/metrics`, alert rules in `monitoring/prometheus/alerts.yml` |
+| Grafana | `http://localhost:3000` | Provisioned dashboard “SipSetu — Overview” (RED + business KPIs), Loki log datasource |
+| Alertmanager | `http://localhost:9093` | Slack notifications — set `SLACK_WEBHOOK_URL` first |
+| Loki | `http://localhost:3100` | Log aggregation backend (Promtail ships container logs) |
+
+Set `SLACK_WEBHOOK_URL` in your `.env` to receive alerts; set `OTEL_ENABLED=true`
+on the backend to ship OpenTelemetry traces to the bundled collector.
 
 The `docker-compose.override.yml` automatically wires development overrides
 (hot-reload servers, dev database).
@@ -590,6 +613,7 @@ All routes are registered under the `api` Blueprint with prefix `/api`. The file
 |---|---|---|---|
 | GET | `/public/preview` | — | Stats, recent jobs, top candidates |
 | GET | `/health` | — | Health check |
+| GET | `/dev/email-preview?template=verification` | — | Render an email template for review (dev only) |
 
 ### 5.6 Scoring & Ranking Pipeline
 
@@ -706,9 +730,14 @@ Sends emails via SMTP when configured in `.env`. **Falls back to printing to con
 
 | Function | Purpose |
 |---|---|
-| `send_email(to, subject, html, text)` | Generic email sender |
+| `send_email(to, subject, html, text)` | Generic email sender (renders Jinja2 templates) |
 | `send_password_reset_otp(to, otp, name)` | Password reset (6-digit code) |
 | `send_verification_otp(to, otp, name)` | Email verification (6-digit code) |
+| `send_interview_reminder(...)` | Interview reminder email |
+| `render_email(template_name, **ctx)` | Render a template to (html, text) — used by the dev preview endpoint |
+
+**Dev preview** — `GET /api/dev/email-preview?template=verification|password_reset|interview_reminder`
+renders a template in the browser for visual review (disabled in production).
 
 ---
 
@@ -1119,29 +1148,35 @@ All return `429 Too Many Requests`:
 
 ## 11. Future Roadmap
 
-### Done (Phase 1 — Foundation & Phase 2 — Hardening)
+### Done (Phase 1 — Foundation, Phase 2 — Hardening, Phase 3 — Observability)
 
-- [x] **Docker Compose** — One-command `docker compose up` (Postgres, Redis, backend, frontend; production profile with Nginx + gunicorn + celery)
+- [x] **Docker Compose** — One-command `docker compose up` (Postgres, Redis, backend, frontend; production profile with Nginx + gunicorn + celery; observability profile with Prometheus/Grafana/Alertmanager/Loki)
 - [x] **Alembic migrations** — Versioned schema migrations (`backend/migrations/`)
-- [x] **Test suite** — pytest (backend, 38 unit tests) + Vitest/RTL (frontend, 14 tests)
+- [x] **Test suite** — pytest (backend) + Vitest/RTL (frontend)
 - [x] **CI pipeline** — GitHub Actions for lint, typecheck, test, build, Docker (path-filtered `backend-ci.yml` / `frontend-ci.yml`)
 - [x] **Redis-backed rate limiting** — Flask-Limiter with in-memory fallback
 - [x] **Production WSGI server** — Gunicorn + gevent
-- [x] **Object storage abstraction** — Local / S3 / MinIO via `utils/storage.py`
-- [x] **Request validation** — Pydantic schemas, file upload hardening
+- [x] **Object storage abstraction** — Local / S3 / MinIO via `utils/storage.py` (incl. presigned upload URLs)
+- [x] **Request validation** — Pydantic schemas, file upload hardening (size/MIME/extension)
 - [x] **Security headers** — Flask-Talisman (CSP, HSTS) in production
 - [x] **Background jobs** — Celery worker/beat for email, ML retraining, reminders
-- [x] **Structured logging** — JSON logs, request-ID middleware
+- [x] **Structured logging** — JSON logs, per-module log levels, request-ID middleware (correlation IDs)
+- [x] **Prometheus metrics** — `prometheus-flask-exporter` `/metrics` endpoint + business counters (registrations, applications, emails) + DB pool/Redis gauges
+- [x] **Grafana dashboards** — Provisioned “SipSetu — Overview” (RED + business KPIs) via the observability profile
+- [x] **Alerting** — Prometheus alert rules (error rate >1%, p99 >2s, pool exhaustion, Redis down) + Alertmanager → Slack
+- [x] **Log aggregation** — Loki + Promtail (ships container logs labeled `logging=promtail`)
+- [x] **Distributed tracing** — OpenTelemetry (Flask/SQLAlchemy/requests instrumentation, 10% sampling) behind `OTEL_ENABLED=true` + bundled OTel collector
+- [x] **Error tracking** — Sentry (backend + frontend) with release tagging
+- [x] **Email templates** — Jinja2 HTML + text templates for verification/reset/reminder emails, dev preview at `/api/dev/email-preview`
+- [x] **Dependency scanning in CI** — `pip-audit` + `npm audit` (non-blocking)
+- [x] **Migration drift check** — `alembic check` in CI
+- [x] **Codecov badge** — Upload + display coverage badge
 
-### Short-term (next — Observability & Operations)
+### Pending
 
-- [ ] **Prometheus metrics** — Wire `prometheus-flask-exporter` `/metrics` endpoint
-- [ ] **Error tracking** — Sentry (backend + frontend) with source maps
-- [ ] **Email templates** — Jinja2 templates for verification/reset emails
-- [ ] **Dependency scanning in CI** — `pip-audit` + `npm audit` (non-blocking)
-- [ ] **Migration drift check** — `alembic check` in CI
-- [ ] **Codecov badge** — Upload + display coverage badge
 - [ ] **Coverage raise** — Push backend coverage from ~33% toward 50%+
+- [ ] **Virus scanning** — ClamAV for uploaded resumes (documented in Known Limitations)
+- [ ] **Streaming uploads / CDN** — Direct-to-S3 client uploads and a CDN in front of static assets
 
 ### Medium-term (3–6 months)
 

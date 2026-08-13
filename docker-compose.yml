@@ -57,6 +57,11 @@ services:
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
       SMTP_FROM: ${SMTP_FROM:-noreply@sipsetu.com}
       FLASK_ENV: development
+      OTEL_ENABLED: ${OTEL_ENABLED:-false}
+      OTEL_SERVICE_NAME: backend
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    labels:
+      - "logging=promtail"
     volumes:
       - ./backend:/app
       - backend_ml_artifacts:/app/ml_artifacts
@@ -124,6 +129,11 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
       SMTP_FROM: ${SMTP_FROM:-noreply@sipsetu.com}
+      OTEL_ENABLED: ${OTEL_ENABLED:-false}
+      OTEL_SERVICE_NAME: celery-worker
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    labels:
+      - "logging=promtail"
     volumes:
       - ./backend:/app
       - backend_ml_artifacts:/app/ml_artifacts
@@ -148,6 +158,8 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/sipsetu
       REDIS_URL: redis://redis:6379/0
+    labels:
+      - "logging=promtail"
     volumes:
       - ./backend:/app
       - backend_ml_artifacts:/app/ml_artifacts
@@ -162,10 +174,112 @@ services:
       - production
       - worker
 
+  # ------------------------------------------------------------------
+  # Observability stack (Phase 3) — enable with:
+  #   docker compose --profile observability up
+  # Configs live in ./monitoring. Grafana: http://localhost:3000
+  # Prometheus: http://localhost:9090  Alertmanager: http://localhost:9093
+  # ------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: sipsetu-prometheus
+    volumes:
+      - ./monitoring/prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+    networks:
+      - sipsetu-network
+    profiles:
+      - observability
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: sipsetu-alertmanager
+    command: --config.file=/etc/alertmanager/alertmanager.yml
+    environment:
+    volumes:
+      - ./monitoring/alertmanager:/etc/alertmanager
+    ports:
+      - "9093:9093"
+    depends_on:
+      - prometheus
+    networks:
+      - sipsetu-network
+    profiles:
+      - observability
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: sipsetu-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - sipsetu-network
+    profiles:
+      - observability
+
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: sipsetu-loki
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./monitoring/loki:/etc/loki
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - sipsetu-network
+    profiles:
+      - observability
+
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: sipsetu-promtail
+    command: -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./monitoring/promtail:/etc/promtail
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - loki
+    networks:
+      - sipsetu-network
+    profiles:
+      - observability
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.103.0
+    container_name: sipsetu-otel-collector
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./monitoring/otel-collector:/etc/otel
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - sipsetu-network
+    profiles:
+      - observability
+
 volumes:
   postgres_data:
   redis_data:
   backend_ml_artifacts:
+  prometheus_data:
+  grafana_data:
+  loki_data:
 
 networks:
   sipsetu-network:

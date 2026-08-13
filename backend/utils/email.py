@@ -55,11 +55,31 @@ def _smtp_config() -> dict | None:
     return None
 
 
+def _increment_email_metric(kind: str) -> None:
+    """Best-effort Prometheus business metric (no-op when metrics disabled)."""
+    try:
+        from flask import current_app, has_app_context
+
+        from metrics import increment
+
+        if has_app_context():
+            increment(
+                current_app._get_current_object(),
+                "sipsetu_emails_sent_total",
+                "Total emails sent by kind",
+                {"kind": kind},
+            )
+    except Exception:
+        # Metrics must never break email delivery.
+        pass
+
+
 def send_email(
     to: str,
     subject: str,
     html_body: str,
     text_body: str | None = None,
+    kind: str = "generic",
 ) -> bool:
     """Send an email. Falls back to console logging in development."""
     config = _smtp_config()
@@ -72,6 +92,7 @@ def send_email(
         print(f"   BODY:\n{html_body}", file=sys.stderr)
         print("=" * 60 + "\n", file=sys.stderr)
         sys.stderr.flush()
+        _increment_email_metric(kind)
         return True
 
     msg = EmailMessage()
@@ -89,6 +110,7 @@ def send_email(
                 server.login(config["user"], config["password"])
             server.send_message(msg)
         logger.info(f"Email sent to {to}: {subject}")
+        _increment_email_metric(kind)
         return True
     except Exception as e:
         logger.error(f"Failed to send email to {to}: {e}")
@@ -99,14 +121,14 @@ def send_password_reset_otp(to: str, otp: str, name: str = "User") -> bool:
     """Send a password reset email with a 6-digit OTP code."""
     subject = "Your SipSetu password reset code"
     html, text = render_email("password_reset", otp=otp, name=name)
-    return send_email(to, subject, html, text)
+    return send_email(to, subject, html, text, kind="password_reset")
 
 
 def send_verification_otp(to: str, otp: str, name: str = "User") -> bool:
     """Send an email verification OTP code."""
     subject = "Your SipSetu email verification code"
     html, text = render_email("verification", otp=otp, name=name)
-    return send_email(to, subject, html, text)
+    return send_email(to, subject, html, text, kind="verification")
 
 
 def send_interview_reminder(
@@ -168,4 +190,4 @@ def send_interview_reminder(
         when=when,
         duration_minutes=duration_minutes,
     )
-    return send_email(to, subject, html, text)
+    return send_email(to, subject, html, text, kind="interview_reminder")

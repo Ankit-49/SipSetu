@@ -63,7 +63,12 @@ def create_app():
     # Configure logging first
     setup_logging(app)
     log_request_middleware(app)
-    
+
+    # Distributed tracing (OpenTelemetry) — no-op unless OTEL_ENABLED=true.
+    # tracing.setup_tracing() handles missing packages internally.
+    from tracing import setup_tracing
+    setup_tracing(app)
+
     # Configure CORS with explicit origins
     frontend_url = settings.FRONTEND_URL
     CORS(app, origins=[frontend_url], supports_credentials=True)
@@ -175,22 +180,44 @@ def create_app():
         try:
             db.session.execute(db.text("SELECT 1"))
             health["checks"]["database"] = "ok"
+            try:
+                from metrics import gauge_set
+                pool = db.engine.pool
+                checkedout = getattr(pool, "checkedout", None)
+                overflow = getattr(pool, "overflow", None)
+                size = getattr(pool, "size", None)
+                # QueuePool (Postgres) exposes these; StaticPool (sqlite tests) does not.
+                if checkedout is not None:
+                    gauge_set(app, "sipsetu_db_pool_checkedout", "SQLAlchemy pool connections checked out", checkedout())
+                if overflow is not None:
+                    gauge_set(app, "sipsetu_db_pool_overflow", "SQLAlchemy pool overflow connections", overflow())
+                if size is not None:
+                    gauge_set(app, "sipsetu_db_pool_size", "SQLAlchemy pool configured size", size())
+            except Exception as pool_err:
+                app.logger.warning(f"Failed to report DB pool metrics: {pool_err}")
         except Exception as e:
             health["checks"]["database"] = f"failed: {str(e)[:100]}"
             health["status"] = "degraded"
         
         # Redis check (if configured)
         redis_url = settings.REDIS_URL
+        redis_up = 0.0
         if redis_url and HAS_REDIS:
             try:
                 r = redis.from_url(redis_url, socket_connect_timeout=2, socket_timeout=2)
                 r.ping()
                 health["checks"]["redis"] = "ok"
+                redis_up = 1.0
             except Exception as e:
                 health["checks"]["redis"] = f"failed: {str(e)[:100]}"
                 health["status"] = "degraded"
         else:
             health["checks"]["redis"] = "not configured"
+        try:
+            from metrics import gauge_set
+            gauge_set(app, "sipsetu_redis_up", "Redis reachability (1 = up, 0 = down)", redis_up)
+        except Exception as gauge_err:
+            app.logger.warning(f"Failed to report Redis metric: {gauge_err}")
         
         status_code = 200 if health["status"] == "healthy" else 503
         return jsonify(health), status_code

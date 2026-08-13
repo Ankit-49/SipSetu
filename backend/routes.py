@@ -12,6 +12,7 @@ from sqlalchemy import func, or_
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from auth_middleware import create_token, require_auth, require_role
+from config import settings
 from models import (
     Applicant,
     EmailVerificationToken,
@@ -49,7 +50,11 @@ from routes_common import (
     format_candidate_preview,
     format_job,
 )
-from utils.email import send_password_reset_otp, send_verification_otp
+from utils.email import (
+    render_email,
+    send_password_reset_otp,
+    send_verification_otp,
+)
 from utils.storage import get_storage
 
 api = Blueprint('api', __name__)
@@ -2230,3 +2235,58 @@ def get_application_status(job_id, applicant_id):
         "application_id": str(application.application_id),
         "status": application.status,
     }), 200
+
+
+# ============ DEV ROUTES (disabled in production) ============
+
+
+@api.route('/dev/email-preview', methods=['GET'])
+def dev_email_preview():
+    """Render an email template in the browser for visual review (dev only).
+
+    Query param ``template`` selects which template to preview:
+    ``verification`` (default), ``password_reset``, or ``interview_reminder``.
+    Returns the rendered HTML email wrapped in a small preview frame plus
+    the plain-text fallback body.
+    """
+    if settings.ENVIRONMENT == 'production':
+        return jsonify({"error": "Not available in production"}), 404
+
+    template = request.args.get('template', 'verification')
+    contexts = {
+        'verification': {'otp': '482931', 'name': 'Jane Doe'},
+        'password_reset': {'otp': '729104', 'name': 'Jane Doe'},
+        'interview_reminder': {
+            'greeting': (
+                'Hi Jane, this is a friendly reminder about your upcoming interview for '
+                '<strong>Senior Frontend Developer</strong> at <strong>Acme Corp</strong>.'
+            ),
+            'schedule_line': (
+                'The interview is scheduled for <strong>Monday, August 17 at 10:00 AM</strong> '
+                'and should last about 60 minutes. Your interviewer is Alex Smith.'
+            ),
+            'cta': 'Prepare your questions and make sure you can join from a quiet, well-lit space.',
+            'meeting_link': 'https://meet.example.com/sipsetu-demo',
+            'time_label': 'tomorrow',
+            'job_title': 'Senior Frontend Developer',
+            'when': 'Monday, August 17 at 10:00 AM',
+            'duration_minutes': 60,
+        },
+    }
+    if template not in contexts:
+        return jsonify({
+            "error": f"Unknown template '{template}'. Choose from: {', '.join(sorted(contexts))}"
+        }), 400
+
+    html, text = render_email(template, **contexts[template])
+    preview = (
+        '<h2 style="font-family: sans-serif">'
+        f'SipSetu email preview — <code>{template}.html.j2</code></h2>'
+        '<h3 style="font-family: sans-serif; color: #64748b">Plain-text fallback</h3>'
+        '<pre style="font-family: monospace; background: #f1f5f9; padding: 12px; '
+        'border-radius: 8px; max-width: 560px; white-space: pre-wrap">'
+        f'{text}</pre>'
+        '<hr style="max-width: 560px">'
+        f'{html}'
+    )
+    return preview, 200, {'Content-Type': 'text/html'}

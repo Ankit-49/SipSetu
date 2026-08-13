@@ -12,6 +12,7 @@ backend/ml_artifacts/
 .coverage.*
 coverage.xml
 htmlcov/
+frontend/coverage/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

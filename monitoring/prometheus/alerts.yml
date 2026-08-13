@@ -1,0 +1,71 @@
+# Prometheus alert rules for SipSetu (Phase 3.2).
+#
+# Targets defined by the roadmap:
+#   - Error rate > 1%            -> HighErrorRate
+#   - Latency p99 > 2s           -> HighLatencyP99
+#   - DB pool exhaustion         -> DatabasePoolExhausted
+#   - Dependencies down          -> BackendDown / RedisDown
+groups:
+  - name: sipsetu
+    rules:
+      - alert: BackendDown
+        expr: up{job="sipsetu-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SipSetu backend is unreachable"
+          description: "Prometheus cannot scrape the backend /metrics endpoint for more than 2 minutes."
+
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(flask_http_request_total{status=~"5.."}[5m])) by (endpoint)
+            / clamp_min(sum(rate(flask_http_request_total[5m])) by (endpoint), 0.0001)
+          > 0.01
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate on {{ $labels.endpoint }}"
+          description: "Error rate is above 1% (currently {{ $value | humanizePercentage }}) for endpoint {{ $labels.endpoint }}."
+
+      - alert: HighLatencyP99
+        expr: |
+          histogram_quantile(0.99, sum(rate(flask_http_request_duration_seconds_bucket[5m])) by (le, endpoint))
+          > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p99 latency above 2s on {{ $labels.endpoint }}"
+          description: "p99 latency for {{ $labels.endpoint }} is {{ $value }}s, above the 2s SLO."
+
+      - alert: High4xxRate
+        expr: |
+          sum(rate(flask_http_request_total{status=~"4.."}[5m])) by (endpoint)
+            / clamp_min(sum(rate(flask_http_request_total[5m])) by (endpoint), 0.0001)
+          > 0.10
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elevated 4xx rate on {{ $labels.endpoint }}"
+          description: "4xx responses exceed 10% (currently {{ $value | humanizePercentage }}) for {{ $labels.endpoint }}."
+
+      - alert: DatabasePoolExhausted
+        expr: sipsetu_db_pool_checkedout >= sipsetu_db_pool_size * 0.9
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection pool near exhaustion"
+          description: "SQLAlchemy pool has {{ $value }} connections checked out (>= 90% of configured size)."
+
+      - alert: RedisDown
+        expr: sipsetu_redis_up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is unreachable"
+          description: "The /api/health check reports Redis down; rate limiting and Celery will degrade to fallbacks."

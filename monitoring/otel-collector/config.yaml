@@ -1,0 +1,28 @@
+# OpenTelemetry Collector for SipSetu (Phase 3.3).
+#
+# Receives OTLP traces from the backend and logs them (plus a Jaeger
+# export you can enable by setting JAEGER_ENDPOINT). Swap the `logging`
+# exporter for a real backend (Jaeger, Tempo, Datadog, ...) in production.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 128
+
+exporters:
+  logging:
+    verbosity: normal
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [logging]

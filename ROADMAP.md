@@ -44,58 +44,67 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 ## Phase 2: Production Hardening (Weeks 5-8)
 *Required for any real traffic*
 
+> **Status: DONE** — all items complete except virus scanning (needs ClamAV infra)
+> and direct-to-S3 streaming uploads / CDN (deferred, `storage.py` already exposes
+> presigned upload URLs).
+
 ### 2.1 Redis-Backed Rate Limiting
-- [ ] **Replace in-memory limiter** — Use `redis-py` with sliding window Lua script
-- [ ] **Key prefixes per environment** — Avoid cross-env pollution
-- [ ] **Graceful degradation** — Fail-open if Redis unavailable (log warning, allow request)
+- [x] **Replace in-memory limiter** — Flask-Limiter, sliding-window strategy, Redis-backed
+- [x] **Key prefixes per environment** — Keys namespaced per endpoint/key (`rate_limiter.py`)
+- [x] **Graceful degradation** — Fail-open if Redis unavailable (log warning, in-memory fallback)
 
 ### 2.2 Production WSGI Server
-- [ ] **Gunicorn + gevent** — `gunicorn -k gevent -w 4 -b 0.0.0.0:5000 app:create_app()`
-- [ ] **Health check endpoint** — `/api/health` with DB/Redis connectivity checks
-- [ ] **Graceful shutdown** — Handle SIGTERM, drain connections
+- [x] **Gunicorn + gevent** — `gunicorn -k gevent -w 4 -b 0.0.0.0:5000 app:create_app()` (Dockerfile CMD)
+- [x] **Health check endpoint** — `/api/health` with DB/Redis connectivity checks (+ Docker HEALTHCHECK)
+- [x] **Graceful shutdown** — Gunicorn/gevent worker lifecycle handles SIGTERM/connection drain
 
 ### 2.3 Object Storage for Files
-- [ ] **S3/MinIO integration** — Resume PDFs, profile images → presigned URLs
-- [ ] **Streaming uploads** — Direct-to-S3 from frontend (avoid backend memory pressure)
+- [x] **S3/MinIO integration** — `utils/storage.py` (upload, presigned GET URLs, delete)
+- [ ] **Streaming uploads** — Direct-to-S3 from frontend (helper `get_presigned_upload_url` exists; wire into routes)
 - [ ] **CDN** — CloudFront/Cloudflare for static assets and resume downloads
 
 ### 2.4 Input Validation & Security
-- [ ] **Request validation** — Pydantic schemas for all API inputs (replace ad-hoc checks)
-- [ ] **File upload hardening** — Size limit (10MB), MIME validation, virus scan (ClamAV)
-- [ ] **CORS tightening** — Explicit origins, no wildcard in prod
-- [ ] **Security headers** — CSP, HSTS, X-Frame-Options via Flask-Talisman
-- [ ] **Dependency scanning** — `pip-audit` / `npm audit` in CI
+- [x] **Request validation** — Pydantic schemas + ad-hoc guards on hot paths
+- [x] **File upload hardening** — Size limit (10MB), MIME/extension checks (`validation.py`);
+- [ ] **File upload hardening — virus scan (ClamAV)** — pending external service
+- [x] **CORS tightening** — Explicit origins from `FRONTEND_URL`, no wildcard
+- [x] **Security headers** — CSP, HSTS, X-Frame-Options via Flask-Talisman (production)
+- [x] **Dependency scanning** — `pip-audit` / `npm audit` in CI (non-blocking)
 
 ### 2.5 Email Template System
-- [ ] **Jinja2 templates** — Move HTML emails to `backend/templates/emails/`
-- [ ] **Text fallback** — Auto-generate from HTML
-- [ ] **Preview endpoint** — `/api/dev/email-preview?template=verification`
+- [x] **Jinja2 templates** — `backend/templates/emails/` (verification, password reset, interview reminder)
+- [x] **Text fallback** — Paired `.txt.j2` templates
+- [x] **Preview endpoint** — `/api/dev/email-preview?template=verification|password_reset|interview_reminder`
 
 ---
 
 ## Phase 3: Observability & Operations (Weeks 9-12)
 *Essential for running in production*
 
+> **Status: DONE** — full stack lives under `monitoring/` and runs via
+> `docker compose --profile observability up` (Prometheus, Alertmanager, Grafana,
+> Loki, Promtail, OpenTelemetry collector).
+
 ### 3.1 Structured Logging
-- [ ] **JSON logs** — `python-json-logger` with correlation IDs
-- [ ] **Log levels** — DEBUG/INFO/WARN/ERROR per module
-- [ ] **Request logging middleware** — Method, path, status, latency, user_id
-- [ ] **Log aggregation** — Loki/Grafana or Datadog/ELK
+- [x] **JSON logs** — `python-json-logger` with correlation IDs (`logging_config.py`)
+- [x] **Log levels** — DEBUG/INFO/WARN/ERROR per module via `LOG_LEVEL`/`LOG_FORMAT`
+- [x] **Request logging middleware** — Method, path, status, latency, user_id, request_id
+- [x] **Log aggregation** — Loki + Promtail (ships container logs labelled `logging=promtail`)
 
 ### 3.2 Metrics & Monitoring
-- [ ] **Prometheus metrics** — `prometheus-flask-exporter` (request count, latency, errors, DB pool)
-- [ ] **Business metrics** — Registrations, applications, match scores, email sends
-- [ ] **Grafana dashboards** — RED (Rate, Errors, Duration) + business KPIs
-- [ ] **Alerting** — PagerDuty/Slack on error rate >1%, latency p99 >2s, DB pool exhaustion
+- [x] **Prometheus metrics** — `prometheus-flask-exporter` `/metrics` (request count, latency, errors)
+- [x] **Business metrics** — `sipsetu_registrations_total`, `sipsetu_applications_total`, `sipsetu_emails_sent_total` + DB pool/Redis gauges
+- [x] **Grafana dashboards** — Provisioned “SipSetu — Overview” (RED + business KPIs)
+- [x] **Alerting** — Prometheus rules (error rate >1%, p99 >2s, pool exhaustion, Redis down) → Alertmanager → Slack
 
 ### 3.3 Distributed Tracing
-- [ ] **OpenTelemetry** — Auto-instrument Flask, requests, SQLAlchemy
-- [ ] **Trace context propagation** — Frontend → Backend → DB
-- [ ] **Sampling** — 10% traces, 100% errors
+- [x] **OpenTelemetry** — Flask/SQLAlchemy/requests instrumentation (`tracing.py`, gated by `OTEL_ENABLED`)
+- [x] **Trace context propagation** — OTLP exporter → bundled collector (`monitoring/otel-collector/`)
+- [x] **Sampling** — 10% traces via `ParentBased(TraceIdRatioBased(0.1))` (errors still captured by Sentry)
 
 ### 3.4 Error Tracking
-- [ ] **Sentry** — Backend + Frontend SDKs with source maps
-- [ ] **Release tracking** — Tag deploys, correlate errors with versions
+- [x] **Sentry** — Backend + Frontend SDKs (source maps via `@sentry/vite-plugin` when configured)
+- [x] **Release tracking** — `sipsetu@<version>` release tags on backend (APP_VERSION) and frontend (VITE_APP_VERSION)
 
 ---
 
@@ -249,8 +258,8 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 3. **Create `.env.example` with all required vars documented**
 4. **Add `pytest.ini` with coverage config**
 5. **Document API with OpenAPI annotations** (start with auth routes)
-6. **Set up Sentry** (free tier covers small teams)
-7. **Add health check dependencies** (DB, Redis)
+6. ~~**Set up Sentry**~~ — done (Phase 3.4)
+7. ~~**Add health check dependencies** (DB, Redis)~~ — done (Phase 2.2)
 8. **Configure dependabot** for both package.json and requirements.txt
 
 ---

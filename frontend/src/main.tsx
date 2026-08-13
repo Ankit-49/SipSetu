@@ -9,6 +9,7 @@ if (import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({
     dsn: import.meta.env.VITE_SENTRY_DSN,
     environment: import.meta.env.VITE_ENVIRONMENT ?? "development",
+    release: `sipsetu@${import.meta.env.VITE_APP_VERSION ?? "1.0.0"}`,
     tracesSampleRate: 0.1,
     integrations: [Sentry.browserTracingIntegration()],
   });
