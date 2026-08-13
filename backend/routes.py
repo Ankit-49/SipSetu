@@ -1,13 +1,13 @@
+import json
 import os
 import random
 import secrets
+import uuid
 from datetime import datetime, timedelta
 from functools import wraps
 
 import fitz  # PyMuPDF
 from flask import Blueprint, current_app, g, jsonify, request
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 from sqlalchemy import func, or_
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -15,6 +15,7 @@ from auth_middleware import create_token, require_auth, require_role
 from config import settings
 from models import (
     Applicant,
+    BulkScreenJob,
     EmailVerificationToken,
     Interview,
     Job,
@@ -31,15 +32,13 @@ from models import (
     db,
 )
 from ranking_ml import (
-    explain_bulk_resume,
     explain_ranking_score,
     get_ranking_model_status,
     train_ranking_model,
 )
 from rate_limiter import rate_limit
 from routes_common import (
-    calculate_experience_score,
-    calculate_match_score,
+    bulk_screen_job_dir,
     calculate_ranking_score,
     create_rankings_for_job,
     create_rankings_for_resume,
@@ -1637,15 +1636,16 @@ def bulk_screen():
     job_title = custom_title
     job_desc = custom_description
     target_experience_years = None
+    selected_job = None
 
     if job_id:
-        job = Job.query.get(job_id)
-        if not job:
+        selected_job = Job.query.get(job_id)
+        if not selected_job:
             return jsonify({"error": "Selected job posting not found"}), 404
-        job_skills_list = [s.skill_name.lower() for s in job.skills]
-        job_title = job.title
-        job_desc = f"{job.title} " + " ".join(job_skills_list)
-        target_experience_years = experience_level_to_years(job.experience_level)
+        job_skills_list = [s.skill_name.lower() for s in selected_job.skills]
+        job_title = selected_job.title
+        job_desc = f"{selected_job.title} " + " ".join(job_skills_list)
+        target_experience_years = experience_level_to_years(selected_job.experience_level)
     else:
         if custom_skills_raw:
             job_skills_list = [s.strip().lower() for s in custom_skills_raw.split(',') if s.strip()]
@@ -1658,95 +1658,107 @@ def bulk_screen():
     if not job_skills_list and not job_desc:
         return jsonify({"error": "Please select a job or provide a job description/skills"}), 400
 
-    results = []
-    for file in uploaded_files:
-        filename = file.filename
-        if not filename.lower().endswith('.pdf'):
-            results.append({
-                "filename": filename, "candidate_name": filename,
-                "match_score": 0.0, "error": "Only PDF files are supported",
-            })
-            continue
+    # Persist the job + uploaded PDFs, then queue the Celery worker task so
+    # large batches don't block the request thread (Phase 4.3).
+    screening_job = BulkScreenJob(
+        # Convert to a real uuid so the FK bind works on both Postgres and
+        # the sqlite test database (JWT subjects are stored as strings).
+        recruiter_id=uuid.UUID(str(g.current_user_id)),
+        status="queued",
+        total_files=len(uploaded_files),
+        job_title=job_title,
+        job_skills=json.dumps(job_skills_list),
+        job_desc=job_desc,
+        target_experience_years=target_experience_years,
+        job_experience_level=selected_job.experience_level if selected_job else None,
+    )
+    db.session.add(screening_job)
+    db.session.flush()
 
+    job_dir = bulk_screen_job_dir(screening_job.job_id)
+    os.makedirs(job_dir, exist_ok=True)
+    saved_files = []
+    for index, file in enumerate(uploaded_files):
+        safe_name = f"{index}_{os.path.basename(file.filename or f'resume_{index}.pdf')}"
+        path = os.path.join(job_dir, safe_name)
+        file.save(path)
+        saved_files.append({"filename": file.filename, "path": path})
+    screening_job.file_paths = json.dumps(saved_files)
+    db.session.commit()
+
+    # Enqueue the Celery task; if no broker is available (or the enqueue
+    # fails), process inline so the endpoint keeps working without Redis.
+    from tasks.bulk_screen_tasks import process_bulk_screen_job, run_bulk_screen_job
+
+    if settings.CELERY_BROKER_URL or settings.REDIS_URL:
         try:
-            file_bytes = file.read()
-            doc = fitz.open(stream=file_bytes, filetype="pdf")
-            text = "".join(page.get_text() for page in doc).strip()
-            doc.close()
-            if not text:
-                results.append({
-                    "filename": filename, "candidate_name": filename,
-                    "match_score": 0.0, "error": "The PDF file has no readable text",
-                })
-                continue
+            process_bulk_screen_job.delay(str(screening_job.job_id))
+            return jsonify({
+                "job_id": str(screening_job.job_id),
+                "status": "queued",
+                "total_files": len(uploaded_files),
+                "job_title": job_title,
+                "job_skills": job_skills_list,
+            }), 202
+        except Exception as exc:
+            current_app.logger.warning(
+                f"Celery enqueue failed ({exc}); processing bulk screen synchronously"
+            )
 
-            base_name, _ = os.path.splitext(filename)
-            cleaned_name = base_name.replace('_', ' ').replace('-', ' ')
-            words = cleaned_name.split()
-            cleaned_words = [
-                w for w in words if w.lower()
-                not in {'resume', 'cv', 'final', 'pdf', 'job', 'application',
-                        '2026', '2025', '2024', 'updated'}
-            ]
-            candidate_name = " ".join(cleaned_words).title() if cleaned_words else cleaned_name.title()
+    try:
+        run_bulk_screen_job(str(screening_job.job_id))
+    except Exception as exc:
+        try:
+            from tasks.bulk_screen_tasks import mark_bulk_screen_failed
+            mark_bulk_screen_failed(str(screening_job.job_id), exc)
+        except Exception:
+            pass
+        return jsonify({"error": f"Bulk screening failed: {exc!s}"}), 500
 
-            resume_skills = extract_skills_from_text(text)
-            skills_score = calculate_match_score(resume_skills, job_skills_list)
-            experience_years = extract_experience_years(text)
-            experience_score = calculate_experience_score(experience_years, target_experience_years)
+    return jsonify(_bulk_screen_job_payload(screening_job)), 200
 
-            content_score = 0.0
-            if job_desc and text:
-                try:
-                    v = TfidfVectorizer(stop_words='english')
-                    tfidf = v.fit_transform([job_desc, text])
-                    content_score = float(cosine_similarity(tfidf[0:1], tfidf[1:2])[0][0]) * 100
-                except Exception:
-                    pass
 
-            combined = 100.0 if (skills_score == 100.0 and experience_score >= 100.0) else \
-                min(round((skills_score * 0.70) + (experience_score * 0.15) + (content_score * 0.15), 2), 99.99)
+def _bulk_screen_job_payload(job):
+    """Serialize a BulkScreenJob for the status/results endpoints."""
+    try:
+        results = json.loads(job.results) if job.results else None
+    except (ValueError, TypeError):
+        results = None
+    try:
+        job_skills = json.loads(job.job_skills or "[]")
+    except (ValueError, TypeError):
+        job_skills = []
+    progress = round((job.processed_files / job.total_files) * 100) if job.total_files else 0
+    return {
+        "job_id": str(job.job_id),
+        "status": job.status,
+        "total_files": job.total_files,
+        "processed_files": job.processed_files,
+        "progress": progress,
+        "job_title": job.job_title or "",
+        "job_skills": job_skills,
+        "results": results,
+        "error": job.error,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "updated_at": job.updated_at.isoformat() if job.updated_at else None,
+    }
 
-            # Per-candidate "why this score" explanation (best-effort; the UI
-            # falls back to the heuristic sub-scores when no model is trained).
-            explanation = None
-            try:
-                explanation = explain_bulk_resume(
-                    raw_text=text,
-                    resume_skills=resume_skills,
-                    job_title=job_title,
-                    job_skills=job_skills_list,
-                    job_description=job_desc,
-                    job_experience_level=job.experience_level if job_id and job else None,
-                )
-            except Exception:
-                pass
 
-            results.append({
-                "filename": filename, "candidate_name": candidate_name,
-                "match_score": combined, "skills_score": round(skills_score, 2),
-                "experience_years": experience_years, "experience_score": round(experience_score, 2),
-                "content_score": round(content_score, 2), "extracted_skills": resume_skills,
-                "matched_skills": list(set(resume_skills) & set(job_skills_list)),
-                "missing_skills": list(set(job_skills_list) - set(resume_skills)),
-                "text_snippet": text[:250] + "..." if len(text) > 250 else text,
-                "raw_text": text,
-                "explanation": explanation,
-            })
-        except Exception as e:
-            results.append({
-                "filename": filename, "candidate_name": filename,
-                "match_score": 0.0, "error": f"Error parsing PDF: {e!s}",
-            })
+@api.route('/recruiters/bulk-screen/<job_id>', methods=['GET'])
+@require_auth
+def bulk_screen_status(job_id):
+    """Poll the status of a bulk screening job (recruiter who started it only)."""
+    try:
+        uuid.UUID(str(job_id))
+    except (ValueError, AttributeError, TypeError):
+        return jsonify({"error": "Bulk screen job not found"}), 404
 
-    results.sort(key=lambda x: (x.get('skills_score', 0), x.get('experience_years') or -1,
-                                 x.get('experience_score', 0), x.get('content_score', 0),
-                                 x.get('match_score', 0)), reverse=True)
-
-    return jsonify({
-        "job_title": job_title, "job_skills": job_skills_list,
-        "total_screened": len(uploaded_files), "results": results,
-    }), 200
+    job = BulkScreenJob.query.get(uuid.UUID(str(job_id)))
+    if not job:
+        return jsonify({"error": "Bulk screen job not found"}), 404
+    if str(job.recruiter_id) != g.current_user_id:
+        return jsonify({"error": "You can only view your own bulk screen jobs"}), 403
+    return jsonify(_bulk_screen_job_payload(job)), 200
 
 
 @api.route('/rankings/<ranking_id>/explain', methods=['GET'])
