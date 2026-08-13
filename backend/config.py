@@ -62,6 +62,13 @@ class Settings(BaseSettings):
     # File Upload
     MAX_FILE_SIZE_MB: int = 10
     ALLOWED_FILE_EXTENSIONS: list = ['.pdf', '.docx', '.txt']
+
+    # Bulk screening temp storage (shared with the Celery worker via the
+    # backend volume in docker-compose)
+    BULK_SCREEN_TMP_DIR: str = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        ".bulk_screen_tmp",
+    )
     
     # Monitoring
     SENTRY_DSN: str | None = os.environ.get('SENTRY_DSN')

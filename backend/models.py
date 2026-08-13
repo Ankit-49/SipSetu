@@ -186,6 +186,38 @@ class Interview(db.Model):
     recruiter = db.relationship('Recruiter', backref='interviews_as_recruiter', foreign_keys=[recruiter_id])
 
 
+class BulkScreenJob(db.Model):
+    """Asynchronous bulk resume screening job (Phase 4.3).
+
+    The POST /recruiters/bulk-screen endpoint persists the uploaded files to
+    disk, records a row here, and enqueues a Celery task; the worker updates
+    progress and stores the JSON results so the status endpoint can serve
+    them. JSON payloads live in Text columns so the model stays portable
+    across Postgres and the sqlite test database.
+    """
+    __tablename__ = 'bulk_screen_jobs'
+    job_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    recruiter_id = db.Column(UUID(as_uuid=True), db.ForeignKey('recruiters.user_id', ondelete='CASCADE'), nullable=False)
+    status = db.Column(db.String(20), default='queued', nullable=False)  # queued, running, completed, failed
+    total_files = db.Column(db.Integer, default=0, nullable=False)
+    processed_files = db.Column(db.Integer, default=0, nullable=False)
+    file_paths = db.Column(db.Text, nullable=True)   # JSON: [{filename, path}]
+    job_title = db.Column(db.String(255), nullable=True)
+    job_skills = db.Column(db.Text, nullable=True)   # JSON: [str]
+    job_desc = db.Column(db.Text, nullable=True)
+    target_experience_years = db.Column(db.Float, nullable=True)
+    job_experience_level = db.Column(db.String(50), nullable=True)
+    results = db.Column(db.Text, nullable=True)      # JSON: [per-file result]
+    error = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Cascade matches the DB-level ON DELETE CASCADE on recruiter_id.
+    recruiter = db.relationship(
+        'Recruiter', backref=db.backref('bulk_screen_jobs', cascade='all, delete-orphan')
+    )
+
+
 class Notification(db.Model):
     __tablename__ = 'notifications'
     notification_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
