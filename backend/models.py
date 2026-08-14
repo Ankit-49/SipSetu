@@ -2,9 +2,32 @@ import uuid
 from datetime import datetime
 
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID as _PgUUID
 
 db = SQLAlchemy()
+
+
+class UUID(_PgUUID):
+    """PostgreSQL UUID column that also accepts string UUIDs on bind.
+
+    Postgres casts string UUIDs natively, but character-based dialects
+    (SQLite - used by the tests and the Docker smoke test) require real
+    ``uuid.UUID`` objects and raise on strings. JWT claims and URL path
+    params arrive as strings, so accepting both keeps every route working
+    on every dialect.
+    """
+
+    def bind_processor(self, dialect):
+        processor = super().bind_processor(dialect)
+        if processor is None:
+            return None
+
+        def process(value):
+            if isinstance(value, str):
+                value = uuid.UUID(value)
+            return processor(value)
+
+        return process
 
 # Junction tables
 job_skills = db.Table('job_skills',
@@ -101,7 +124,7 @@ class JobApplication(db.Model):
         db.UniqueConstraint('job_id', 'applicant_id', name='uq_job_applicant_application'),
     )
 
-    applicant = db.relationship('Applicant', backref='job_applications')
+    applicant = db.relationship('Applicant', backref=db.backref('job_applications', cascade='all, delete-orphan'))
 
 class Ranking(db.Model):
     __tablename__ = 'rankings'
@@ -120,7 +143,9 @@ class EmailVerificationToken(db.Model):
     used = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    user = db.relationship('User', backref='email_verification_tokens')
+    # Cascade matches the DB-level ON DELETE CASCADE on user_id; without it
+    # the ORM tries to NULL the FK on delete (NOT NULL violation).
+    user = db.relationship('User', backref=db.backref('email_verification_tokens', cascade='all, delete-orphan'))
 
 
 class PasswordResetToken(db.Model):
@@ -132,7 +157,7 @@ class PasswordResetToken(db.Model):
     used = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    user = db.relationship('User', backref='password_reset_tokens')
+    user = db.relationship('User', backref=db.backref('password_reset_tokens', cascade='all, delete-orphan'))
 
 
 class SkillProgress(db.Model):
@@ -148,7 +173,7 @@ class SkillProgress(db.Model):
         db.UniqueConstraint('applicant_id', 'skill_name', name='uq_applicant_skill_progress'),
     )
 
-    applicant = db.relationship('Applicant', backref='skill_progress')
+    applicant = db.relationship('Applicant', backref=db.backref('skill_progress', cascade='all, delete-orphan'))
 
 
 class SavedJob(db.Model):
@@ -162,8 +187,8 @@ class SavedJob(db.Model):
         db.UniqueConstraint('applicant_id', 'job_id', name='uq_applicant_saved_job'),
     )
 
-    applicant = db.relationship('Applicant', backref='saved_jobs')
-    job = db.relationship('Job', backref='saved_by_applicants')
+    applicant = db.relationship('Applicant', backref=db.backref('saved_jobs', cascade='all, delete-orphan'))
+    job = db.relationship('Job', backref=db.backref('saved_by_applicants', cascade='all, delete-orphan'))
 
 
 class Interview(db.Model):
@@ -181,9 +206,9 @@ class Interview(db.Model):
     reminders_sent = db.Column(db.String(255), default="", nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    job = db.relationship('Job', backref='interviews')
-    applicant = db.relationship('Applicant', backref='interviews', foreign_keys=[applicant_id])
-    recruiter = db.relationship('Recruiter', backref='interviews_as_recruiter', foreign_keys=[recruiter_id])
+    job = db.relationship('Job', backref=db.backref('interviews', cascade='all, delete-orphan'))
+    applicant = db.relationship('Applicant', backref=db.backref('interviews', cascade='all, delete-orphan'), foreign_keys=[applicant_id])
+    recruiter = db.relationship('Recruiter', backref=db.backref('interviews_as_recruiter', cascade='all, delete-orphan'), foreign_keys=[recruiter_id])
 
 
 class BulkScreenJob(db.Model):
@@ -229,6 +254,6 @@ class Notification(db.Model):
     related_job_id = db.Column(UUID(as_uuid=True), db.ForeignKey('jobs.job_id', ondelete='SET NULL'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    user = db.relationship('User', backref='notifications')
+    user = db.relationship('User', backref=db.backref('notifications', cascade='all, delete-orphan'))
     related_job = db.relationship('Job', foreign_keys=[related_job_id])
 
