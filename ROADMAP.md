@@ -15,29 +15,33 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 ## Phase 1: Foundation & Reliability (Weeks 1-4)
 *High impact, blocks production deployment*
 
+> **Status: DONE** — containerization, Alembic migrations, test infrastructure,
+> and CI are all in place. Remaining: E2E Playwright coverage and a
+> deploy/migration workflow for staging (see "Deployment" in the summary).
+
 ### 1.1 Containerization & Local Dev Parity
-- [ ] **Docker Compose** — Single-command `docker compose up` for Postgres, Redis, Backend, Frontend
-- [ ] **Multi-stage Dockerfiles** — Optimized images (backend: Python slim, frontend: Nginx static serve)
-- [ ] **`.dockerignore`** — Exclude node_modules, venv, .git, ml_artifacts
-- [ ] **Environment parity** — Dev/staging/prod compose overrides
+- [x] **Docker Compose** — Single-command `docker compose up` for Postgres, Redis, Backend, Frontend
+- [x] **Multi-stage Dockerfiles** — Optimized images (backend: Python slim, frontend: Nginx static serve)
+- [x] **`.dockerignore`** — Exclude node_modules, venv, .git, ml_artifacts
+- [x] **Environment parity** — Dev/staging/prod compose overrides (`docker-compose.override.yml` for dev)
 
 ### 1.2 Database Migrations
-- [ ] **Alembic setup** — Replace raw SQL migrations with versioned, reversible migrations
-- [ ] **Initial migration** — Generate from current schema (`alembic revision --autogenerate`)
-- [ ] **Migration CI check** — Fail build if model/schema drift detected
+- [x] **Alembic setup** — Replace raw SQL migrations with versioned, reversible migrations
+- [x] **Initial migration** — Generate from current schema (`alembic revision --autogenerate`)
+- [x] **Migration CI check** — `alembic upgrade head` + `alembic check` in CI (currently non-blocking; flip to blocking when ready)
 
 ### 1.3 Test Infrastructure
-- [ ] **Backend: pytest + pytest-cov** — Unit tests for scoring, auth, utils; integration tests for API routes
-- [ ] **Frontend: Vitest + React Testing Library** — Component tests, hook tests, utils
+- [x] **Backend: pytest + pytest-cov** — Unit tests for scoring, auth, utils; integration tests for API routes
+- [x] **Frontend: Vitest + React Testing Library** — Component tests, hook tests, utils
 - [ ] **E2E: Playwright** — Critical flows: register→verify→login→upload resume→match jobs
-- [ ] **Test DB** — Separate test database with fixtures/factories (factory_boy)
-- [ ] **Coverage targets** — ≥80% backend, ≥70% frontend
+- [x] **Test DB** — Separate test database with fixtures/factories (factory_boy; CI Postgres service + conftest fixtures)
+- [x] **Coverage targets** — frontend ≥70% enforced in CI; backend ≥30% enforced (80% aspirational, not yet reached)
 
 ### 1.4 CI/CD Pipeline (GitHub Actions)
-- [ ] **Backend workflow** — Lint (ruff), typecheck (mypy), test, build Docker image
-- [ ] **Frontend workflow** — Lint (eslint), typecheck (tsc), test, build, upload artifacts
+- [x] **Backend workflow** — Lint (ruff), typecheck (mypy), test, build Docker image
+- [x] **Frontend workflow** — Lint (eslint), typecheck (tsc), test, build, upload artifacts
 - [ ] **Migration workflow** — Run Alembic upgrade on staging DB
-- [ ] **Dependabot** — Weekly dependency updates with auto-merge for patch
+- [x] **Dependabot** — Weekly dependency updates (grouped PRs; auto-merge not configured)
 
 ---
 
@@ -124,7 +128,8 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 ### 4.3 Background Job Infrastructure
 - [x] **Celery + Redis** — Bulk screening moved off the request thread (`tasks/bulk_screen_tasks.py` + `GET /recruiters/bulk-screen/<job_id>` status endpoint; sync fallback without a broker). Email tasks (`tasks/email_tasks.py`) and ML retraining (`tasks/ml_tasks.py`) were already queued.
 - [ ] **Task priorities** — High (email), Low (retrain) via `task_routes` queues
-- [x] **Retry/backoff** — Exponential backoff on email and bulk-screen tasks (`self.retry(countdown=60 * 2**retries)`); dead-letter queue pending
+- [x] **Retry/backoff** — Exponential backoff on email and bulk-screen tasks (`self.retry(countdown=60 * 2**retries)`)
+- [ ] **Dead-letter queue** — Failed jobs land in a DLQ for inspection/requeue
 - [ ] **Flower monitoring** — Celery dashboard
 
 ### 4.4 Database Optimization
@@ -253,14 +258,14 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 
 ## Quick Wins (Can start immediately, <1 week each)
 
-1. **Enable ruff + mypy** in pre-commit and CI
-2. **Add request ID middleware** for traceability
-3. **Create `.env.example` with all required vars documented**
-4. **Add `pytest.ini` with coverage config**
+1. **Add pre-commit hooks** for ruff + mypy (both already run in CI)
+2. ~~**Add request ID middleware** for traceability~~ — done (Phase 3.1)
+3. ~~**Create `.env.example` with all required vars documented**~~ — done
+4. ~~**Add `pytest.ini` with coverage config**~~ — done
 5. **Document API with OpenAPI annotations** (start with auth routes)
 6. ~~**Set up Sentry**~~ — done (Phase 3.4)
 7. ~~**Add health check dependencies** (DB, Redis)~~ — done (Phase 2.2)
-8. **Configure dependabot** for both package.json and requirements.txt
+8. ~~**Configure dependabot** for both package.json and requirements.txt~~ — done
 
 ---
 
