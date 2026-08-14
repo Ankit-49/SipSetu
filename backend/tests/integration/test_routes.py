@@ -1,14 +1,19 @@
 """Integration tests for API routes."""
 
+from uuid import uuid4
 
 
 class TestAuthRoutes:
     """Tests for authentication endpoints."""
 
     def test_register_applicant(self, client):
+        # Unique email so the row registered here never collides with other
+        # tests (the register endpoint commits the user and the suite shares
+        # one in-memory database).
+        email = f"newuser{uuid4().hex[:8]}@test.com"
         response = client.post("/api/auth/register", json={
             "name": "New User",
-            "email": "newuser@test.com",
+            "email": email,
             "password": "password123",
             "role": "applicant"
         })
@@ -16,18 +21,20 @@ class TestAuthRoutes:
         data = response.get_json()
         assert "token" in data
         assert data["role"] == "applicant"
-        assert data["email"] == "newuser@test.com"
+        assert data["email"] == email
 
     def test_register_recruiter(self, client):
+        email = f"newrec{uuid4().hex[:8]}@test.com"
         response = client.post("/api/auth/register", json={
             "name": "New Recruiter",
-            "email": "newrec@test.com",
+            "email": email,
             "password": "password123",
             "role": "recruiter"
         })
         assert response.status_code == 201
         data = response.get_json()
         assert data["role"] == "recruiter"
+        assert data["email"] == email
 
     def test_register_duplicate_email(self, client, test_user):
         response = client.post("/api/auth/register", json={
@@ -36,7 +43,7 @@ class TestAuthRoutes:
             "password": "password123",
             "role": "applicant"
         })
-        assert response.status_code == 400
+        assert response.status_code == 409
 
     def test_register_short_password(self, client):
         response = client.post("/api/auth/register", json={
@@ -173,9 +180,13 @@ class TestApplicationRoutes:
         assert "application_id" in data
 
     def test_apply_twice(self, client, auth_headers, test_job, test_resume):
-        client.post(f"/api/jobs/{test_job.job_id}/apply", headers=auth_headers)
+        first = client.post(f"/api/jobs/{test_job.job_id}/apply", headers=auth_headers)
+        assert first.status_code == 201
+        # Applying again is idempotent — the route returns the existing application.
         response = client.post(f"/api/jobs/{test_job.job_id}/apply", headers=auth_headers)
-        assert response.status_code == 400  # Duplicate application
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["message"] == "Job application already exists"
 
     def test_save_job(self, client, auth_headers, test_job):
         response = client.post(f"/api/jobs/{test_job.job_id}/save", headers=auth_headers)
