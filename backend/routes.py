@@ -944,9 +944,14 @@ def upload_resume_pdf():
         doc = fitz.open(stream=file_bytes, filetype="pdf")
         text = "".join(page.get_text() for page in doc).strip()
         doc.close()
-        if not text:
-            return jsonify({"error": "The PDF has no readable text"}), 400
+    except Exception as e:
+        # A corrupt/invalid PDF is a client error (400), not a server failure.
+        return jsonify({"error": f"Invalid or corrupted PDF file: {e!s}"}), 400
 
+    if not text:
+        return jsonify({"error": "The PDF has no readable text"}), 400
+
+    try:
         extracted_skills = extract_skills_from_text(text)
 
         # Upload to storage (S3/MinIO/local)
@@ -992,7 +997,7 @@ def upload_resume_pdf():
         }), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": f"Error parsing PDF: {e!s}"}), 500
+        return jsonify({"error": f"Error processing PDF: {e!s}"}), 500
 
 
 def _compute_job_match_score(resume, job):
