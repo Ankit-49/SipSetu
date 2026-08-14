@@ -27,25 +27,116 @@ def format_candidate_preview(ranking):
     }
 
 
-def extract_skills_from_text(text):
+# Seed list of commonly occurring skills. This is NOT an exhaustive
+# allow-list: extract_skills_from_text() also matches every skill already
+# recorded in the database (posted by a recruiter or provided by an
+# applicant), so a brand-new skill becomes recognizable the moment it is
+# required/posted anywhere in the system — it no longer needs to be
+# predetermined to be detected.
+PREDEFINED_SKILLS = [
+    # Languages
+    'python', 'javascript', 'typescript', 'java', 'c++', 'c#', 'golang',
+    'rust', 'php', 'ruby', 'kotlin', 'swift', 'scala', 'matlab',
+    # Web / backend / frontend
+    'react', 'angular', 'vue', 'svelte', 'next.js', 'node.js', 'express',
+    'django', 'flask', 'fastapi', 'spring boot', 'graphql', 'rest api',
+    'html', 'css', 'tailwind', 'bootstrap', 'sass', 'webpack', 'vite',
+    'figma', 'ui', 'ux',
+    # Data / databases
+    'sql', 'sqlite', 'postgresql', 'mysql', 'mongodb', 'redis',
+    'elasticsearch', 'cassandra', 'dynamodb', 'snowflake', 'bigquery',
+    'kafka', 'airflow',
+    'spark', 'hadoop', 'pandas', 'numpy', 'scikit-learn',
+    'machine learning', 'deep learning', 'nlp', 'computer vision',
+    'tensorflow', 'pytorch',
+    # Cloud / DevOps
+    'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'jenkins', 'terraform',
+    'ansible', 'prometheus', 'grafana', 'linux', 'git', 'github', 'gitlab',
+    'ci/cd',
+    # Business / soft skills
+    'excel', 'tableau', 'power bi', 'looker', 'design', 'product', 'agile',
+    'scrum', 'jira', 'communication', 'leadership', 'teamwork',
+    'problem solving', 'critical thinking',
+]
+
+# DB-recorded skills shorter than this are too ambiguous to auto-detect in
+# free text ("go", "r", "c" appear constantly in prose), so only curated
+# seed entries may be shorter.
+_MIN_AUTO_DETECT_LENGTH = 3
+
+
+# Used to find every occurrence of the word in a case-insensitive way while
+# avoiding partial matches (e.g. 'sql' inside 'sqlite', 'java' inside
+# 'javascript'). Common word suffixes are tolerated so 'design' still matches
+# 'designer'.
+_SKILL_TOKEN_RE_TEMPLATE = r"(?<![a-z0-9]){escaped}(?:s|ing|ed|er)?(?![a-z0-9])"
+
+
+def _db_known_skills():
+    """Return every skill name already recorded in the database.
+
+    Returns [] when no Flask app context is active (pure unit tests), so
+    extraction stays usable without a database.
+    """
+    try:
+        from flask import has_app_context
+
+        if not has_app_context():
+            return []
+        from models import Skill
+
+        return [s.skill_name for s in Skill.query.all()]
+    except Exception:
+        return []
+
+
+def _text_contains_skill(text_lower, skill):
+    """Case-insensitive containment with word-boundary awareness."""
+    if " " in skill:
+        # Phrases fall back to plain substring matching (handles plurals like
+        # "rest apis" and "machine learning models").
+        return skill in text_lower
+    pattern = _SKILL_TOKEN_RE_TEMPLATE.format(escaped=re.escape(skill))
+    return re.search(pattern, text_lower) is not None
+
+
+def extract_skills_from_text(text, extra_skills=None):
+    """Return the skills mentioned in ``text`` (lowercase, de-duplicated).
+
+    Matches against the curated seed list PLUS any skills already recorded
+    in the database, so a skill that was posted/required once (e.g.
+    "terraform") is recognized in every later resume, PDF, or job
+    description even though it was never in the predetermined list.
+    ``extra_skills`` adds caller-known skills to the candidate set.
+    """
     if not text:
         return []
 
     text_lower = text.lower()
-    common_skills = [
-        'python', 'javascript', 'typescript', 'java', 'c++', 'c#', 'rust', 'php', 'ruby',
-        'react', 'angular', 'vue', 'svelte', 'node.js', 'express', 'django', 'flask', 'fastapi',
-        'sql', 'postgresql', 'mysql', 'mongodb', 'redis', 'elasticsearch', 'graphql', 'rest api',
-        'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'jenkins', 'git', 'github', 'gitlab',
-        'html', 'css', 'tailwind', 'bootstrap', 'sass', 'webpack', 'vite',
-        'machine learning', 'deep learning', 'nlp', 'computer vision', 'tensorflow', 'pytorch',
-        'design', 'figma', 'ui', 'ux', 'product', 'agile', 'scrum', 'jira',
-        'communication', 'leadership', 'teamwork', 'problem solving', 'critical thinking'
-    ]
+
+    candidates = list(PREDEFINED_SKILLS)
+    seen = set(candidates)
+
+    for skill in extra_skills or []:
+        name = str(skill).strip().lower()
+        if name and name not in seen:
+            candidates.append(name)
+            seen.add(name)
+
+    for skill in _db_known_skills():
+        if skill not in seen:
+            candidates.append(skill)
+            seen.add(skill)
 
     found_skills = []
-    for skill in common_skills:
-        if skill in text_lower:
+    for skill in candidates:
+        if not skill:
+            continue
+        # The curated seed may contain short entries (ui, ux, c++, c#); DB
+        # skills that short are too ambiguous for free-text auto-detection.
+        if skill not in PREDEFINED_SKILLS and len(skill) < _MIN_AUTO_DETECT_LENGTH:
+            continue
+        if _text_contains_skill(text_lower, skill):
             found_skills.append(skill)
 
     return found_skills

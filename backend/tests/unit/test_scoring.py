@@ -1,6 +1,7 @@
 """Unit tests for scoring and ranking functions."""
 
 from uuid import uuid4
+
 from models import Job, Recruiter, Resume, Skill
 from routes_common import (
     calculate_experience_score,
@@ -41,6 +42,37 @@ class TestSkillExtraction:
         skills = extract_skills_from_text(text)
         assert "python" in skills
         assert "javascript" in skills
+
+    def test_word_boundary_matching(self):
+        # 'java' must not match inside 'javascript', 'sql' not inside 'sqlite'.
+        skills = extract_skills_from_text("JavaScript and SQLite experience")
+        assert "java" not in skills
+        assert "sql" not in skills
+        assert "javascript" in skills
+        assert "sqlite" in skills
+
+    def test_extract_extra_skills_parameter(self):
+        skills = extract_skills_from_text(
+            "We use kubernetes for orchestration",
+            extra_skills=["kubernetes", "helm"],
+        )
+        assert "kubernetes" in skills
+        assert "helm" not in skills  # helm is not mentioned in the text
+
+    def test_db_known_skills_recognized(self, app):
+        # A skill that was never in the predefined list becomes recognizable
+        # once it is recorded in the database (e.g. a recruiter posts a job
+        # requiring it).
+        with app.app_context():
+            from models import Skill, db
+
+            db.session.add(Skill(skill_name="terraform"))
+            db.session.commit()
+
+            skills = extract_skills_from_text(
+                "5 years of terraform infrastructure experience"
+            )
+            assert "terraform" in skills
 
 
 class TestMatchScore:
@@ -139,8 +171,9 @@ class TestHeuristicBreakdown:
 
     def test_heuristic_breakdown_perfect_match(self, app):
         with app.app_context():
-            from models import db, Recruiter, Applicant
             from werkzeug.security import generate_password_hash
+
+            from models import Applicant, Recruiter, db
 
             # Create recruiter (requires User fields)
             recruiter = Recruiter(
@@ -166,9 +199,11 @@ class TestHeuristicBreakdown:
             db.session.add(applicant)
             db.session.flush()
 
-            # Create skills
+            # Unique skill names so the test is independent of any other test
+            # that already committed the same literal skill names (the app
+            # fixture's DB is shared across the whole pytest run).
             skills = []
-            for name in ["python", "react", "sql"]:
+            for name in [f"python_{uuid4()}", f"react_{uuid4()}", f"sql_{uuid4()}"]:
                 skill = Skill(skill_name=name)
                 db.session.add(skill)
                 skills.append(skill)
@@ -196,8 +231,9 @@ class TestHeuristicScore:
 
     def test_heuristic_score_range(self, app):
         with app.app_context():
-            from models import db, Recruiter, Applicant
             from werkzeug.security import generate_password_hash
+
+            from models import Applicant, Recruiter, db
 
             recruiter = Recruiter(
                 user_id=uuid4(),
@@ -237,8 +273,9 @@ class TestHeuristicScore:
 
     def test_heuristic_score_perfect(self, app):
         with app.app_context():
-            from models import db, Recruiter, Applicant
             from werkzeug.security import generate_password_hash
+
+            from models import Applicant, Recruiter, db
 
             recruiter = Recruiter(
                 user_id=uuid4(),
