@@ -79,6 +79,15 @@ class Settings(BaseSettings):
     # Celery
     CELERY_BROKER_URL: str | None = None
     CELERY_RESULT_BACKEND: str | None = None
+
+    # API versioning & docs (Phase 4.1)
+    # Canonical prefix is /api/{API_VERSION}; the legacy unversioned /api
+    # prefix stays live until API_DEPRECATION_DATE (RFC 8594 Sunset header).
+    API_VERSION: str = "v1"
+    API_DEPRECATION_DATE: str = "Sun, 15 Feb 2027 00:00:00 GMT"
+    SWAGGER_ENABLED: bool = os.environ.get(
+        'SWAGGER_ENABLED', 'true'
+    ).lower() in ('1', 'true', 'yes')
     
     class Config:
         env_file = ".env"
