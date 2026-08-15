@@ -31,6 +31,15 @@ from models import (
     User,
     db,
 )
+from pagination import (
+    build_envelope,
+    decode_cursor,
+    encode_cursor,
+    in_memory_after,
+    is_v1_request,
+    keyset_filter,
+    parse_limit,
+)
 from ranking_ml import (
     explain_ranking_score,
     get_ranking_model_status,
@@ -698,9 +707,8 @@ def public_preview():
 def jobs():
     """List all jobs (public)."""
     # GET — supports filters: recruiter_id, search, job_type, experience_level,
-    # location, salary_min, salary_max, skill
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    # location, salary_min, salary_max, skill. On /api/v1 also ?sort= and
+    # cursor pagination (?limit=, ?cursor=) — Phase 4.2.
     recruiter_id = request.args.get('recruiter_id')
     search_q = (request.args.get('search') or '').strip().lower()
     job_type_filter = (request.args.get('job_type') or '').strip().lower()
@@ -739,9 +747,47 @@ def jobs():
             )
         )
 
-    pagination = query.order_by(Job.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
+    # Ordering — stable keyset (primary column + id tiebreaker).
+    sort = (request.args.get('sort') or '-created_at').strip().lower()
+    sort_map = {
+        'created_at': (Job.created_at, Job.job_id, False),
+        '-created_at': (Job.created_at, Job.job_id, True),
+        'title': (Job.title, Job.job_id, False),
+        '-title': (Job.title, Job.job_id, True),
+    }
+    sort_col, id_col, descending = sort_map.get(sort, sort_map['-created_at'])
+    query = query.order_by(
+        sort_col.desc() if descending else sort_col.asc(),
+        id_col.desc() if descending else id_col.asc(),
     )
+
+    if is_v1_request():
+        # Canonical /api/v1 — cursor (keyset) pagination + {data, meta} envelope.
+        limit = parse_limit(20)
+        cursor_values = decode_cursor(request.args.get('cursor'))
+        if cursor_values:
+            query = keyset_filter(
+                query, [sort_col, id_col], cursor_values, descending=descending
+            )
+        rows = query.limit(limit + 1).all()
+        has_more = len(rows) > limit
+        page_items = rows[:limit]
+        next_cursor = None
+        if has_more and page_items:
+            last = page_items[-1]
+            next_cursor = encode_cursor(
+                getattr(last, sort_col.key), getattr(last, id_col.key)
+            )
+        return jsonify(build_envelope(
+            [format_job(job) for job in page_items],
+            total=query.count(), limit=limit,
+            next_cursor=next_cursor, has_more=has_more,
+        )), 200
+
+    # Legacy /api — offset pagination with the historical response shape.
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     return jsonify({
         "total": pagination.total,
         "page": page,
@@ -903,6 +949,11 @@ def get_applicant_applications(applicant_id):
             "matching_score": round(score, 2),
         })
 
+    if is_v1_request():
+        return jsonify(build_envelope(
+            result, total=len(result), limit=len(result),
+            applicant_id=str(applicant.user_id),
+        )), 200
     return jsonify({
         "applicant_id": str(applicant.user_id),
         "total": len(result),
@@ -1100,12 +1151,17 @@ def resumes():
     # GET -- list resumes for authenticated applicant
     resumes_list = Resume.query.filter_by(applicant_id=applicant_id)\
         .order_by(Resume.uploaded_at.desc()).all()
-    return jsonify([{
+    payload = [{
         "resume_id": str(r.resume_id),
         "uploaded_at": r.uploaded_at.isoformat(),
         "file_path": r.file_path or "",
         "skills": [s.skill_name for s in r.skills],
-    } for r in resumes_list]), 200
+    } for r in resumes_list]
+    if is_v1_request():
+        return jsonify(build_envelope(
+            payload, total=len(payload), limit=len(payload),
+        )), 200
+    return jsonify(payload), 200
 
 
 @api.route('/resumes/upload-pdf', methods=['POST'])
@@ -1286,6 +1342,10 @@ def get_matched_jobs(applicant_id):
     latest_resume = Resume.query.filter_by(applicant_id=applicant_id)\
         .order_by(Resume.uploaded_at.desc()).first()
     if not latest_resume:
+        if is_v1_request():
+            return jsonify(build_envelope(
+                [], total=0, limit=parse_limit(50), resume_id=None,
+            )), 200
         return jsonify({
             "total": 0, "page": 1, "per_page": 20, "pages": 0,
             "resume_id": None, "matched_jobs": [],
@@ -1344,7 +1404,41 @@ def get_matched_jobs(applicant_id):
         enriched = [j for j in enriched
                     if location in (j.get("location") or "").lower()]
 
-    enriched.sort(key=lambda j: (j.get("matching_score", 0.0), j.get("created_at") or ""), reverse=True)
+    # Ordering — ?sort= matching_score|-matching_score|created_at|-created_at
+    sort = (request.args.get('sort') or '-matching_score').strip().lower()
+    if sort not in ('matching_score', '-matching_score', 'created_at', '-created_at'):
+        sort = '-matching_score'
+    descending = sort.startswith('-')
+    field = sort.lstrip('-')
+
+    def order_key(job):
+        if field == 'created_at':
+            return ((job.get("created_at") or ""), (job.get("matching_score") or 0.0), (job.get("job_id") or ""))
+        return ((job.get("matching_score") or 0.0), (job.get("created_at") or ""), (job.get("job_id") or ""))
+
+    enriched.sort(key=order_key, reverse=descending)
+
+    if is_v1_request():
+        # Canonical /api/v1 — cursor pagination over the ranked list.
+        limit = parse_limit(50)
+        cursor_values = decode_cursor(request.args.get('cursor'))
+        if cursor_values:
+            enriched = in_memory_after(
+                enriched, order_key, cursor_values, descending=descending
+            )
+        has_more = len(enriched) > limit
+        page_items = enriched[:limit]
+        next_cursor = None
+        if has_more and page_items:
+            next_cursor = encode_cursor(*order_key(page_items[-1]))
+        return jsonify(build_envelope(
+            page_items,
+            total=len(enriched), limit=limit,
+            next_cursor=next_cursor, has_more=has_more,
+            resume_id=str(latest_resume.resume_id),
+        )), 200
+
+    # Legacy /api — offset pagination with the historical response shape.
     total = len(enriched)
     pages = max(1, (total + per_page - 1) // per_page) if total else 0
     start = (page - 1) * per_page
@@ -1629,9 +1723,13 @@ def get_job_candidates(job_id):
     if str(job.recruiter_id) != g.current_user_id:
         return jsonify({"error": "You can only view candidates for your own jobs"}), 403
 
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 10, type=int)
     min_score = request.args.get('min_score', 0, type=float)
+
+    # Ordering — ?sort= matching_score|-matching_score (default desc).
+    sort = (request.args.get('sort') or '-matching_score').strip().lower()
+    if sort not in ('matching_score', '-matching_score'):
+        sort = '-matching_score'
+    descending = sort.startswith('-')
 
     query = Ranking.query.join(Resume).join(
         JobApplication,
@@ -1640,21 +1738,13 @@ def get_job_candidates(job_id):
     ).filter(
         Ranking.job_id == job_id,
         Ranking.matching_score >= min_score,
-    ).order_by(Ranking.matching_score.desc())
+    ).order_by(
+        Ranking.matching_score.desc() if descending else Ranking.matching_score.asc(),
+        Ranking.ranking_id.desc() if descending else Ranking.ranking_id.asc(),
+    )
 
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    seen: set[str] = set()
-    rankings: list = []
-    for r in pagination.items:
-        if str(r.ranking_id) in seen:
-            continue
-        seen.add(str(r.ranking_id))
-        rankings.append(r)
-
-    return jsonify({
-        "total": pagination.total, "page": page, "per_page": per_page, "pages": pagination.pages,
-        "job_id": str(job_id), "job_title": job.title,
-        "candidates": [{
+    def _candidate_payload(r):
+        return {
             "ranking_id": str(r.ranking_id),
             "applicant_id": str(r.resume.applicant_id),
             "applicant_name": r.resume.applicant.name or r.resume.applicant.email,
@@ -1663,7 +1753,52 @@ def get_job_candidates(job_id):
             "matching_score": r.matching_score,
             "candidate_rank": r.candidate_rank,
             "resume_skills": [s.skill_name for s in r.resume.skills],
-        } for r in rankings],
+        }
+
+    def _dedupe(rows):
+        seen: set[str] = set()
+        result = []
+        for r in rows:
+            if str(r.ranking_id) in seen:
+                continue
+            seen.add(str(r.ranking_id))
+            result.append(r)
+        return result
+
+    if is_v1_request():
+        limit = parse_limit(10)
+        cursor_values = decode_cursor(request.args.get('cursor'))
+        if cursor_values:
+            query = keyset_filter(
+                query,
+                [Ranking.matching_score, Ranking.ranking_id],
+                cursor_values,
+                descending=descending,
+            )
+        rows = _dedupe(query.limit(limit + 1).all())
+        has_more = len(rows) > limit
+        page_items = rows[:limit]
+        next_cursor = None
+        if has_more and page_items:
+            last = page_items[-1]
+            next_cursor = encode_cursor(last.matching_score, last.ranking_id)
+        return jsonify(build_envelope(
+            [_candidate_payload(r) for r in page_items],
+            total=query.count(), limit=limit,
+            next_cursor=next_cursor, has_more=has_more,
+            job_id=str(job_id), job_title=job.title,
+        )), 200
+
+    # Legacy /api — offset pagination with the historical response shape.
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    rankings = _dedupe(pagination.items)
+
+    return jsonify({
+        "total": pagination.total, "page": page, "per_page": per_page, "pages": pagination.pages,
+        "job_id": str(job_id), "job_title": job.title,
+        "candidates": [_candidate_payload(r) for r in rankings],
     }), 200
 
 
@@ -1678,15 +1813,24 @@ def get_recruiter_candidates(recruiter_id):
     jobs_list = Job.query.filter_by(recruiter_id=recruiter_id).all()
     job_ids = [j.job_id for j in jobs_list]
     if not job_ids:
+        if is_v1_request():
+            return jsonify(build_envelope(
+                [], total=0, limit=parse_limit(20),
+                recruiter_id=str(recruiter_id), jobs=[],
+            )), 200
         return jsonify({
             "total": 0, "recruiter_id": str(recruiter_id),
             "candidates": [], "jobs": [],
         }), 200
 
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
     min_score = request.args.get('min_score', 0, type=float)
     job_filter = request.args.get('job_id')
+
+    # Ordering — ?sort= matching_score|-matching_score (default desc).
+    sort = (request.args.get('sort') or '-matching_score').strip().lower()
+    if sort not in ('matching_score', '-matching_score'):
+        sort = '-matching_score'
+    descending = sort.startswith('-')
 
     query = Ranking.query.join(Resume).join(
         JobApplication,
@@ -1700,22 +1844,29 @@ def get_recruiter_candidates(recruiter_id):
     if job_filter and job_filter in [str(j) for j in job_ids]:
         query = query.filter(Ranking.job_id == job_filter)
 
-    query = query.order_by(Ranking.matching_score.desc())
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    query = query.order_by(
+        Ranking.matching_score.desc() if descending else Ranking.matching_score.asc(),
+        Ranking.ranking_id.desc() if descending else Ranking.ranking_id.asc(),
+    )
 
-    seen: set[str] = set()
-    rankings: list = []
-    for r in pagination.items:
-        if str(r.ranking_id) in seen:
-            continue
-        seen.add(str(r.ranking_id))
-        rankings.append(r)
+    def _dedupe(rows):
+        seen: set[str] = set()
+        result = []
+        for r in rows:
+            if str(r.ranking_id) in seen:
+                continue
+            seen.add(str(r.ranking_id))
+            result.append(r)
+        return result
 
-    return jsonify({
-        "total": pagination.total, "page": page, "per_page": per_page, "pages": pagination.pages,
-        "recruiter_id": str(recruiter_id),
-        "jobs": [{"job_id": str(j.job_id), "title": j.title} for j in jobs_list],
-        "candidates": [{
+    def _recruiter_candidate_payload(r):
+        app = JobApplication.query.filter_by(
+            job_id=r.job.job_id, applicant_id=r.resume.applicant_id
+        ).first()
+        iv = Interview.query.filter_by(
+            job_id=r.job.job_id, applicant_id=r.resume.applicant_id
+        ).filter(Interview.status.in_(['pending', 'confirmed'])).first()
+        return {
             "ranking_id": str(r.ranking_id),
             "job_id": str(r.job.job_id),
             "job_title": r.job.title,
@@ -1727,18 +1878,53 @@ def get_recruiter_candidates(recruiter_id):
             "matching_score": r.matching_score,
             "candidate_rank": r.candidate_rank,
             "resume_skills": [s.skill_name for s in r.resume.skills],
-            "application_id": str(app.application_id) if (app := JobApplication.query.filter_by(
-                job_id=r.job.job_id, applicant_id=r.resume.applicant_id).first()) else None,
+            "application_id": str(app.application_id) if app else None,
             "application_status": app.status if app else "pending",
             "interview": ({
                 "interview_id": str(iv.interview_id),
                 "scheduled_at": iv.scheduled_at.isoformat(),
                 "status": iv.status,
                 "meeting_link": iv.meeting_link or "",
-            } if (iv := Interview.query.filter_by(
-                job_id=r.job.job_id, applicant_id=r.resume.applicant_id
-            ).filter(Interview.status.in_(['pending', 'confirmed'])).first()) else None),
-        } for r in rankings],
+            } if iv else None),
+        }
+
+    jobs_meta = [{"job_id": str(j.job_id), "title": j.title} for j in jobs_list]
+
+    if is_v1_request():
+        limit = parse_limit(20)
+        cursor_values = decode_cursor(request.args.get('cursor'))
+        if cursor_values:
+            query = keyset_filter(
+                query,
+                [Ranking.matching_score, Ranking.ranking_id],
+                cursor_values,
+                descending=descending,
+            )
+        rows = _dedupe(query.limit(limit + 1).all())
+        has_more = len(rows) > limit
+        page_items = rows[:limit]
+        next_cursor = None
+        if has_more and page_items:
+            last = page_items[-1]
+            next_cursor = encode_cursor(last.matching_score, last.ranking_id)
+        return jsonify(build_envelope(
+            [_recruiter_candidate_payload(r) for r in page_items],
+            total=query.count(), limit=limit,
+            next_cursor=next_cursor, has_more=has_more,
+            recruiter_id=str(recruiter_id), jobs=jobs_meta,
+        )), 200
+
+    # Legacy /api — offset pagination with the historical response shape.
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    rankings = _dedupe(pagination.items)
+
+    return jsonify({
+        "total": pagination.total, "page": page, "per_page": per_page, "pages": pagination.pages,
+        "recruiter_id": str(recruiter_id),
+        "jobs": jobs_meta,
+        "candidates": [_recruiter_candidate_payload(r) for r in rankings],
     }), 200
 
 
@@ -2016,16 +2202,27 @@ def update_ranking(ranking_id):
 @_ownership_required
 def get_notifications(user_id):
     """Get notifications for a user."""
-    notifications = Notification.query.filter_by(user_id=user_id)\
-        .order_by(Notification.created_at.desc()).limit(50).all()
-    return jsonify([{
-        "notification_id": str(n.notification_id),
-        "title": n.title, "message": n.message, "type": n.type,
-        "is_read": n.is_read,
-        "related_job_id": str(n.related_job_id) if n.related_job_id else None,
-        "related_job_title": n.related_job.title if n.related_job else None,
-        "created_at": n.created_at.isoformat(),
-    } for n in notifications]), 200
+    query = Notification.query.filter_by(user_id=user_id)\
+        .order_by(Notification.created_at.desc())
+
+    def _payload(n):
+        return {
+            "notification_id": str(n.notification_id),
+            "title": n.title, "message": n.message, "type": n.type,
+            "is_read": n.is_read,
+            "related_job_id": str(n.related_job_id) if n.related_job_id else None,
+            "related_job_title": n.related_job.title if n.related_job else None,
+            "created_at": n.created_at.isoformat(),
+        }
+
+    if is_v1_request():
+        limit = parse_limit(50)
+        rows = query.limit(limit).all()
+        return jsonify(build_envelope(
+            [_payload(n) for n in rows],
+            total=query.count(), limit=limit,
+        )), 200
+    return jsonify([_payload(n) for n in query.limit(50).all()]), 200
 
 
 @api.route('/notifications/<notification_id>/read', methods=['PATCH'])
@@ -2119,6 +2316,10 @@ def get_saved_jobs(applicant_id):
         job_data["saved_at"] = sj.created_at.isoformat()
         jobs.append(job_data)
 
+    if is_v1_request():
+        return jsonify(build_envelope(
+            jobs, total=len(jobs), limit=len(jobs),
+        )), 200
     return jsonify({
         "total": len(jobs),
         "saved_jobs": jobs,
@@ -2137,6 +2338,10 @@ def get_saved_job_ids(applicant_id):
         str(sj.job_id)
         for sj in SavedJob.query.filter_by(applicant_id=applicant_id).all()
     ]
+    if is_v1_request():
+        return jsonify(build_envelope(
+            saved_ids, total=len(saved_ids), limit=len(saved_ids),
+        )), 200
     return jsonify({"saved_job_ids": saved_ids}), 200
 
 
@@ -2408,22 +2613,30 @@ def list_interviews(user_id):
         interviews = Interview.query.filter_by(applicant_id=user_id)\
             .order_by(Interview.scheduled_at.desc()).all()
 
-    return jsonify([{
-        "interview_id": str(iv.interview_id),
-        "job_id": str(iv.job_id),
-        "job_title": iv.job.title if iv.job else "",
-        "applicant_id": str(iv.applicant_id),
-        "applicant_name": iv.applicant.name or iv.applicant.email,
-        "recruiter_id": str(iv.recruiter_id),
-        "recruiter_name": iv.recruiter.name or iv.recruiter.email,
-        "recruiter_company": iv.recruiter.company or "",
-        "scheduled_at": iv.scheduled_at.isoformat(),
-        "duration_minutes": iv.duration_minutes,
-        "status": iv.status,
-        "notes": iv.notes or "",
-        "meeting_link": iv.meeting_link or "",
-        "created_at": iv.created_at.isoformat(),
-    } for iv in interviews]), 200
+    def _payload(iv):
+        return {
+            "interview_id": str(iv.interview_id),
+            "job_id": str(iv.job_id),
+            "job_title": iv.job.title if iv.job else "",
+            "applicant_id": str(iv.applicant_id),
+            "applicant_name": iv.applicant.name or iv.applicant.email,
+            "recruiter_id": str(iv.recruiter_id),
+            "recruiter_name": iv.recruiter.name or iv.recruiter.email,
+            "recruiter_company": iv.recruiter.company or "",
+            "scheduled_at": iv.scheduled_at.isoformat(),
+            "duration_minutes": iv.duration_minutes,
+            "status": iv.status,
+            "notes": iv.notes or "",
+            "meeting_link": iv.meeting_link or "",
+            "created_at": iv.created_at.isoformat(),
+        }
+
+    if is_v1_request():
+        return jsonify(build_envelope(
+            [_payload(iv) for iv in interviews],
+            total=len(interviews), limit=len(interviews),
+        )), 200
+    return jsonify([_payload(iv) for iv in interviews]), 200
 
 
 @api.route('/jobs/<job_id>/application-status/<applicant_id>', methods=['GET'])
