@@ -42,7 +42,11 @@ class TestVersionPrefix:
     def test_v1_jobs_list(self, client, test_job):
         response = client.get("/api/v1/jobs")
         assert response.status_code == 200
-        assert len(response.get_json()["jobs"]) >= 1
+        body = response.get_json()
+        # v1 uses the Phase 4.2 {data, meta} envelope.
+        assert isinstance(body["data"], list)
+        assert len(body["data"]) >= 1
+        assert "pagination" in body["meta"]
 
 
 class TestDeprecationHeaders:
