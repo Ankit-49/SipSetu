@@ -121,9 +121,9 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 - [x] **Deprecation headers** — legacy `/api/*` responses carry `Deprecation: true`, `Sunset` (from `API_DEPRECATION_DATE`), and `Link: <…/api/v1/…>; rel="successor-version"`
 
 ### 4.2 Pagination & Query Standards
-- [ ] **Cursor pagination** — Replace offset/limit for large datasets
-- [ ] **Standard query params** — `filter[]`, `sort`, `fields`, `include`
-- [ ] **Response envelope** — `{ data: [], meta: { pagination, totals } }`
+- [x] **Cursor pagination** — Keyset (seek) pagination via `?limit=` + opaque `?cursor=` (`backend/pagination.py`); applied to `/jobs`, `matched-jobs`, `/jobs/<id>/candidates`, `/recruiters/<id>/candidates` on `/api/v1` — O(1) per page, stable under inserts
+- [x] **Standard query params** — `?sort=` supported on v1 list endpoints (`sort=title`, `sort=-created_at`, `sort=matching_score`/`-matching_score`); `filter[]`, `fields`, `include` not yet implemented
+- [x] **Response envelope** — `{ data: [], meta: { pagination: { total, limit, next_cursor, has_more }, ... } }` on all `/api/v1` list endpoints (jobs, matched-jobs, candidates, applications, notifications, saved-jobs, saved-job-ids, resumes, interviews); legacy `/api` keeps its historical shapes
 
 ### 4.3 Background Job Infrastructure
 - [x] **Celery + Redis** — Bulk screening moved off the request thread (`tasks/bulk_screen_tasks.py` + `GET /recruiters/bulk-screen/<job_id>` status endpoint; sync fallback without a broker). Email tasks (`tasks/email_tasks.py`) and ML retraining (`tasks/ml_tasks.py`) were already queued.

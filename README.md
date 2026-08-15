@@ -505,7 +505,9 @@ Tokens expire after 24 hours (configurable via `JWT_EXPIRATION_HOURS`).
 
 **File:** `backend/routes.py`
 
-All routes are registered under the `api` Blueprint at **two prefixes** (Phase 4.1): the canonical `/api/v1` and the legacy `/api` alias. The legacy prefix is deprecated — responses carry `Deprecation: true`, a `Sunset` date, and a `Link: <…/api/v1/…>; rel="successor-version"` header (RFC 8594). Interactive OpenAPI docs live at **`/apidocs/`** (spec at `/apispec.json`); the auth endpoints carry request/response schemas and more can be documented by adding a `---` YAML block to the route docstring (schemas are defined in `backend/api_docs.py`). The file is ~1400 lines and organises endpoints into sections:
+All routes are registered under the `api` Blueprint at **two prefixes** (Phase 4.1): the canonical `/api/v1` and the legacy `/api` alias. The legacy prefix is deprecated — responses carry `Deprecation: true`, a `Sunset` date, and a `Link: <…/api/v1/…>; rel="successor-version"` header (RFC 8594). Interactive OpenAPI docs live at **`/apidocs/`** (spec at `/apispec.json`); the auth endpoints carry request/response schemas and more can be documented by adding a `---` YAML block to the route docstring (schemas are defined in `backend/api_docs.py`).
+
+On `/api/v1` every **list endpoint** uses the Phase 4.2 envelope: `{ "data": [...], "meta": { "pagination": { "total", "limit", "next_cursor", "has_more" }, ... } }`. The paginated ones (`/jobs`, `matched-jobs`, `/jobs/<id>/candidates`, `/recruiters/<id>/candidates`) use **keyset cursor pagination** (`?limit=` + opaque `?cursor=`, helpers in `backend/pagination.py`) and accept `?sort=` (`sort=title`, `sort=-created_at`, `sort=matching_score` / `-matching_score`). The legacy `/api` prefix keeps the historical response shapes for the deprecation window. The file is ~1400 lines and organises endpoints into sections:
 
 #### Authentication
 
