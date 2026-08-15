@@ -399,10 +399,11 @@ The `create_app()` factory function:
 5. Initialises SQLAlchemy (`db.init_app(app)`) with Postgres pool options (skipped for SQLite)
 6. Enables Flask-Talisman security headers (CSP, HSTS, secure cookies) when `ENVIRONMENT=production`
 7. Initialises the Redis-backed rate limiter (flask-limiter), falling back to the in-memory limiter if Redis is unavailable
-8. Registers the `api` blueprint under `/api`
+8. Registers the `api` blueprint twice — canonical `/api/v1` and the legacy `/api` alias (Phase 4.1 versioning; legacy responses carry `Deprecation`/`Sunset`/`Link` headers)
 9. Runs `db.create_all()` to create any missing tables, plus safe `ALTER TABLE ADD COLUMN IF NOT EXISTS` migrations for late-added columns (status, profile_image, email_verified, phone, location, reminders_sent)
 10. Registers a `/api/health` endpoint that verifies DB and Redis connectivity
 11. Attaches request-ID generation and `X-Request-ID` response headers
+12. When `SWAGGER_ENABLED` (default true), initialises Flasgger OpenAPI docs — UI at `/apidocs/`, spec at `/apispec.json` (documents `/api/v1` only)
 
 **File:** `backend/config.py`
 
@@ -504,7 +505,7 @@ Tokens expire after 24 hours (configurable via `JWT_EXPIRATION_HOURS`).
 
 **File:** `backend/routes.py`
 
-All routes are registered under the `api` Blueprint with prefix `/api`. The file is ~1400 lines and organises endpoints into sections:
+All routes are registered under the `api` Blueprint at **two prefixes** (Phase 4.1): the canonical `/api/v1` and the legacy `/api` alias. The legacy prefix is deprecated — responses carry `Deprecation: true`, a `Sunset` date, and a `Link: <…/api/v1/…>; rel="successor-version"` header (RFC 8594). Interactive OpenAPI docs live at **`/apidocs/`** (spec at `/apispec.json`); the auth endpoints carry request/response schemas and more can be documented by adding a `---` YAML block to the route docstring (schemas are defined in `backend/api_docs.py`). The file is ~1400 lines and organises endpoints into sections:
 
 #### Authentication
 

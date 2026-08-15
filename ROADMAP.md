@@ -115,10 +115,10 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 ## Phase 4: API & Architecture Maturity (Weeks 13-16)
 
 ### 4.1 API Versioning & Documentation
-- [ ] **Version prefix** — `/api/v1/` with deprecation policy
-- [ ] **OpenAPI/Swagger** — `flasgger` or `apispec` auto-generated from route decorators
-- [ ] **Schema validation** — Request/response schemas in OpenAPI
-- [ ] **Deprecation headers** — `Sunset` and `Link` headers for old versions
+- [x] **Version prefix** — `/api/v1/` canonical (dual-registered blueprint in `app.py`); legacy `/api` alias stays live until the Sunset date
+- [x] **OpenAPI/Swagger** — `flasgger` auto-generated from route YAML docstrings (`api_docs.py`); UI at `/apidocs/`, spec at `/apispec.json` (legacy `/api` endpoints excluded via `rule_filter`)
+- [x] **Schema validation** — Auth request/response schemas defined in the OpenAPI `definitions` (single source of truth in `api_docs.py`) and `$ref`'d from route docstrings; more routes can be documented by adding YAML blocks
+- [x] **Deprecation headers** — legacy `/api/*` responses carry `Deprecation: true`, `Sunset` (from `API_DEPRECATION_DATE`), and `Link: <…/api/v1/…>; rel="successor-version"`
 
 ### 4.2 Pagination & Query Standards
 - [ ] **Cursor pagination** — Replace offset/limit for large datasets
