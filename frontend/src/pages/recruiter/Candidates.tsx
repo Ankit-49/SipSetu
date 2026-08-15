@@ -88,13 +88,13 @@ export default function RecruiterCandidates() {
       setLoading(true);
       try {
         const params = new URLSearchParams();
-        params.set("per_page", "50");
+        params.set("limit", "50");
         if (selectedJob !== "all-jobs") params.set("job_id", selectedJob);
         if (selectedScore !== "all-scores") params.set("min_score", selectedScore);
 
         const response = await api.get(`/recruiters/${user.id}/candidates?${params.toString()}`);
-        setCandidates(response.data.candidates || []);
-        setJobs(response.data.jobs || []);
+        setCandidates(response.data.data || []);
+        setJobs(response.data.meta?.jobs || []);
       } catch (err) {
         console.error("Failed to load recruiter candidates", err);
         setCandidates([]);

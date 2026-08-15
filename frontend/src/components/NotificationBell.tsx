@@ -51,7 +51,7 @@ export function NotificationBell() {
     if (!userId) return;
     try {
       const res = await api.get(`/notifications/${userId}`);
-      setNotifications(res.data);
+      setNotifications(res.data?.data || []);
     } catch {
       // silently fail
     }

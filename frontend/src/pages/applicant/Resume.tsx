@@ -289,8 +289,9 @@ export default function ApplicantResume() {
       return;
     }      try {
           const res = await api.get(`/resumes?applicant_id=${userId}`);
-      if (res.data && res.data.length > 0) {
-        const latest = res.data[0];
+      const resumeList = res.data?.data || [];
+      if (resumeList.length > 0) {
+        const latest = resumeList[0];
         setResume(latest);
         // Fetch the full raw_text (list endpoint does not return it) so we
         // can pre-populate the builder for edits. We also pass the stored
@@ -467,7 +468,8 @@ export default function ApplicantResume() {
       const userId2 = localStorage.getItem("user_id");
       if (userId2) {
         const metaRes = await api.get(`/resumes?applicant_id=${userId2}`);
-        if (metaRes.data?.length > 0) setResume(metaRes.data[0]);
+        const metaList = metaRes.data?.data || [];
+        if (metaList.length > 0) setResume(metaList[0]);
       }
       // Restore form snapshot so deletions remain visible without a full refetch
       setForm(formSnapshot);

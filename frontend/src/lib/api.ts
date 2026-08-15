@@ -1,6 +1,9 @@
 import axios from "axios";
 
-const API_BASE = "http://localhost:5000/api";
+// Canonical versioned API base (Phase 4.1/4.2). Override with VITE_API_URL.
+const API_BASE =
+  (import.meta.env.VITE_API_URL as string | undefined) ||
+  "http://localhost:5000/api/v1";
 
 const api = axios.create({
   baseURL: API_BASE,

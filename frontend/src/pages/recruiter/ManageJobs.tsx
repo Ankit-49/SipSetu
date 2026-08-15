@@ -78,8 +78,8 @@ export default function RecruiterManageJobs() {
   const fetchJobs = async () => {
     if (!user) return;
     try {
-      const response = await api.get(`/jobs?recruiter_id=${user.id}&per_page=100`);
-      setJobs(response.data.jobs || []);
+      const response = await api.get(`/jobs?recruiter_id=${user.id}&limit=100`);
+      setJobs(response.data.data || []);
     } catch (err) {
       console.error("Failed to fetch jobs", err);
     } finally {

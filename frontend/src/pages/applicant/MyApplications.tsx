@@ -66,7 +66,7 @@ export default function ApplicantMyApplications() {
     const fetchApplications = async () => {
       try {
         const response = await api.get(`/applicants/${user.id}/applications`);
-        setData(response.data.applications || []);
+        setData(response.data.data || []);
       } catch (err) {
         console.error("Failed to fetch applications", err);
       } finally {

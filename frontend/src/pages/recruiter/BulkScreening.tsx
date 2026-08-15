@@ -99,10 +99,10 @@ export default function RecruiterBulkScreening() {
         const response = await api.get("/jobs", {
           params: {
             recruiter_id: userId,
-            per_page: 100
+            limit: 100
           }
         });
-        const myJobs = response.data.jobs || [];
+        const myJobs = response.data.data || [];
         setActiveJobs(myJobs);
         if (myJobs.length > 0) {
           setSelectedJobId((current) => current || myJobs[0].job_id);

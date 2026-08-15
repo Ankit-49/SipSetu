@@ -51,7 +51,7 @@ export default function ApplicantJobMatches() {
   const [cancelling, setCancelling] = useState(false);
 
   const buildQuery = useCallback(() => {
-    const params = new URLSearchParams({ per_page: "100" });
+    const params = new URLSearchParams({ limit: "100" });
     if (search) params.set("search", search);
     if (locationFilter !== "all") params.set("location", locationFilter);
     if (jobTypeFilter !== "all") params.set("job_type", jobTypeFilter);
@@ -67,10 +67,10 @@ export default function ApplicantJobMatches() {
     try {
       const params = buildQuery();
       const matchesRes = await api.get(`/applicants/${user.id}/matched-jobs?${params}`);
-      const jobsData = matchesRes.data.matched_jobs || [];
+      const jobsData = matchesRes.data.data || [];
       setJobs(jobsData.map((job: any) => ({ ...job, applied: Boolean(job.applied) })));
       setAppliedJobIds(jobsData.filter((j: any) => j.applied).map((j: any) => String(j.job_id)));
-      if (matchesRes.data.resume_id === null) setHasResume(false);
+      if (matchesRes.data.meta?.resume_id === null) setHasResume(false);
     } catch (err) {
       console.error("Failed to load job matches", err);
       setHasResume(false);
@@ -84,7 +84,7 @@ export default function ApplicantJobMatches() {
     if (!user) return;
     try {
       const res = await api.get(`/applicants/${user.id}/saved-job-ids`);
-      setSavedJobIds(res.data.saved_job_ids || []);
+      setSavedJobIds(res.data.data || []);
     } catch (err) {
       console.error("Failed to load saved job IDs", err);
     }

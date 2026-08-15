@@ -32,8 +32,8 @@ export default function ApplicantSavedJobs() {
     if (!user) return;
     try {
       const res = await api.get(`/applicants/${user.id}/saved-jobs`);
-      setJobs(res.data.saved_jobs || []);
-      setAppliedJobIds(res.data.saved_jobs.filter((j: any) => j.applied).map((j: any) => String(j.job_id)));
+      setJobs(res.data.data || []);
+      setAppliedJobIds((res.data.data || []).filter((j: any) => j.applied).map((j: any) => String(j.job_id)));
     } catch (err) {
       console.error("Failed to load saved jobs", err);
     } finally {
