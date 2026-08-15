@@ -131,9 +131,21 @@ def create_app():
                 from rate_limiter import rate_limit as fallback_rate_limit
                 app.fallback_rate_limit = fallback_rate_limit
 
-    # Register routes
+    # Register routes — canonical versioned prefix (/api/v1) plus the legacy
+    # unversioned prefix (/api), which stays live until the Sunset date but is
+    # marked deprecated via RFC 8594 headers (Phase 4.1).
     from routes import api
-    app.register_blueprint(api, url_prefix='/api')
+    app.register_blueprint(api, url_prefix=f'/api/{settings.API_VERSION}')
+    app.register_blueprint(api, url_prefix='/api', name='api_legacy')
+
+    # OpenAPI/Swagger documentation (Phase 4.1) — documents the /api/v1 surface
+    # only; the legacy /api endpoints are excluded from the spec.
+    if settings.SWAGGER_ENABLED:
+        try:
+            from api_docs import build_swagger
+            build_swagger(app)
+        except Exception as e:
+            app.logger.warning(f"Failed to initialize Swagger docs: {e}")
 
     # Prometheus metrics (exposes /metrics)
     if HAS_METRICS and settings.METRICS_ENABLED:
@@ -231,6 +243,26 @@ def create_app():
     @app.after_request
     def add_response_headers(response):
         response.headers['X-Request-ID'] = getattr(request, 'request_id', 'unknown')
+        return response
+
+    @app.after_request
+    def add_api_deprecation_headers(response):
+        """RFC 8594 deprecation headers for the legacy unversioned /api prefix.
+
+        The canonical surface is /api/v1/*. Requests hitting the legacy
+        /api/* alias (except the unversioned infra endpoint /api/health) get
+        Deprecation: true, a Sunset date, and a Link to the v1 successor.
+        """
+        path = request.path
+        if (
+            path.startswith("/api/")
+            and path != "/api/health"
+            and not path.startswith(f"/api/{settings.API_VERSION}/")
+        ):
+            response.headers["Deprecation"] = "true"
+            response.headers["Sunset"] = settings.API_DEPRECATION_DATE
+            successor = f"/api/{settings.API_VERSION}{path[len('/api'):]}"
+            response.headers["Link"] = f'<{successor}>; rel="successor-version"'
         return response
 
     return app
