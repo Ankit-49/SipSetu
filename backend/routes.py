@@ -85,7 +85,29 @@ def _ownership_required(f):
 @api.route('/auth/forgot-password', methods=['POST'])
 @rate_limit(max_requests=3, window_seconds=900, key_by="email")
 def forgot_password():
-    """Send a password reset OTP to the user's email."""
+    """Send a password reset OTP to the user's email.
+
+    Returns 200 even when the email is unregistered to prevent user
+    enumeration.
+    ---
+    tags:
+      - auth
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/ForgotPasswordRequest'
+    responses:
+      200:
+        description: OTP sent (or intentionally ambiguous for unregistered emails)
+        schema:
+          $ref: '#/definitions/ForgotPasswordResponse'
+      400:
+        description: Email is required
+        schema:
+          $ref: '#/definitions/Error'
+    """
     data = request.get_json()
     email = (data or {}).get('email', '').strip().lower()
 
@@ -124,7 +146,33 @@ def forgot_password():
 
 @api.route('/auth/verify-reset-otp', methods=['POST'])
 def verify_reset_otp():
-    """Verify the OTP and return a temporary reset token for setting a new password."""
+    """Verify the OTP and return a temporary reset token for setting a new password.
+
+    The returned reset_token is exchanged for a new password via
+    /auth/reset-password.
+    ---
+    tags:
+      - auth
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/VerifyOTPRequest'
+    responses:
+      200:
+        description: OTP verified
+        schema:
+          $ref: '#/definitions/VerifyResetOTPResponse'
+      400:
+        description: Invalid or expired OTP
+        schema:
+          $ref: '#/definitions/Error'
+      404:
+        description: User not found
+        schema:
+          $ref: '#/definitions/Error'
+    """
     data = request.get_json()
     email = (data or {}).get('email', '').strip().lower()
     otp = (data or {}).get('otp', '').strip()
@@ -167,7 +215,30 @@ def verify_reset_otp():
 
 @api.route('/auth/reset-password', methods=['POST'])
 def reset_password():
-    """Reset the password using a temp token (issued after OTP verification)."""
+    """Reset the password using a temp token (issued after OTP verification).
+    ---
+    tags:
+      - auth
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/ResetPasswordRequest'
+    responses:
+      200:
+        description: Password reset successfully
+        schema:
+          $ref: '#/definitions/ResetPasswordResponse'
+      400:
+        description: Invalid or expired token, or weak password
+        schema:
+          $ref: '#/definitions/Error'
+      404:
+        description: User not found
+        schema:
+          $ref: '#/definitions/Error'
+    """
     data = request.get_json()
     token = (data or {}).get('token', '').strip()
     email = (data or {}).get('email', '').strip().lower()
@@ -205,7 +276,33 @@ def reset_password():
 @api.route('/auth/register', methods=['POST'])
 @rate_limit(max_requests=5, window_seconds=3600, key_by="ip")
 def register():
-    """Register a new user (applicant or recruiter)"""
+    """Register a new user (applicant or recruiter).
+
+    Creates the account, sends a verification OTP, and returns a JWT.
+    ---
+    tags:
+      - auth
+    security: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/RegisterRequest'
+    responses:
+      201:
+        description: User registered successfully
+        schema:
+          $ref: '#/definitions/AuthResponse'
+      400:
+        description: Missing fields, invalid role, or weak password
+        schema:
+          $ref: '#/definitions/Error'
+      409:
+        description: User already exists
+        schema:
+          $ref: '#/definitions/Error'
+    """
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
@@ -275,7 +372,31 @@ def register():
 
 @api.route('/auth/login', methods=['POST'])
 def login():
-    """Login and retrieve user credentials with JWT token."""
+    """Login and retrieve user credentials with JWT token.
+    ---
+    tags:
+      - auth
+    security: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/LoginRequest'
+    responses:
+      200:
+        description: Login successful
+        schema:
+          $ref: '#/definitions/AuthResponse'
+      400:
+        description: Missing email or password
+        schema:
+          $ref: '#/definitions/Error'
+      401:
+        description: Invalid credentials
+        schema:
+          $ref: '#/definitions/Error'
+    """
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
@@ -311,6 +432,24 @@ def auth_me():
     """Return the currently authenticated user's profile.
 
     Used by the frontend to validate the stored JWT on page reload.
+    ---
+    tags:
+      - auth
+    security:
+      - BearerAuth: []
+    responses:
+      200:
+        description: Current user profile
+        schema:
+          $ref: '#/definitions/MeResponse'
+      401:
+        description: Missing or invalid token
+        schema:
+          $ref: '#/definitions/Error'
+      404:
+        description: User not found
+        schema:
+          $ref: '#/definitions/Error'
     """
     user = User.query.get(g.current_user_id)
     if not user:
@@ -338,7 +477,31 @@ def auth_me():
 @api.route('/auth/verify-email', methods=['POST'])
 @rate_limit(max_requests=5, window_seconds=600, key_by="email")
 def verify_email():
-    """Verify a user's email using an OTP code."""
+    """Verify a user's email using an OTP code.
+    ---
+    tags:
+      - auth
+    security: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          $ref: '#/definitions/VerifyEmailRequest'
+    responses:
+      200:
+        description: Email verified successfully
+        schema:
+          $ref: '#/definitions/VerifyEmailResponse'
+      400:
+        description: Invalid or expired verification code
+        schema:
+          $ref: '#/definitions/Error'
+      404:
+        description: User not found
+        schema:
+          $ref: '#/definitions/Error'
+    """
     data = request.get_json()
     email = (data or {}).get('email', '').strip().lower()
     otp = (data or {}).get('otp', '').strip()
@@ -378,7 +541,26 @@ def verify_email():
 @require_auth
 @rate_limit(max_requests=3, window_seconds=900, key_by="user_id")
 def resend_verification():
-    """Resend the email verification OTP to the authenticated user."""
+    """Resend the email verification OTP to the authenticated user.
+    ---
+    tags:
+      - auth
+    security:
+      - BearerAuth: []
+    responses:
+      200:
+        description: Verification email sent (or already verified)
+        schema:
+          $ref: '#/definitions/ResendVerificationResponse'
+      401:
+        description: Missing or invalid token
+        schema:
+          $ref: '#/definitions/Error'
+      404:
+        description: User not found
+        schema:
+          $ref: '#/definitions/Error'
+    """
     user = User.query.get(g.current_user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
@@ -411,7 +593,17 @@ def resend_verification():
 
 @api.route('/auth/logout', methods=['POST'])
 def logout():
-    """Clear any server-side auth state for the current client."""
+    """Clear any server-side auth state for the current client.
+    ---
+    tags:
+      - auth
+    security: []
+    responses:
+      200:
+        description: Logged out successfully
+        schema:
+          $ref: '#/definitions/LogoutResponse'
+    """
     return jsonify({"message": "Logged out successfully"}), 200
 
 # ============ PROFILE ROUTES ============
