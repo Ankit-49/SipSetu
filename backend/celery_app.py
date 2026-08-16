@@ -14,6 +14,7 @@ celery_app = Celery(
         "tasks.ml_tasks",
         "tasks.reminder_tasks",
         "tasks.bulk_screen_tasks",
+        "tasks.dead_letter_tasks",
     ],
 )
 
@@ -30,6 +31,28 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=100,
     result_expires=3600,
+    # ------------------------------------------------------------------
+    # Phase 4.3 — task priority queues + dead-letter queue.
+    # ------------------------------------------------------------------
+    # Priority routing: email delivery is high priority, bulk screening
+    # medium, ML retraining low. With the Redis broker lower numbers are
+    # delivered first (0-9). Each queue is also consumed by a dedicated
+    # worker (see docker-compose.yml) so heavy retraining never competes
+    # with interactive work.
+    task_routes={
+        "tasks.email_tasks.*": {"queue": "email", "priority": 3},
+        "tasks.bulk_screen_tasks.*": {"queue": "bulk_screen", "priority": 5},
+        "tasks.ml_tasks.retrain_ranking_model": {"queue": "retrain", "priority": 9},
+    },
+    task_default_queue="celery",
+    task_default_priority=5,
+    task_queue_max_priority=10,
+    queue_order_strategy="priority",
+    # At-least-once delivery: acks happen after the task finishes, so a lost
+    # worker redelivers instead of silently dropping the job, and the DLQ
+    # catches jobs that fail permanently.
+    task_acks_late=True,
+    task_reject_on_worker_lost=True,
     # Fail fast when the broker is unreachable so the API can fall back to
     # processing inline instead of blocking the request thread.
     broker_connection_timeout=3,
@@ -67,6 +90,25 @@ class FlaskTask(celery_app.Task):
     def __call__(self, *args, **kwargs):
         with get_flask_app().app_context():
             return self.run(*args, **kwargs)
+
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        """Publish a dead-letter record when a task permanently fails.
+
+        ``on_failure`` fires only after retries are exhausted (or immediately
+        for tasks without retry logic), so every record here represents a job
+        that needs operator attention. No-op without a configured Redis.
+        """
+        from tasks.dead_letter import publish_dead_letter
+
+        publish_dead_letter(
+            self.app,
+            self.name,
+            task_id,
+            args,
+            kwargs,
+            exc,
+            einfo.traceback if einfo else None,
+        )
 
 
 celery_app.Task = FlaskTask
