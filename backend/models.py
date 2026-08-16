@@ -100,6 +100,19 @@ class Job(db.Model):
     rankings = db.relationship('Ranking', backref='job', lazy=True, cascade='all, delete-orphan')
     applications = db.relationship('JobApplication', backref='job', lazy=True, cascade='all, delete-orphan')
 
+    # Phase 4.4 — hot-query composite indexes (mirrored by migration 003):
+    #   - default public list + v1 keyset pagination (ORDER BY created_at DESC, job_id DESC)
+    #   - recruiter's job list / dashboard (WHERE recruiter_id = ? ORDER BY created_at DESC)
+    #   - job-type browsing (WHERE job_type = ? ORDER BY created_at DESC)
+    __table_args__ = (
+        db.Index('ix_jobs_created_at_id', 'created_at', 'job_id',
+                 postgresql_ops={'created_at': 'DESC', 'job_id': 'DESC'}),
+        db.Index('ix_jobs_recruiter_created', 'recruiter_id', 'created_at',
+                 postgresql_ops={'created_at': 'DESC'}),
+        db.Index('ix_jobs_type_created', 'job_type', 'created_at',
+                 postgresql_ops={'created_at': 'DESC'}),
+    )
+
 class Resume(db.Model):
     __tablename__ = 'resumes'
     resume_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -133,6 +146,16 @@ class Ranking(db.Model):
     resume_id = db.Column(UUID(as_uuid=True), db.ForeignKey('resumes.resume_id', ondelete='CASCADE'), nullable=False)
     matching_score = db.Column(db.Float)
     candidate_rank = db.Column(db.Integer)
+
+    # Phase 4.4 — hot-query composite indexes (mirrored by migration 003):
+    #   - candidate lists: WHERE job_id = ? AND matching_score >= ? ORDER BY
+    #     matching_score DESC, ranking_id DESC (keyset cursor)
+    #   - ranking regeneration after resume changes (WHERE resume_id IN (...))
+    __table_args__ = (
+        db.Index('ix_rankings_job_score', 'job_id', 'matching_score', 'ranking_id',
+                 postgresql_ops={'matching_score': 'DESC', 'ranking_id': 'DESC'}),
+        db.Index('ix_rankings_resume', 'resume_id'),
+    )
 
 class EmailVerificationToken(db.Model):
     __tablename__ = 'email_verification_tokens'
@@ -256,4 +279,11 @@ class Notification(db.Model):
 
     user = db.relationship('User', backref=db.backref('notifications', cascade='all, delete-orphan'))
     related_job = db.relationship('Job', foreign_keys=[related_job_id])
+
+    # Phase 4.4 — hot-query composite index (mirrored by migration 003):
+    # notification list + unread badge (WHERE user_id = ? ORDER BY created_at DESC).
+    __table_args__ = (
+        db.Index('ix_notifications_user_created', 'user_id', 'created_at',
+                 postgresql_ops={'created_at': 'DESC'}),
+    )
 
