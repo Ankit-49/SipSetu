@@ -112,13 +112,15 @@ services:
     profiles:
       - production
 
-  # Celery worker for background tasks
+  # Celery worker for background tasks. Consumes the interactive queues
+  # (default + email high-priority + bulk screening); the low-priority ML
+  # retraining queue runs on its own dedicated worker below (Phase 4.3).
   celery-worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: sipsetu-celery-worker
-    command: celery -A celery_app worker --loglevel=info --concurrency=4
+    command: celery -A celery_app worker --loglevel=info --concurrency=4 -Q celery,email,bulk_screen
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/sipsetu
       REDIS_URL: redis://redis:6379/0
@@ -131,6 +133,37 @@ services:
       SMTP_FROM: ${SMTP_FROM:-noreply@sipsetu.com}
       OTEL_ENABLED: ${OTEL_ENABLED:-false}
       OTEL_SERVICE_NAME: celery-worker
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    labels:
+      - "logging=promtail"
+    volumes:
+      - ./backend:/app
+      - backend_ml_artifacts:/app/ml_artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sipsetu-network
+    profiles:
+      - production
+      - worker
+
+  # Low-priority worker for ML retraining (Phase 4.3) — isolated from the
+  # interactive worker so heavy training never competes with email delivery.
+  celery-worker-retrain:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sipsetu-celery-worker-retrain
+    command: celery -A celery_app worker --loglevel=info --concurrency=1 -Q retrain -n retrain@%h
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/sipsetu
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-sipsetu-dev-jwt-secret-change-in-production}
+      OTEL_ENABLED: ${OTEL_ENABLED:-false}
+      OTEL_SERVICE_NAME: celery-worker-retrain
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     labels:
       - "logging=promtail"
