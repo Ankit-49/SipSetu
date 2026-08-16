@@ -169,8 +169,8 @@ SipSetu/
 │   ├── tracing.py              # Optional OpenTelemetry setup (OTEL_ENABLED=true)
 │   ├── validation.py           # File upload validation (size, MIME, extension)
 │   ├── schemas.py              # Pydantic request/response schemas
-│   ├── celery_app.py           # Celery application (broker/result backend config)
-│   ├── tasks/                  # Celery tasks: email, ML, reminders
+│   ├── celery_app.py           # Celery application (broker/result backend, task_routes, DLQ hook)
+│   ├── tasks/                  # Celery tasks: email (high pri), ML/retrain (low pri), reminders, bulk-screen, dead-letter ops
 │   ├── utils/
 │   │   ├── email.py            # SMTP email sender (dev fallback to console)
 │   │   ├── parser.py           # Resume text parsing helpers
@@ -1145,6 +1145,7 @@ All return `429 Too Many Requests`:
 3. **Email sending** — Falls back to console in development. Requires SMTP config for production.
 4. **Single-process default** — The dev server is synchronous; production uses Gunicorn + gevent (Dockerfile default).
 5. **Bulk screening is async** — `/recruiters/bulk-screen` queues a Celery job (`tasks/bulk_screen_tasks.py`) and the UI polls `GET /recruiters/bulk-screen/<job_id>`. Falls back to synchronous processing when no broker is configured.
+5b. **Priority queues + dead-letter queue** — `task_routes` split work into `email` (high), `bulk_screen` (medium) and `retrain` (low) queues consumed by dedicated workers (see `docker-compose.yml`); a job that permanently fails is recorded in the `dead_letter` Redis list by `FlaskTask.on_failure` and can be inspected/requeued via `celery -A celery_app call tasks.dead_letter_tasks.{list,count,requeue}_dead_letters`.
 6. **Profile images** — Stored as base64/URL text in the database, not on object storage.
 7. **File upload size validation** — Size/MIME/extension checks exist (`validation.py`), but no virus scanning (ClamAV).
 8. **Redis hard dependency for production features** — Rate limiting, Celery, and health checks degrade gracefully to dev fallbacks, but require Redis for production behavior.
@@ -1177,11 +1178,20 @@ All return `429 Too Many Requests`:
 - [x] **Migration drift check** — `alembic check` in CI
 - [x] **Codecov badge** — Upload + display coverage badge
 
+### Phase 4 (API & Architecture Maturity) — in progress
+
+- [x] **API versioning** — Canonical `/api/v1` + deprecated legacy `/api` (RFC 8594 `Deprecation`/`Sunset`/`Link` headers)
+- [x] **OpenAPI docs** — Flasgger UI at `/apidocs/`, spec at `/apispec.json` (auth schemas in `backend/api_docs.py`)
+- [x] **Response envelope + cursor pagination** — `{ data, meta }` on all v1 list endpoints; keyset pagination via `?limit=` + `?cursor=` (`backend/pagination.py`); `?sort=` support
+- [x] **Celery priority queues + DLQ** — `task_routes` (email high / bulk-screen medium / retrain low) with dedicated workers; permanently failed jobs land in the `dead_letter` Redis list, inspect/requeue via `tasks.dead_letter_tasks.*`
+- [x] **Hot-query index audit** — Composite DESC indexes on `jobs`, `rankings`, `notifications` (migration `003_hot_query_indexes`, mirrors model `__table_args__`); re-run audit: `backend/scripts/explain_analyze.sql`
+
 ### Pending
 
 - [ ] **Coverage raise** — Push backend coverage from ~33% toward 50%+
 - [ ] **Virus scanning** — ClamAV for uploaded resumes (documented in Known Limitations)
 - [ ] **Streaming uploads / CDN** — Direct-to-S3 client uploads and a CDN in front of static assets
+- [ ] **Phase 4.4 remaining** — PgBouncer connection pooling, read replicas, partitioning
 
 ### Medium-term (3–6 months)
 
