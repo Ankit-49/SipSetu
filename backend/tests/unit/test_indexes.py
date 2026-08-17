@@ -1,8 +1,10 @@
 """Unit tests for Phase 4.4 hot-query composite indexes.
 
 The model-level ``__table_args__`` indexes are created by ``db.create_all()``
-in dev/sqlite and must mirror the Postgres indexes added by alembic migration
-003 (``003_hot_query_indexes``) — these tests pin that parity.
+in dev/sqlite and must mirror the Postgres indexes added by alembic migrations
+003 (``003_hot_query_indexes``) and 004 (``004_pg_trgm_jobs_search``) — these
+tests pin that parity. On SQLite the pg_trgm GIN indexes materialize as plain
+btree indexes (the ``postgresql_using``/``postgresql_ops`` kwargs are ignored).
 """
 
 
@@ -42,3 +44,11 @@ def test_index_columns_match_query_patterns(app):
 
     notif_idx = _indexes(app, "notifications")
     assert notif_idx["ix_notifications_user_created"] == ["user_id", "created_at"]
+
+
+def test_jobs_search_trgm_indexes(app):
+    """GET /jobs?search= ILIKE columns get pg_trgm GIN indexes (migration 004)."""
+    job_idx = _indexes(app, "jobs")
+    assert job_idx["ix_jobs_title_trgm"] == ["title"]
+    assert job_idx["ix_jobs_location_trgm"] == ["location"]
+    assert job_idx["ix_jobs_job_type_trgm"] == ["job_type"]

@@ -95,7 +95,7 @@ class Job(db.Model):
     salary_min = db.Column(db.Float, nullable=True)
     salary_max = db.Column(db.Float, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     skills = db.relationship('Skill', secondary=job_skills, backref=db.backref('jobs', lazy='dynamic'))
     rankings = db.relationship('Ranking', backref='job', lazy=True, cascade='all, delete-orphan')
     applications = db.relationship('JobApplication', backref='job', lazy=True, cascade='all, delete-orphan')
@@ -104,6 +104,8 @@ class Job(db.Model):
     #   - default public list + v1 keyset pagination (ORDER BY created_at DESC, job_id DESC)
     #   - recruiter's job list / dashboard (WHERE recruiter_id = ? ORDER BY created_at DESC)
     #   - job-type browsing (WHERE job_type = ? ORDER BY created_at DESC)
+    #   - GET /jobs?search= leading-wildcard ILIKE -> pg_trgm GIN (migration 004;
+    #     plain btree equivalents on SQLite since postgresql_using/ops are ignored)
     __table_args__ = (
         db.Index('ix_jobs_created_at_id', 'created_at', 'job_id',
                  postgresql_ops={'created_at': 'DESC', 'job_id': 'DESC'}),
@@ -111,6 +113,12 @@ class Job(db.Model):
                  postgresql_ops={'created_at': 'DESC'}),
         db.Index('ix_jobs_type_created', 'job_type', 'created_at',
                  postgresql_ops={'created_at': 'DESC'}),
+        db.Index('ix_jobs_title_trgm', 'title',
+                 postgresql_using='gin', postgresql_ops={'title': 'gin_trgm_ops'}),
+        db.Index('ix_jobs_location_trgm', 'location',
+                 postgresql_using='gin', postgresql_ops={'location': 'gin_trgm_ops'}),
+        db.Index('ix_jobs_job_type_trgm', 'job_type',
+                 postgresql_using='gin', postgresql_ops={'job_type': 'gin_trgm_ops'}),
     )
 
 class Resume(db.Model):
