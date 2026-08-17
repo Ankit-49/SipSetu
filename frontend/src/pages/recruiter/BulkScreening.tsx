@@ -25,6 +25,7 @@ import {
 import api, { API_BASE } from "@/lib/api";
 import confetti from "canvas-confetti";
 import ScoreExplanation from "@/components/ScoreExplanation";
+import { useAuth } from "@/app/context/AuthContext";
 
 interface CandidateResult {
   filename: string;
@@ -50,6 +51,7 @@ interface JobPosting {
 }
 
 export default function RecruiterBulkScreening() {
+  const { user } = useAuth();
   // Mode selection
   const [jobMode, setJobMode] = useState<"posted" | "custom">("posted");
   const [activeJobs, setActiveJobs] = useState<JobPosting[]>([]);
@@ -95,14 +97,14 @@ export default function RecruiterBulkScreening() {
   useEffect(() => {
     const fetchJobs = async () => {
       try {
-        const userId = localStorage.getItem("user_id");
+        const userId = user?.id || localStorage.getItem("user_id");
         const response = await api.get("/jobs", {
           params: {
             recruiter_id: userId,
             limit: 100
           }
         });
-        const myJobs = response.data.data || [];
+        const myJobs = response.data?.data ?? response.data?.jobs ?? [];
         setActiveJobs(myJobs);
         if (myJobs.length > 0) {
           setSelectedJobId((current) => current || myJobs[0].job_id);
@@ -112,7 +114,7 @@ export default function RecruiterBulkScreening() {
       }
     };
     fetchJobs();
-  }, []);
+  }, [user]);
 
   // Drag and drop handlers
   const handleDrag = (e: React.DragEvent) => {
