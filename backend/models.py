@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.dialects.postgresql import UUID as _PgUUID
 
 db = SQLAlchemy()
@@ -95,6 +96,14 @@ class Job(db.Model):
     salary_min = db.Column(db.Float, nullable=True)
     salary_max = db.Column(db.Float, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Postgres full-text search vector (migration 005) — maintained by
+    # routes_common.set_job_search_vector on Postgres writes; always NULL on
+    # SQLite (dev/tests), where the search path falls back to ILIKE. The
+    # with_variant keeps db.create_all() working on both dialects.
+    search_vector = db.Column(
+        TSVECTOR().with_variant(db.Text(), 'sqlite'),
+        nullable=True,
+    )
 
     skills = db.relationship('Skill', secondary=job_skills, backref=db.backref('jobs', lazy='dynamic'))
     rankings = db.relationship('Ranking', backref='job', lazy=True, cascade='all, delete-orphan')
@@ -119,6 +128,9 @@ class Job(db.Model):
                  postgresql_using='gin', postgresql_ops={'location': 'gin_trgm_ops'}),
         db.Index('ix_jobs_job_type_trgm', 'job_type',
                  postgresql_using='gin', postgresql_ops={'job_type': 'gin_trgm_ops'}),
+        # Full-text search over the search_vector column (migration 005).
+        db.Index('ix_jobs_search_vector', 'search_vector',
+                 postgresql_using='gin'),
     )
 
 class Resume(db.Model):

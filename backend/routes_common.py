@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import re
 
+from sqlalchemy import func
+
 from models import Job, JobApplication, Ranking, Resume, db
 
 EXPERIENCE_LEVEL_TO_YEARS = {
@@ -11,6 +13,25 @@ EXPERIENCE_LEVEL_TO_YEARS = {
     "3-5": 4.0,
     "5+": 5.0,
 }
+
+
+def set_job_search_vector(job):
+    """Maintain ``Job.search_vector`` for Postgres full-text search.
+
+    Computed by the database with ``to_tsvector`` so the value matches the
+    migration-005 backfill exactly. No-op on SQLite (dev/tests), where the
+    search path falls back to ILIKE.
+    """
+    if db.engine.dialect.name != 'postgresql':
+        job.search_vector = None
+        return
+    job.search_vector = func.to_tsvector(
+        'english',
+        func.coalesce(job.title, '')
+        + ' ' + func.coalesce(job.description, '')
+        + ' ' + func.coalesce(job.location, '')
+        + ' ' + func.coalesce(job.job_type, ''),
+    )
 
 
 def format_candidate_preview(ranking):

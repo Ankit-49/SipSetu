@@ -1184,7 +1184,8 @@ All return `429 Too Many Requests`:
 - [x] **OpenAPI docs** — Flasgger UI at `/apidocs/`, spec at `/apispec.json` (auth schemas in `backend/api_docs.py`)
 - [x] **Response envelope + cursor pagination** — `{ data, meta }` on all v1 list endpoints; keyset pagination via `?limit=` + `?cursor=` (`backend/pagination.py`); `?sort=` support
 - [x] **Celery priority queues + DLQ** — `task_routes` (email high / bulk-screen medium / retrain low) with dedicated workers; permanently failed jobs land in the `dead_letter` Redis list, inspect/requeue via `tasks.dead_letter_tasks.*`
-- [x] **Hot-query index audit** — Composite DESC indexes on `jobs`, `rankings`, `notifications` (migration `003_hot_query_indexes`, mirrors model `__table_args__`); re-run audit: `backend/scripts/explain_analyze.sql`
+- [x] **Hot-query index audit** — Composite DESC indexes on `jobs`, `rankings`, `notifications` (migration `003_hot_query_indexes`, mirrors model `__table_args__`) + `pg_trgm` GIN indexes on `jobs` search columns (migration `004_pg_trgm_jobs_search`); re-run audit: `backend/scripts/explain_analyze.sql`
+- [x] **Jobs full-text search** — `GET /jobs?search=` now uses Postgres `tsvector` full-text search (migration `005_jobs_full_text_search`: `search_vector` column + GIN index, backfilled) and ranks results by relevance (`ts_rank`); short terms and SQLite dev/tests fall back to ILIKE, backed by the pg_trgm GIN indexes
 
 ### Pending
 

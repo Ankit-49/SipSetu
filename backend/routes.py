@@ -57,6 +57,7 @@ from routes_common import (
     extract_skills_from_text,
     format_candidate_preview,
     format_job,
+    set_job_search_vector,
 )
 from utils.email import (
     render_email,
@@ -738,16 +739,27 @@ def jobs():
             if skill_obj:
                 query = query.filter(Job.skills.any(Skill.skill_id == skill_obj.skill_id))
 
+    fts_active = False
+    fts_query = None
     if search_q:
-        query = query.filter(
-            or_(
-                Job.title.ilike(f'%{search_q}%'),
-                Job.location.ilike(f'%{search_q}%'),
-                Job.job_type.ilike(f'%{search_q}%'),
+        fts_active = db.engine.dialect.name == 'postgresql' and len(search_q) >= 3
+        if fts_active:
+            # Postgres full-text search over the tsvector column (migration 005).
+            fts_query = func.plainto_tsquery('english', search_q)
+            query = query.filter(Job.search_vector.op('@@')(fts_query))
+        else:
+            # Fallback: leading-wildcard ILIKE — used on SQLite (dev/tests) and
+            # for short terms where the pg_trgm GIN indexes cannot help.
+            query = query.filter(
+                or_(
+                    Job.title.ilike(f'%{search_q}%'),
+                    Job.location.ilike(f'%{search_q}%'),
+                    Job.job_type.ilike(f'%{search_q}%'),
+                )
             )
-        )
 
-    # Ordering — stable keyset (primary column + id tiebreaker).
+    # Ordering — stable keyset (primary column + id tiebreaker). While
+    # full-text searching, relevance (ts_rank) wins over the ?sort= param.
     sort = (request.args.get('sort') or '-created_at').strip().lower()
     sort_map = {
         'created_at': (Job.created_at, Job.job_id, False),
@@ -755,29 +767,56 @@ def jobs():
         'title': (Job.title, Job.job_id, False),
         '-title': (Job.title, Job.job_id, True),
     }
-    sort_col, id_col, descending = sort_map.get(sort, sort_map['-created_at'])
-    query = query.order_by(
-        sort_col.desc() if descending else sort_col.asc(),
-        id_col.desc() if descending else id_col.asc(),
-    )
+    if fts_active:
+        rank_expr = func.ts_rank(Job.search_vector, fts_query).label('search_rank')
+        query = query.order_by(
+            rank_expr.desc(), Job.created_at.desc(), Job.job_id.desc(),
+        )
+    else:
+        sort_col, id_col, descending = sort_map.get(sort, sort_map['-created_at'])
+        query = query.order_by(
+            sort_col.desc() if descending else sort_col.asc(),
+            id_col.desc() if descending else id_col.asc(),
+        )
 
     if is_v1_request():
         # Canonical /api/v1 — cursor (keyset) pagination + {data, meta} envelope.
         limit = parse_limit(20)
         cursor_values = decode_cursor(request.args.get('cursor'))
-        if cursor_values:
-            query = keyset_filter(
-                query, [sort_col, id_col], cursor_values, descending=descending
-            )
-        rows = query.limit(limit + 1).all()
-        has_more = len(rows) > limit
-        page_items = rows[:limit]
-        next_cursor = None
-        if has_more and page_items:
-            last = page_items[-1]
-            next_cursor = encode_cursor(
-                getattr(last, sort_col.key), getattr(last, id_col.key)
-            )
+        if fts_active:
+            # Relevance ranking — keyset seek over (search_rank, created_at,
+            # job_id); ts_rank is computed per row, so the cursor carries it
+            # and the WHERE compares the same expression.
+            fts_q = query.add_columns(rank_expr)
+            if cursor_values:
+                fts_q = keyset_filter(
+                    fts_q, [rank_expr, Job.created_at, Job.job_id],
+                    cursor_values, descending=True,
+                )
+            rows = fts_q.limit(limit + 1).all()
+            has_more = len(rows) > limit
+            page_rows = rows[:limit]
+            page_items = [row[0] for row in page_rows]
+            next_cursor = None
+            if has_more and page_rows:
+                last = page_rows[-1]
+                next_cursor = encode_cursor(
+                    last[1], last[0].created_at, last[0].job_id,
+                )
+        else:
+            if cursor_values:
+                query = keyset_filter(
+                    query, [sort_col, id_col], cursor_values, descending=descending
+                )
+            rows = query.limit(limit + 1).all()
+            has_more = len(rows) > limit
+            page_items = rows[:limit]
+            next_cursor = None
+            if has_more and page_items:
+                last = page_items[-1]
+                next_cursor = encode_cursor(
+                    getattr(last, sort_col.key), getattr(last, id_col.key)
+                )
         return jsonify(build_envelope(
             [format_job(job) for job in page_items],
             total=query.count(), limit=limit,
@@ -833,6 +872,7 @@ def create_job():
         if skill not in new_job.skills:
             new_job.skills.append(skill)
     db.session.add(new_job)
+    set_job_search_vector(new_job)
     db.session.commit()
     create_rankings_for_job(new_job.job_id)
     return jsonify({
@@ -1013,6 +1053,7 @@ def update_job(job_id):
             if skill not in job.skills:
                 job.skills.append(skill)
 
+    set_job_search_vector(job)
     db.session.commit()
     create_rankings_for_job(job.job_id)
 

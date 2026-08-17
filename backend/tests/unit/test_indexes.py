@@ -21,6 +21,7 @@ def test_jobs_hot_query_indexes(app):
     assert "ix_jobs_created_at_id" in names      # default list + keyset pagination
     assert "ix_jobs_recruiter_created" in names  # recruiter's job list/dashboard
     assert "ix_jobs_type_created" in names       # job-type browsing
+    assert "ix_jobs_search_vector" in names      # full-text search (migration 005)
 
 
 def test_rankings_hot_query_indexes(app):
@@ -52,3 +53,19 @@ def test_jobs_search_trgm_indexes(app):
     assert job_idx["ix_jobs_title_trgm"] == ["title"]
     assert job_idx["ix_jobs_location_trgm"] == ["location"]
     assert job_idx["ix_jobs_job_type_trgm"] == ["job_type"]
+
+
+def test_jobs_search_vector_index(app):
+    """Full-text search index covers only the tsvector column (migration 005)."""
+    job_idx = _indexes(app, "jobs")
+    assert job_idx["ix_jobs_search_vector"] == ["search_vector"]
+
+
+def test_jobs_search_vector_column_created(app):
+    """db.create_all() creates the column on SQLite as TEXT (variant of TSVECTOR)."""
+    from models import db
+
+    with app.app_context():
+        inspector = __import__("sqlalchemy").inspect(db.engine)
+        cols = {c["name"]: str(c["type"]) for c in inspector.get_columns("jobs")}
+    assert cols.get("search_vector") == "TEXT"

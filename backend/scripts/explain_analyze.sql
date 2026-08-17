@@ -1,8 +1,9 @@
 -- ============================================================================
 -- Phase 4.4 — Hot-query EXPLAIN ANALYZE audit
 -- ============================================================================
--- Run against the staging/production Postgres to verify the composite indexes
--- added by migration 003 (003_hot_query_indexes) are actually used.
+-- Run against the staging/production Postgres to verify the indexes added by
+-- migrations 003 (003_hot_query_indexes, composite) and 004
+-- (004_pg_trgm_jobs_search, pg_trgm GIN) are actually used.
 --
 --   psql "$DATABASE_URL" -f backend/scripts/explain_analyze.sql
 --
@@ -100,11 +101,48 @@ SELECT count(*)
 FROM notifications
 WHERE user_id = :user_id AND is_read = false;
 
+-- ---------------------------------------------------------------------------
+-- 9. GET /jobs?search=term — Postgres full-text search (migration 005),
+--    ranking results by relevance (ts_rank).
+--
+--    EXPECTED PLAN CHANGE:
+--      * BEFORE (migration 004, ILIKE only): Seq Scan — a btree index cannot
+--        satisfy a leading-wildcard '%term%' pattern.
+--      * AFTER (migration 005): Bitmap Index Scan on ix_jobs_search_vector
+--        (GIN over the tsvector column) -> Bitmap Heap Scan with Recheck Cond,
+--        ordered by ts_rank DESC (relevance) then created_at DESC.
+--
+--    Caveats:
+--      * The tsvector is maintained by the application on create/update
+--        (routes_common.set_job_search_vector) and backfilled by migration 005,
+--        so every job row carries a vector.
+--      * The @@ path only runs on Postgres for terms >= 3 characters. The
+--        ILIKE fallback (SQLite dev/tests and short terms) still relies on the
+--        pg_trgm GIN indexes from migration 004 — those also serve the
+--        location-filter ILIKE in the base query (ix_jobs_location_trgm).
+--      * The planner may still choose a Seq Scan on tiny tables — that is a
+--        cost-based decision, not an index failure; check against real volume.
+-- ---------------------------------------------------------------------------
+EXPLAIN ANALYZE
+SELECT job_id, title, location, job_type, created_at,
+       ts_rank(search_vector, plainto_tsquery('english', :term)) AS search_rank
+FROM jobs
+WHERE search_vector @@ plainto_tsquery('english', :term)
+ORDER BY search_rank DESC, created_at DESC
+LIMIT 20;
+
+-- Fallback shape (what the route runs when the FTS path is not active):
+EXPLAIN ANALYZE
+SELECT job_id, title, location, job_type, created_at
+FROM jobs
+WHERE title ILIKE '%' || :term || '%'
+   OR location ILIKE '%' || :term || '%'
+   OR job_type ILIKE '%' || :term || '%'
+ORDER BY created_at DESC
+LIMIT 20;
+
 -- ============================================================================
 -- Known non-indexable paths (noted in the audit):
---   * GET /jobs?search=... uses ILIKE '%term%' — a btree index cannot help a
---     leading-wildcard LIKE. If this becomes hot, add pg_trgm GIN indexes or
---     full-text search (tsvector).
 --   * The v1 matched-jobs endpoint scores every job in Python (Job.query.all()
 --     + in-memory ranking) — index help is limited until scoring moves to SQL
 --     or a precomputed ranking table is queried instead.
