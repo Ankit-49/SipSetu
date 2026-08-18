@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, Briefcase, Send, Loader2, BookmarkCheck, Bookmark, Trash2, Heart, Eye, Banknote, GraduationCap, Ban, CheckCircle2 } from "lucide-react";
+import { MapPin, Clock, Briefcase, Send, Loader2, Bookmark, Trash2, Heart, Eye, Banknote, GraduationCap, Ban, CheckCircle2 } from "lucide-react";
 import { Link } from "react-router";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
@@ -49,7 +49,7 @@ export default function ApplicantSavedJobs() {
       setAppliedJobIds((prev) => [...prev, jobId]);
       const job = jobs.find(j => String(j.job_id) === String(jobId));
       toast({ title: "Application sent!", description: `You applied to "${job?.title || "the job"}".` });
-    } catch (err) {
+    } catch {
       toast({ title: "Could not apply", description: "Please try again.", variant: "destructive" });
     } finally {
       setApplyingJobId(null);
@@ -98,7 +98,7 @@ export default function ApplicantSavedJobs() {
       await api.delete(`/jobs/${jobId}/save`);
       setJobs((prev) => prev.filter(j => String(j.job_id) !== String(jobId)));
       toast({ title: "Removed from saved jobs" });
-    } catch (err) {
+    } catch {
       toast({ title: "Failed to remove", variant: "destructive" });
     } finally {
       setUnsavingId(null);

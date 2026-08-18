@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { 
   UploadCloud, 
   Trash2, 
@@ -22,7 +22,7 @@ import {
   RefreshCw,
   BarChart3
 } from "lucide-react";
-import api, { API_BASE } from "@/lib/api";
+import api from "@/lib/api";
 import confetti from "canvas-confetti";
 import ScoreExplanation from "@/components/ScoreExplanation";
 import { useAuth } from "@/app/context/AuthContext";
@@ -332,7 +332,7 @@ export default function RecruiterBulkScreening() {
         } else {
           setProgressText(`Screening in progress (${data.processed_files ?? 0}/${data.total_files ?? 0})...`);
         }
-      } catch (err) {
+      } catch {
         // Transient network error — keep polling.
       }
     };

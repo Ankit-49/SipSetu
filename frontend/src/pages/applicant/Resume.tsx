@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
-import { useAuth } from "@/app/context/AuthContext";
 
 // ----- Structured resume types -----
 
