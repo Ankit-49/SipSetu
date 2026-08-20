@@ -92,7 +92,7 @@ jobs:
 
       - name: Serve frontend (background)
         working-directory: ./frontend
-        run: nohup npx serve dist -l 5173 > /tmp/frontend.log 2>&1 &
+        run: nohup npx serve dist -l 5173 -s > /tmp/frontend.log 2>&1 &
         timeout-minutes: 1
 
       # ---- Wait for services ----
@@ -108,6 +108,19 @@ jobs:
             sleep 2
           done
           curl -sf http://localhost:5000/api/health || (echo 'Backend failed to start'; cat /tmp/backend.log; exit 1)
+
+      - name: Wait for frontend to be ready
+        run: |
+          echo "Waiting for frontend..."
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:5173/ > /dev/null; then
+              echo "Frontend ready!"
+              break
+            fi
+            echo "Attempt $i/15..."
+            sleep 2
+          done
+          curl -sf http://localhost:5173/ > /dev/null || (echo 'Frontend failed to start'; cat /tmp/frontend.log; exit 1)
 
       # ---- Playwright ----
       - name: Install Playwright
