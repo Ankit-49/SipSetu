@@ -16,8 +16,7 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 *High impact, blocks production deployment*
 
 > **Status: DONE** — containerization, Alembic migrations, test infrastructure,
-> and CI are all in place. Remaining: E2E Playwright coverage and a
-> deploy/migration workflow for staging (see "Deployment" in the summary).
+> CI, E2E Playwright tests, and a staging migration workflow are all in place.
 
 ### 1.1 Containerization & Local Dev Parity
 - [x] **Docker Compose** — Single-command `docker compose up` for Postgres, Redis, Backend, Frontend
@@ -33,14 +32,14 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 ### 1.3 Test Infrastructure
 - [x] **Backend: pytest + pytest-cov** — Unit tests for scoring, auth, utils; integration tests for API routes
 - [x] **Frontend: Vitest + React Testing Library** — Component tests, hook tests, utils
-- [ ] **E2E: Playwright** — Critical flows: register→verify→login→upload resume→match jobs
+- [x] **E2E: Playwright** — Critical flows: register→verify→login→upload resume→match jobs (`e2e/` directory + `e2e-ci.yml` workflow)
 - [x] **Test DB** — Separate test database with fixtures/factories (factory_boy; CI Postgres service + conftest fixtures)
 - [x] **Coverage targets** — frontend ≥70% enforced in CI; backend ≥30% enforced (80% aspirational, not yet reached)
 
 ### 1.4 CI/CD Pipeline (GitHub Actions)
 - [x] **Backend workflow** — Lint (ruff), typecheck (mypy), test, build Docker image
 - [x] **Frontend workflow** — Lint (eslint), typecheck (tsc), test, build, upload artifacts
-- [ ] **Migration workflow** — Run Alembic upgrade on staging DB
+- [x] **Migration workflow** — Run Alembic upgrade on staging DB (`.github/workflows/migration.yml`)
 - [x] **Dependabot** — Weekly dependency updates (grouped PRs; auto-merge not configured)
 
 ---
@@ -49,8 +48,9 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 *Required for any real traffic*
 
 > **Status: DONE** — all items complete except virus scanning (needs ClamAV infra)
-> and direct-to-S3 streaming uploads / CDN (deferred, `storage.py` already exposes
-> presigned upload URLs).
+> and CDN (deferred). Direct-to-S3 streaming uploads are now wired: backend exposes
+> `POST /resumes/presigned-upload-url` + `POST /resumes/confirm-upload` and the
+> frontend uses presigned URLs when available (with server-side fallback).
 
 ### 2.1 Redis-Backed Rate Limiting
 - [x] **Replace in-memory limiter** — Flask-Limiter, sliding-window strategy, Redis-backed
@@ -64,7 +64,7 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 
 ### 2.3 Object Storage for Files
 - [x] **S3/MinIO integration** — `utils/storage.py` (upload, presigned GET URLs, delete)
-- [ ] **Streaming uploads** — Direct-to-S3 from frontend (helper `get_presigned_upload_url` exists; wire into routes)
+- [x] **Streaming uploads** — Direct-to-S3 from frontend (presigned URL route + confirm-upload route in `routes.py`; `Resume.tsx` tries presigned path first, falls back to server-side multipart)
 - [ ] **CDN** — CloudFront/Cloudflare for static assets and resume downloads
 
 ### 2.4 Input Validation & Security
@@ -87,7 +87,7 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 
 > **Status: DONE** — full stack lives under `monitoring/` and runs via
 > `docker compose --profile observability up` (Prometheus, Alertmanager, Grafana,
-> Loki, Promtail, OpenTelemetry collector).
+> Loki, Promtail, OpenTelemetry collector). Flower dashboard included.
 
 ### 3.1 Structured Logging
 - [x] **JSON logs** — `python-json-logger` with correlation IDs (`logging_config.py`)
@@ -130,7 +130,7 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 - [x] **Task priorities** — `task_routes` in `celery_app.py`: email queue (priority 3, high), bulk-screen queue (5), retrain queue (9, low), `queue_order_strategy=priority`; dedicated `celery-worker-retrain` compose service so training never competes with email
 - [x] **Retry/backoff** — Exponential backoff on email and bulk-screen tasks (`self.retry(countdown=60 * 2**retries)`)
 - [x] **Dead-letter queue** — `FlaskTask.on_failure` publishes permanently failed jobs to the `dead_letter` Redis list (`tasks/dead_letter.py`); inspect/requeue via `tasks.dead_letter_tasks.{list,count,requeue}_dead_letters`
-- [ ] **Flower monitoring** — Celery dashboard
+- [x] **Flower monitoring** — Celery dashboard (`flower:5555` in docker-compose; Prometheus scrape target added)
 
 ### 4.4 Database Optimization
 - [x] **Index audit** — `EXPLAIN ANALYZE` on all hot queries; add composite indexes. Migration `003_hot_query_indexes` + model `__table_args__` parity: jobs `(created_at, job_id)` / `(recruiter_id, created_at)` / `(job_type, created_at)`, rankings `(job_id, matching_score, ranking_id)` + `(resume_id)`, notifications `(user_id, created_at)` — all DESC-ordered to match the ORDER BY. Search: migration `004_pg_trgm_jobs_search` adds `pg_trgm` GIN indexes on jobs `title`/`location`/`job_type` (also serving the location-filter ILIKE). Re-runnable audit script: `backend/scripts/explain_analyze.sql`
