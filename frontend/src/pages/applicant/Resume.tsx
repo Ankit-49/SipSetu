@@ -517,15 +517,45 @@ export default function ApplicantResume() {
     }
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", pendingFile);
-      formData.append("applicant_id", userId);
-      const res = await api.post("/resumes/upload-pdf", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      // Attempt direct-to-S3 presigned upload (Phase 2.3).
+      // Falls back to server-side multipart if presigned URL is unavailable.
+      let uploaded = false;
+      try {
+        const presigned = await api.post("/resumes/presigned-upload-url", {
+          filename: pendingFile.name,
+          content_type: pendingFile.type || "application/pdf",
+        });
+        if (presigned.data.upload_url && !presigned.data.fallback) {
+          // Upload directly to S3 using the presigned URL
+          await fetch(presigned.data.upload_url, {
+            method: presigned.data.method || "PUT",
+            headers: presigned.data.headers || {},
+            body: pendingFile,
+          });
+          // Confirm the upload on the server
+          await api.post("/resumes/confirm-upload", {
+            key: presigned.data.key,
+            filename: pendingFile.name,
+          });
+          uploaded = true;
+        }
+      } catch {
+        // Presigned upload failed — fall through to server-side upload
+      }
+
+      if (!uploaded) {
+        // Fallback: upload through the backend (server-side multipart)
+        const formData = new FormData();
+        formData.append("file", pendingFile);
+        formData.append("applicant_id", userId);
+        await api.post("/resumes/upload-pdf", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
       toast({
         title: "Resume uploaded ✓",
-        description: `${res.data.skill_count} skills extracted. Switching to Build tab to fine-tune.`,
+        description: `Skills extracted. Switching to Build tab to fine-tune.`,
       });
       await fetchResume();
       setActiveTab("builder");

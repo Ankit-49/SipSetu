@@ -1289,6 +1289,173 @@ def upload_resume_pdf():
         return jsonify({"error": f"Error processing PDF: {e!s}"}), 500
 
 
+@api.route('/resumes/presigned-upload-url', methods=['POST'])
+@require_role('applicant')
+def get_presigned_upload_url():
+    """Generate a presigned S3 URL for direct-to-S3 resume upload.
+
+    The frontend uploads the file directly to S3 (bypassing the backend),
+    then calls POST /resumes/confirm-upload to record the upload.
+    Falls back gracefully for local storage providers.
+
+    ---
+    tags:
+      - resumes
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            filename:
+              type: string
+              description: Original filename (used for extension)
+            content_type:
+              type: string
+              default: application/pdf
+    responses:
+      200:
+        description: Presigned URL and metadata
+      400:
+        description: Missing filename
+    """
+    data = request.get_json(silent=True) or {}
+    filename = (data.get('filename') or '').strip()
+    content_type = data.get('content_type', 'application/pdf')
+
+    if not filename:
+        return jsonify({"error": "filename is required"}), 400
+
+    ext = os.path.splitext(filename)[1] or '.pdf'
+    storage = get_storage()
+    key = f"resumes/{g.current_user_id}/{uuid.uuid4().hex}{ext}"
+
+    result = storage.get_presigned_upload_url(
+        key=key,
+        content_type=content_type,
+        expires_in=3600,
+    )
+
+    if 'error' in result:
+        return jsonify({
+            "error": result['error'],
+            "fallback": True,
+            "message": "Direct upload not available; use multipart upload instead",
+        }), 200
+
+    return jsonify({
+        "upload_url": result['url'],
+        "key": result['key'],
+        "method": result.get('method', 'PUT'),
+        "headers": result.get('headers', {}),
+        "expires_in": result.get('expires_in', 3600),
+        "storage_provider": storage.provider,
+    }), 200
+
+
+@api.route('/resumes/confirm-upload', methods=['POST'])
+@require_role('applicant')
+def confirm_upload():
+    """Confirm a direct-to-S3 upload by extracting text & storing the resume.
+
+    Called after the frontend has uploaded the file to S3 using the
+    presigned URL from GET /resumes/presigned-upload-url.
+
+    ---
+    tags:
+      - resumes
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            key:
+              type: string
+              description: S3 storage key from presigned upload response
+            filename:
+              type: string
+              description: Original filename for metadata
+    responses:
+      201:
+        description: Resume confirmed and analyzed
+      400:
+        description: Missing key or filename
+    """
+    data = request.get_json(silent=True) or {}
+    key = (data.get('key') or '').strip()
+    filename = (data.get('filename') or 'resume.pdf').strip()
+
+    if not key:
+        return jsonify({"error": "key is required"}), 400
+
+    applicant_id = g.current_user_id
+    applicant = Applicant.query.get(applicant_id)
+    if not applicant:
+        return jsonify({"error": "Applicant not found"}), 404
+
+    storage = get_storage()
+    try:
+        # Download the file from storage for text extraction
+        if storage.provider in ('s3', 'minio') and storage._client:
+            import io
+            buf = io.BytesIO()
+            storage._client.download_fileobj(storage.bucket, key, buf)
+            file_bytes = buf.getvalue()
+        else:
+            return jsonify({"error": "Confirm-upload requires S3/MinIO storage"}), 400
+
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        text = "".join(page.get_text() for page in doc).strip()
+        doc.close()
+    except Exception as e:
+        return jsonify({"error": f"Error reading uploaded file: {e!s}"}), 400
+
+    if not text:
+        return jsonify({"error": "The PDF has no readable text"}), 400
+
+    extracted_skills = extract_skills_from_text(text)
+
+    # Keep only the latest resume per applicant
+    for old in Resume.query.filter_by(applicant_id=applicant_id).all():
+        db.session.delete(old)
+    db.session.flush()
+
+    new_resume = Resume(
+        applicant_id=applicant_id,
+        raw_text=text,
+        file_path=key,
+    )
+    for skill_name in extracted_skills:
+        skill = Skill.query.filter_by(skill_name=skill_name.lower()).first()
+        if not skill:
+            skill = Skill(skill_name=skill_name.lower())
+            db.session.add(skill)
+        if skill not in new_resume.skills:
+            new_resume.skills.append(skill)
+    db.session.add(new_resume)
+    db.session.flush()
+    create_rankings_for_resume(new_resume.resume_id, applicant_id)
+    db.session.commit()
+
+    return jsonify({
+        "message": "Resume upload confirmed and analyzed successfully",
+        "resume_id": str(new_resume.resume_id),
+        "filename": filename,
+        "uploaded_at": new_resume.uploaded_at.isoformat(),
+        "skills_extracted": extracted_skills,
+        "skill_count": len(extracted_skills),
+        "file_url": storage.get_url(key),
+        "storage_provider": storage.provider,
+    }), 201
+
+
 def _compute_job_match_score(resume, job):
     if not resume or not job:
         return 0.0
