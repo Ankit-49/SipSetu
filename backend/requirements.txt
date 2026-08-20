@@ -43,8 +43,8 @@ sentry-sdk[flask]>=2.68.0
 opentelemetry-sdk>=1.25.0
 opentelemetry-api>=1.25.0
 opentelemetry-exporter-otlp>=1.44.0
-opentelemetry-instrumentation-flask>=0.50b0
-opentelemetry-instrumentation-sqlalchemy>=0.50b0
+opentelemetry-instrumentation-flask>=0.65b0
+opentelemetry-instrumentation-sqlalchemy>=0.65b0
 opentelemetry-instrumentation-requests>=0.50b0
 
 # Security
