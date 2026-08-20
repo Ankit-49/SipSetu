@@ -32,7 +32,7 @@ flower>=2.0.0
 flask-limiter>=3.5.0
 
 # API Documentation (Phase 4.1)
-flasgger>=0.9.7
+flasgger>=0.9.7.1
 
 # Monitoring & Observability
 prometheus-flask-exporter>=0.23.0
