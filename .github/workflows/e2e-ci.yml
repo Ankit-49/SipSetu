@@ -71,8 +71,8 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
           JWT_SECRET_KEY: e2e-test-secret
           FLASK_ENV: development
-        run: python app.py &
-        timeout_seconds: 10
+        run: nohup python app.py > /tmp/backend.log 2>&1 &
+        timeout-minutes: 1
 
       # ---- Frontend ----
       - name: Set up Node.js
@@ -92,16 +92,22 @@ jobs:
 
       - name: Serve frontend (background)
         working-directory: ./frontend
-        run: npx serve dist -l 5173 &
-        timeout_seconds: 10
+        run: nohup npx serve dist -l 5173 > /tmp/frontend.log 2>&1 &
+        timeout-minutes: 1
 
       # ---- Wait for services ----
       - name: Wait for backend to be ready
         run: |
+          echo "Waiting for backend..."
           for i in $(seq 1 30); do
-            curl -sf http://localhost:5000/api/health && break
+            if curl -sf http://localhost:5000/api/health; then
+              echo "Backend ready!"
+              break
+            fi
+            echo "Attempt $i/30..."
             sleep 2
           done
+          curl -sf http://localhost:5000/api/health || (echo 'Backend failed to start'; cat /tmp/backend.log; exit 1)
 
       # ---- Playwright ----
       - name: Install Playwright
