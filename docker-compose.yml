@@ -181,6 +181,33 @@ services:
       - production
       - worker
 
+  # Celery monitoring dashboard (Phase 4.3)
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sipsetu-flower
+    command: celery -A celery_app flower --port=5555 --broker_api=redis://redis:6379/0
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/sipsetu
+      REDIS_URL: redis://redis:6379/0
+      FLOWER_BASIC_AUTH: ${FLOWER_BASIC_AUTH:-admin:sipsetu}
+    labels:
+      - "logging=promtail"
+    volumes:
+      - ./backend:/app
+    ports:
+      - "5555:5555"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - sipsetu-network
+    profiles:
+      - production
+      - worker
+      - observability
+
   # Celery beat for periodic tasks
   celery-beat:
     build:

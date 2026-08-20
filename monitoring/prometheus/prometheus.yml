@@ -22,6 +22,13 @@ scrape_configs:
       - targets:
           - "backend:5000"
 
+  # Flower — Celery monitoring dashboard (Phase 4.3)
+  - job_name: "sipsetu-flower"
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "flower:5555"
+
   # Prometheus self-monitoring
   - job_name: "prometheus"
     static_configs:

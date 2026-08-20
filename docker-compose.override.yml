@@ -34,3 +34,7 @@ services:
   celery-beat:
     deploy:
       replicas: 0
+
+  flower:
+    deploy:
+      replicas: 0
