@@ -1,0 +1,77 @@
+name: Database Migrations (Staging)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/migrations/**'
+      - 'migrations/**'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Migration action'
+        required: true
+        default: 'upgrade'
+        type: choice
+        options:
+          - upgrade
+          - check
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  migrate:
+    name: Run Alembic Migrations
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    environment: staging
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: sipsetu_staging
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d sipsetu_staging"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: pip install -r requirements.txt
+
+      - name: Check for schema drift
+        working-directory: ./backend
+        run: alembic check
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sipsetu_staging
+        if: ${{ github.event.inputs.action == 'check' || (!github.event.inputs.action) }}
+
+      - name: Run Alembic upgrade head
+        working-directory: ./backend
+        run: alembic upgrade head
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sipsetu_staging
+        if: ${{ github.event.inputs.action == 'upgrade' || (!github.event.inputs.action) }}
+
+      - name: Show current migration
+        working-directory: ./backend
+        run: alembic heads
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sipsetu_staging
