@@ -35,4 +35,4 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:5000/api/health', timeout=5)" || exit 1
 
-CMD ["gunicorn", "-k", "gevent", "-w", "4", "-b", "0.0.0.0:5000", "app:create_app()"]
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "app:create_app()"]
