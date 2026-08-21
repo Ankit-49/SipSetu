@@ -27,6 +27,9 @@ import RecruiterProfile from "../pages/recruiter/Profile";
 import RecruiterBulkScreening from "../pages/recruiter/BulkScreening";
 import RecruiterManageJobs from "../pages/recruiter/ManageJobs";
 
+// Admin
+import AdminDashboard from "../pages/admin/Dashboard";
+
 export const router = createBrowserRouter([
   { path: "/", Component: LandingPage },
   { path: "/preview", Component: PreviewPage },
@@ -155,6 +158,16 @@ export const router = createBrowserRouter([
     Component: () => (
       <ProtectedRoute requiredRole="recruiter">
         <RecruiterLayout><RecruiterProfile /></RecruiterLayout>
+      </ProtectedRoute>
+    ),
+  },
+
+  // Admin Routes
+  {
+    path: "/admin",
+    Component: () => (
+      <ProtectedRoute>
+        <ApplicantLayout><AdminDashboard /></ApplicantLayout>
       </ProtectedRoute>
     ),
   },

@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router";
 import { LayoutDashboard, FileText, Briefcase, TrendingUp, User, Menu, X, ClipboardList, Heart } from "lucide-react";
+import { NotificationCenter } from "@/components/NotificationCenter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -190,6 +191,7 @@ export function ApplicantLayout({ children }: { children: React.ReactNode }) {
             <Menu className="h-6 w-6" />
           </button>
           <SipSetuLogo className="text-white text-xl font-bold tracking-tight" />
+          <div className="ml-auto"><NotificationCenter /></div>
         </div>
 
         <ScrollArea className="flex-1 h-full">
