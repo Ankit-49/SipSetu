@@ -140,6 +140,10 @@ class Resume(db.Model):
     raw_text = db.Column(db.Text)
     file_path = db.Column(db.String(500))
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Phase 5.1 — LLM-parsed structured sections and confidence
+    parsed_sections = db.Column(db.Text, nullable=True)  # JSON: {summary, experience, education, skills, projects}
+    parse_confidence = db.Column(db.Float, nullable=True)  # 0.0-1.0 extraction confidence
+    parse_method = db.Column(db.String(20), nullable=True)  # 'llm' | 'regex'
 
     skills = db.relationship('Skill', secondary=resume_skills, backref=db.backref('resumes', lazy='dynamic'))
     rankings = db.relationship('Ranking', backref='resume', lazy=True, cascade='all, delete-orphan')
@@ -252,6 +256,49 @@ class Interview(db.Model):
     job = db.relationship('Job', backref=db.backref('interviews', cascade='all, delete-orphan'))
     applicant = db.relationship('Applicant', backref=db.backref('interviews', cascade='all, delete-orphan'), foreign_keys=[applicant_id])
     recruiter = db.relationship('Recruiter', backref=db.backref('interviews_as_recruiter', cascade='all, delete-orphan'), foreign_keys=[recruiter_id])
+
+
+class RankingFeedback(db.Model):
+    """Explicit recruiter feedback on a candidate ranking (Phase 5.2).
+
+    Recruiters can indicate that a candidate should be ranked higher or
+    lower, providing active-learning labels that improve the ML model
+    over time.
+    """
+    __tablename__ = 'ranking_feedback'
+    feedback_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ranking_id = db.Column(UUID(as_uuid=True), db.ForeignKey('rankings.ranking_id', ondelete='CASCADE'), nullable=False)
+    recruiter_id = db.Column(UUID(as_uuid=True), db.ForeignKey('recruiters.user_id', ondelete='CASCADE'), nullable=False)
+    direction = db.Column(db.String(10), nullable=False)  # 'higher', 'lower', 'correct'
+    note = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    ranking = db.relationship('Ranking', backref=db.backref('feedbacks', cascade='all, delete-orphan'))
+    recruiter = db.relationship('Recruiter', backref=db.backref('ranking_feedbacks', cascade='all, delete-orphan'))
+
+    __table_args__ = (
+        db.UniqueConstraint('ranking_id', 'recruiter_id', name='uq_ranking_recruiter_feedback'),
+    )
+
+
+class AuditLog(db.Model):
+    """Immutable audit log for admin and sensitive actions (Phase 5.4)."""
+    __tablename__ = 'audit_logs'
+    log_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    actor_id = db.Column(UUID(as_uuid=True), db.ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True)
+    action = db.Column(db.String(100), nullable=False)
+    target_type = db.Column(db.String(50), nullable=True)  # 'user', 'job', 'application', etc.
+    target_id = db.Column(db.String(255), nullable=True)
+    details = db.Column(db.Text, nullable=True)  # JSON
+    ip_address = db.Column(db.String(45), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    actor = db.relationship('User', backref=db.backref('audit_logs', cascade='all, delete-orphan'))
+
+    __table_args__ = (
+        db.Index('ix_audit_logs_actor_created', 'actor_id', 'created_at',
+                 postgresql_ops={'created_at': 'DESC'}),
+    )
 
 
 class BulkScreenJob(db.Model):

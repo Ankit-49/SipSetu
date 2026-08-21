@@ -89,6 +89,14 @@ class Settings(BaseSettings):
         'SWAGGER_ENABLED', 'true'
     ).lower() in ('1', 'true', 'yes')
     
+    # LLM (Phase 5.1)
+    LLM_API_KEY: str | None = os.environ.get('LLM_API_KEY')
+    LLM_BASE_URL: str = os.environ.get('LLM_BASE_URL', 'https://api.openai.com/v1')
+    LLM_MODEL: str = os.environ.get('LLM_MODEL', 'gpt-4o-mini')
+
+    # Admin (Phase 5.4)
+    ADMIN_EMAILS: str = os.environ.get('ADMIN_EMAILS', '')
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
