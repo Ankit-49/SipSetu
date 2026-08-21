@@ -158,7 +158,7 @@ def _regex_parse(text: str) -> dict[str, Any]:
             sections["summary"] = content[:500]
         elif "experience" in h_lower or "employment" in h_lower:
             # Split by bullet points or lines
-            lines = [l.strip() for l in content.split("\n") if l.strip()]
+            lines = [ln.strip() for ln in content.split("\n") if ln.strip()]
             current_exp: dict[str, Any] | None = None
             for line in lines:
                 if _EXPERIENCE_PATTERN.search(line):
@@ -170,28 +170,28 @@ def _regex_parse(text: str) -> dict[str, Any]:
             if current_exp:
                 sections["experience"].append(current_exp)
         elif "education" in h_lower or "academic" in h_lower:
-            lines = [l.strip() for l in content.split("\n") if l.strip()]
+            lines = [ln.strip() for ln in content.split("\n") if ln.strip()]
             for line in lines[:5]:
                 sections["education"].append({
                     "degree": line, "institution": "", "year": "", "gpa": None,
                 })
         elif "skill" in h_lower:
             # Extract comma or bullet-separated skills
-            skill_text = re.sub(r"[•●○▪–—\-]", ",", content)
+            skill_text = re.sub(r"[•●○▪–—\-]", ",", content)  # noqa: RUF001
             skills = [s.strip() for s in skill_text.split(",") if s.strip()]
             sections["skills"] = skills[:30]
         elif "project" in h_lower:
-            lines = [l.strip() for l in content.split("\n") if l.strip()]
+            lines = [ln.strip() for ln in content.split("\n") if ln.strip()]
             for line in lines[:5]:
                 sections["projects"].append({
                     "name": line, "description": "", "technologies": [],
                 })
         elif "cert" in h_lower:
-            cert_text = re.sub(r"[•●○▪–—\-]", ",", content)
+            cert_text = re.sub(r"[•●○▪–—\-]", ",", content)  # noqa: RUF001
             sections["certifications"] = [c.strip() for c in cert_text.split(",") if c.strip()]
         elif "language" in h_lower:
-            lang_text = re.sub(r"[•●○▪–—\-]", ",", content)
-            sections["languages"] = [l.strip() for l in lang_text.split(",") if l.strip()]
+            lang_text = re.sub(r"[•●○▪–—\-]", ",", content)  # noqa: RUF001
+            sections["languages"] = [ln.strip() for ln in lang_text.split(",") if ln.strip()]
 
     # Always extract skills from the full text using existing extractor
     if not sections["skills"]:

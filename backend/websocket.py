@@ -27,12 +27,12 @@ _initialized = False
 def _detect_async_mode() -> str:
     """Detect the best available async mode for Flask-SocketIO."""
     try:
-        import eventlet  # noqa: F401
+        import eventlet
         return "eventlet"
     except ImportError:
         pass
     try:
-        import gevent  # noqa: F401
+        import gevent
         return "gevent"
     except ImportError:
         pass
