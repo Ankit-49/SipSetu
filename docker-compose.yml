@@ -60,6 +60,7 @@ services:
       OTEL_ENABLED: ${OTEL_ENABLED:-false}
       OTEL_SERVICE_NAME: backend
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     labels:
       - "logging=promtail"
     volumes:

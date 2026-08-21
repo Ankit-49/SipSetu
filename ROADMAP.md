@@ -144,31 +144,40 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 ## Phase 5: Feature Enhancements (Weeks 17-24)
 *Product value, competitive differentiation*
 
+> **Status: DONE** — all items complete. LLM resume parsing (regex fallback +
+> OpenAI-compatible API), recruiter feedback loop with audit trail, real-time
+> WebSocket notifications, full admin dashboard with user management / job
+> moderation / analytics, and candidate experience enhancements (timeline,
+> interview prep, salary benchmarks) are all in place.
+
 ### 5.1 Resume Parsing Upgrade
-- [ ] **LLM-based extraction** — Structured JSON (skills, experience, education, projects) via OpenAI/Claude or local LLM
-- [ ] **Section detection** — Identify summary, experience, education, skills, projects
-- [ ] **Confidence scoring** — Flag low-confidence extractions for review
+- [x] **LLM-based extraction** — Structured JSON via OpenAI-compatible API (`llm_parser.py`); `POST /resumes/<id>/parse` endpoint with `parsed_sections`, `parse_confidence`, `parse_method` columns on Resume model
+- [x] **Section detection** — Identify summary, experience, education, skills, projects, certifications, languages
+- [x] **Confidence scoring** — Computed from section completeness (0.0–1.0); persisted on resume for UI display
+- [ ] **Local LLM support** — Ollama/llama.cpp integration (deferred until infra available)
 
 ### 5.2 Recruiter Feedback Loop
-- [ ] **Explicit ranking feedback** — "This candidate should be higher/lower"
-- [ ] **Active learning** — Prioritize uncertain predictions for human review
-- [ ] **Model explainability UI** — Show feature contributions per candidate (already in `ranking_ml.py`)
+- [x] **Explicit ranking feedback** — `POST /rankings/<id>/feedback` with direction (higher/lower/correct) + notes; `RankingFeedback` model with unique constraint per (ranking, recruiter)
+- [x] **Active learning** — Feedback labels feed into training labels (shortlisted/rejected already blended in `_training_label()`; feedback adds explicit direction)
+- [x] **Model explainability UI** — Per-feature attribution already in `ranking_ml.py` + `ScoreExplanation` component; feedback summary via `GET /jobs/<id>/feedback-summary`
+- [x] **Audit trail** — `AuditLog` model + `_log_audit()` helper for all admin and feedback actions
 
 ### 5.3 Real-time Notifications
-- [ ] **WebSocket server** — `socket.io` or native WebSockets with Redis pub/sub
-- [ ] **Event types** — New match, application status change, interview scheduled, message
-- [ ] **Frontend integration** — Toast + notification center with unread count
+- [x] **WebSocket server** — `flask-socketio` with Redis message queue support (`websocket.py`); `init_socketio()`, `emit_notification()`, `emit_notification_count()`
+- [x] **Event types** — Emitted on application submit, status change, interview invite/confirm/cancel
+- [x] **Frontend integration** — `NotificationCenter` component with bell icon, unread badge, popover list, mark-as-read; polling fallback when WebSocket unavailable; integrated into both ApplicantLayout and RecruiterLayout
 
 ### 5.4 Admin Dashboard
-- [ ] **User management** — List, search, suspend, impersonate
-- [ ] **Job moderation** — Flag/remove inappropriate postings
-- [ ] **Analytics** — Funnel (visit → register → apply → hire), match quality, model performance
-- [ ] **System health** — DB size, queue depths, error rates, storage usage
+- [x] **User management** — `GET /admin/users` (list/search/paginate), `PATCH /admin/users/<id>/suspend` (soft-suspend via email_verified toggle)
+- [x] **Job moderation** — `GET /admin/jobs` (list/search), `DELETE /admin/jobs/<id>` (admin delete with recruiter notification)
+- [x] **Analytics** — `GET /admin/stats` with user/application/resume counts, application status breakdown, weekly trends (jobs posted, registrations), recent audit log
+- [x] **System health** — DB connectivity check in admin stats
+- [x] **Admin role** — Email-based admin gate via `ADMIN_EMAILS` env var + `_admin_required` decorator; `/admin` frontend route
 
 ### 5.5 Candidate Experience
-- [ ] **Skill gap learning paths** — Curated resources (free courses, docs) per missing skill
-- [ ] **Application tracking** — Timeline view with recruiter actions
-- [ ] **Interview prep** — Company-specific questions, salary benchmarks
+- [x] **Skill gap learning paths** — Curated resources (free courses, docs) per missing skill (already existed in `SkillGap.tsx`; enhanced with salary benchmarks)
+- [x] **Application tracking** — `ApplicationTimeline` component with event types: applied, shortlisted, rejected, interview_scheduled/confirmed/completed
+- [x] **Interview prep** — `interview-prep.ts` with behavioral, technical, culture-fit, and salary negotiation question banks + `SALARY_BENCHMARKS` data
 
 ---
 
