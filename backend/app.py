@@ -138,6 +138,17 @@ def create_app():
     app.register_blueprint(api, url_prefix=f'/api/{settings.API_VERSION}')
     app.register_blueprint(api, url_prefix='/api', name='api_legacy')
 
+    # Phase 5 routes (LLM parsing, feedback, admin, notifications)
+    from routes_phase5 import phase5
+    app.register_blueprint(phase5, url_prefix=f'/api/{settings.API_VERSION}')
+    app.register_blueprint(phase5, url_prefix='/api', name='phase5_legacy')
+
+    # Phase 5.3 — Initialize WebSocket (Flask-SocketIO) for real-time notifications.
+    # init_socketio() is a no-op when flask-socketio is not installed.
+    from websocket import init_socketio
+    socketio = init_socketio(app)
+    app.socketio = socketio
+
     # OpenAPI/Swagger documentation (Phase 4.1) — documents the /api/v1 surface
     # only; the legacy /api endpoints are excluded from the spec.
     if settings.SWAGGER_ENABLED:
@@ -279,4 +290,9 @@ if __name__ == '__main__':
         start_retrain_scheduler(app)
     
     port = int(os.environ.get('PORT', 5000))
-    app.run(debug=debug, host='0.0.0.0', port=port)
+    socketio = getattr(app, 'socketio', None)
+    if socketio:
+        # Use Flask-SocketIO's server which supports both HTTP and WebSocket
+        socketio.run(app, debug=debug, host='0.0.0.0', port=port)
+    else:
+        app.run(debug=debug, host='0.0.0.0', port=port)

@@ -70,6 +70,20 @@ api = Blueprint('api', __name__)
 
 
 # ---------------------------------------------------------------------------
+# WebSocket helper (Phase 5.3)
+# ---------------------------------------------------------------------------
+
+def _emit_ws(user_id, title, message, notif_type="info", related_job_id=None):
+    """Emit a real-time notification via WebSocket (no-op if not configured)."""
+    try:
+        from websocket import emit_notification, emit_notification_count
+        emit_notification(user_id, title, message, notif_type, related_job_id)
+        emit_notification_count(user_id)
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -919,6 +933,8 @@ def apply_for_job(job_id):
             related_job_id=job_id,
         ))
         db.session.flush()
+        _emit_ws(applicant_id, "Application Submitted", f"You have successfully applied for '{job.title}'.", "success", job_id)
+        _emit_ws(str(job.recruiter_id), "New Job Application", f"{applicant.name} has applied for your job '{job.title}'.", "info", job_id)
 
     create_rankings_for_job(job_id)
     db.session.commit()
@@ -2594,6 +2610,9 @@ def update_application_status(application_id):
             title="🎉 You've been shortlisted!" if new_status == 'shortlisted' else "Application Update",
             message=msg, type=notif_type, related_job_id=application.job_id,
         ))
+        _emit_ws(str(application.applicant_id),
+                 "🎉 You've been shortlisted!" if new_status == 'shortlisted' else "Application Update",
+                 msg, notif_type, str(application.job_id))
 
     db.session.commit()
     return jsonify({
@@ -2715,6 +2734,7 @@ def propose_interview():
         related_job_id=job_id,
     ))
     db.session.commit()
+    _emit_ws(applicant_id, "Interview Invitation", f"You've been invited for an interview for '{job.title}'.", "info", job_id)
 
     return jsonify({
         "message": "Interview proposed successfully",
