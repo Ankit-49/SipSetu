@@ -223,7 +223,7 @@ def parse_resume(text: str) -> dict[str, Any]:
         }
 
     # Try LLM first
-    prompt = _PARSE_PROMPT.format(resume_text=text[:8000])  # Truncate for token limits
+    prompt = _PARSE_PROMPT.replace("{resume_text}", text[:8000])  # Truncate for token limits
     llm_response = _call_llm(prompt)
 
     if llm_response:
