@@ -74,6 +74,7 @@ ignore = [
 "tests/*" = ["S101", "B017", "F811", "F401", "RUF013"]
 "migrations/*" = ["I001", "DTZ003", "UP006"]
 "models.py" = ["RUF012"]
+"gunicorn.conf.py" = ["I001"]
 
 # Formatter
 [format]
