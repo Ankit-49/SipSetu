@@ -56,19 +56,19 @@ jobs:
         working-directory: ./backend
         run: pip install -r requirements.txt
 
-      - name: Check for schema drift
-        working-directory: ./backend
-        run: alembic check
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sipsetu_staging
-        if: ${{ github.event.inputs.action == 'check' || (!github.event.inputs.action) }}
-
       - name: Run Alembic upgrade head
         working-directory: ./backend
         run: alembic upgrade head
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sipsetu_staging
         if: ${{ github.event.inputs.action == 'upgrade' || (!github.event.inputs.action) }}
+
+      - name: Check for schema drift
+        working-directory: ./backend
+        run: alembic check
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sipsetu_staging
+        if: always() && (github.event.inputs.action == 'check' || (!github.event.inputs.action))
 
       - name: Show current migration
         working-directory: ./backend
