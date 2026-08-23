@@ -26,6 +26,8 @@ import RecruiterCandidates from "../pages/recruiter/Candidates";
 import RecruiterProfile from "../pages/recruiter/Profile";
 import RecruiterBulkScreening from "../pages/recruiter/BulkScreening";
 import RecruiterManageJobs from "../pages/recruiter/ManageJobs";
+import RecruiterOrganizations from "../pages/recruiter/Organizations";
+import OrganizationDetailPage from "../pages/recruiter/OrganizationDetail";
 
 // Admin
 import AdminDashboard from "../pages/admin/Dashboard";
@@ -158,6 +160,22 @@ export const router = createBrowserRouter([
     Component: () => (
       <ProtectedRoute requiredRole="recruiter">
         <RecruiterLayout><RecruiterProfile /></RecruiterLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/recruiter/organizations",
+    Component: () => (
+      <ProtectedRoute requiredRole="recruiter">
+        <RecruiterLayout><RecruiterOrganizations /></RecruiterLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/recruiter/organizations/:orgId",
+    Component: () => (
+      <ProtectedRoute requiredRole="recruiter">
+        <RecruiterLayout><OrganizationDetailPage /></RecruiterLayout>
       </ProtectedRoute>
     ),
   },
