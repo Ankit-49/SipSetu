@@ -184,9 +184,12 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 ## Phase 6: Scale & Advanced (Months 7-12)
 
 ### 6.1 Multi-tenancy / Organizations
-- [ ] **Organization model** — Recruiters belong to orgs, shared job pools, team dashboards
-- [ ] **Role-based access** — Admin, hiring manager, interviewer, viewer
-- [ ] **Billing/usage** — Seat-based or usage-based pricing infrastructure
+> **Status: IN PROGRESS** — Organization model, role-based access, shared job pools,
+> team dashboard, and full frontend UI are complete. Billing/usage deferred.
+
+- [x] **Organization model** — Recruiters belong to orgs, shared job pools, team dashboards (`Organization`, `OrganizationMember` models; migration 007)
+- [x] **Role-based access** — Owner, admin, hiring_manager, interviewer, viewer roles with `_admin_required` gates
+- [ ] **Billing/usage** — Seat-based or usage-based pricing infrastructure (deferred)
 
 ### 6.2 Advanced Matching
 - [ ] **Semantic search** — Vector embeddings (pgvector) for resume/job similarity beyond keywords
