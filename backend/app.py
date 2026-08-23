@@ -143,6 +143,11 @@ def create_app():
     app.register_blueprint(phase5, url_prefix=f'/api/{settings.API_VERSION}')
     app.register_blueprint(phase5, url_prefix='/api', name='phase5_legacy')
 
+    # Phase 6.1 — Organization & team management routes
+    from routes_organizations import orgs_bp
+    app.register_blueprint(orgs_bp, url_prefix=f'/api/{settings.API_VERSION}')
+    app.register_blueprint(orgs_bp, url_prefix='/api', name='orgs_legacy')
+
     # Phase 5.3 — Initialize WebSocket (Flask-SocketIO) for real-time notifications.
     # init_socketio() is a no-op when flask-socketio is not installed.
     from websocket import init_socketio
@@ -185,6 +190,7 @@ def create_app():
             db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)"))
             db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS location VARCHAR(255)"))
             db.session.execute(db.text("ALTER TABLE interviews ADD COLUMN IF NOT EXISTS reminders_sent VARCHAR(255) DEFAULT ''"))
+            db.session.execute(db.text("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS organization_id UUID"))
             db.session.commit()
         except Exception as e:
             db.session.rollback()
