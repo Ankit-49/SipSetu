@@ -192,9 +192,13 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 - [ ] **Billing/usage** — Seat-based or usage-based pricing infrastructure (deferred)
 
 ### 6.2 Advanced Matching
-- [ ] **Semantic search** — Vector embeddings (pgvector) for resume/job similarity beyond keywords
-- [ ] **Diversity signals** — Optional demographic-aware ranking (compliance mode)
-- [ ] **Market intelligence** — Skill demand trends, salary benchmarks by region
+> **Status: DONE** — TF-IDF semantic search with pgvector extension point,
+> diversity-aware skill taxonomy analysis, and full market intelligence
+> (skill demand trends, salary benchmarks, hiring velocity, competitiveness).
+
+- [x] **Semantic search** — TF-IDF cosine similarity for resume/job matching with pgvector extension (`semantic_search.py`); routes: `GET /search/similar-resumes/<job_id>`, `GET /search/similar-jobs/<resume_id>`, `POST /search/similar-resumes/<job_id>` (reindex)
+- [x] **Diversity signals** — Skill taxonomy-based diversity analysis per job (`DIVERSITY_SKILL_TAXONOMY`); route: `GET /jobs/<job_id>/diversity-analysis` with Shannon entropy diversity score
+- [x] **Market intelligence** — Skill demand trends, salary benchmarks (p25/p50/p75), hiring velocity, applicant-to-job ratios, skill competitiveness metrics (`market_intelligence.py`); 7 market routes
 
 ### 6.3 Integrations
 - [ ] **ATS sync** — Greenhouse, Lever, Workday webhook receivers
