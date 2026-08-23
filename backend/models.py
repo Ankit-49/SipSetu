@@ -96,6 +96,8 @@ class Job(db.Model):
     salary_min = db.Column(db.Float, nullable=True)
     salary_max = db.Column(db.Float, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Phase 6.2 — semantic embedding (JSON-encoded float list, portability across dialects)
+    embedding = db.Column(db.Text, nullable=True)
     # Postgres full-text search vector (migration 005) — maintained by
     # routes_common.set_job_search_vector on Postgres writes; always NULL on
     # SQLite (dev/tests), where the search path falls back to ILIKE. The
@@ -140,6 +142,8 @@ class Resume(db.Model):
     raw_text = db.Column(db.Text)
     file_path = db.Column(db.String(500))
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Phase 6.2 — semantic embedding (JSON-encoded float list)
+    embedding = db.Column(db.Text, nullable=True)
     # Phase 5.1 — LLM-parsed structured sections and confidence
     parsed_sections = db.Column(db.Text, nullable=True)  # JSON: {summary, experience, education, skills, projects}
     parse_confidence = db.Column(db.Float, nullable=True)  # 0.0-1.0 extraction confidence
