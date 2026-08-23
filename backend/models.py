@@ -301,6 +301,55 @@ class AuditLog(db.Model):
     )
 
 
+class Organization(db.Model):
+    """Multi-tenant organization that recruiters belong to (Phase 6.1).
+
+    Organizations provide shared job pools, team dashboards, and role-based
+    access control for hiring teams.
+    """
+    __tablename__ = 'organizations'
+    org_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = db.Column(db.String(255), nullable=False)
+    slug = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    logo_url = db.Column(db.Text, nullable=True)
+    description = db.Column(db.Text, nullable=True)
+    website = db.Column(db.String(500), nullable=True)
+    industry = db.Column(db.String(100), nullable=True)
+    size = db.Column(db.String(50), nullable=True)  # '1-10', '11-50', '51-200', '201-500', '500+'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    members = db.relationship('OrganizationMember', backref='organization', lazy=True, cascade='all, delete-orphan')
+    jobs = db.relationship('Job', backref='organization', lazy=True)
+
+
+class OrganizationMember(db.Model):
+    """Membership of a user in an organization with a specific role (Phase 6.1).
+
+    Roles: owner, admin, hiring_manager, interviewer, viewer.
+    """
+    __tablename__ = 'organization_members'
+    membership_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    org_id = db.Column(UUID(as_uuid=True), db.ForeignKey('organizations.org_id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    role = db.Column(db.String(30), nullable=False, default='viewer')
+    # owner, admin, hiring_manager, interviewer, viewer
+    invited_by = db.Column(UUID(as_uuid=True), db.ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True)
+    joined_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', foreign_keys=[user_id], backref='organization_memberships')
+    inviter = db.relationship('User', foreign_keys=[invited_by])
+
+    __table_args__ = (
+        db.UniqueConstraint('org_id', 'user_id', name='uq_org_user_membership'),
+        db.Index('ix_org_members_user', 'user_id'),
+    )
+
+
+# Add optional org_id to Job
+Job.organization_id = db.Column(UUID(as_uuid=True), db.ForeignKey('organizations.org_id', ondelete='SET NULL'), nullable=True)
+
+
 class BulkScreenJob(db.Model):
     """Asynchronous bulk resume screening job (Phase 4.3).
 
