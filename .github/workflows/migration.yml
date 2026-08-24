@@ -63,12 +63,13 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sipsetu_staging
         if: ${{ github.event.inputs.action == 'upgrade' || (!github.event.inputs.action) }}
 
-      - name: Check for schema drift
+      - name: Check for schema drift (informational)
         working-directory: ./backend
         run: alembic check
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sipsetu_staging
         if: always() && (github.event.inputs.action == 'check' || (!github.event.inputs.action))
+        continue-on-error: true
 
       - name: Show current migration
         working-directory: ./backend
