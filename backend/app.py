@@ -199,7 +199,6 @@ def create_app():
             db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE"))
             db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)"))
             db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS location VARCHAR(255)"))
-            db.session.execute(db.text("ALTER TABLE interviews ADD COLUMN IF NOT EXISTS reminders_sent VARCHAR(255) DEFAULT ''"))
             db.session.execute(db.text("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS organization_id UUID"))
             db.session.execute(db.text("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS embedding TEXT"))
             db.session.execute(db.text("ALTER TABLE resumes ADD COLUMN IF NOT EXISTS embedding TEXT"))
