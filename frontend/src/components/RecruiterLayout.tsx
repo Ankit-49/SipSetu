@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router";
-import { LayoutDashboard, PlusSquare, Users, User, Sparkles, Menu, X, Briefcase, Building2 } from "lucide-react";
+import { LayoutDashboard, PlusSquare, Users, User, Sparkles, Menu, X, Briefcase, Building2, Link2 } from "lucide-react";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -28,6 +28,7 @@ const navItems = [
   { name: "Candidates", href: "/recruiter/candidates", icon: Users },
   { name: "Bulk Screen", href: "/recruiter/bulk-screen", icon: Sparkles },
   { name: "Organizations", href: "/recruiter/organizations", icon: Building2 },
+  { name: "Integrations", href: "/recruiter/integrations", icon: Link2 },
   { name: "Profile", href: "/recruiter/profile", icon: User },
 ];
 
