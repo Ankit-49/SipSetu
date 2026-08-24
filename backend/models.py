@@ -407,3 +407,161 @@ class Notification(db.Model):
                  postgresql_ops={'created_at': 'DESC'}),
     )
 
+
+# ─── Phase 6.3 — Integrations ───────────────────────────────────────────────
+
+class ATSConnection(db.Model):
+    """ATS (Applicant Tracking System) connection — Greenhouse, Lever, Workday.
+
+    Stores API credentials and sync state for each recruiter's external ATS.
+    """
+    __tablename__ = 'ats_connections'
+    connection_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    recruiter_id = db.Column(UUID(as_uuid=True), db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    provider = db.Column(db.String(50), nullable=False)  # 'greenhouse', 'lever', 'workday'
+    api_key_encrypted = db.Column(db.Text, nullable=False)  # encrypted API key
+    webhook_secret = db.Column(db.String(128), nullable=True)  # for inbound webhooks
+    ats_org_id = db.Column(db.String(255), nullable=True)  # external ATS org identifier
+    sync_status = db.Column(db.String(20), default='idle')  # idle, syncing, error, disabled
+    last_synced_at = db.Column(db.DateTime, nullable=True)
+    sync_cursor = db.Column(db.Text, nullable=True)  # pagination cursor for incremental sync
+    config = db.Column(db.Text, nullable=True)  # JSON blob for provider-specific settings
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    recruiter = db.relationship('User', backref=db.backref('ats_connections', cascade='all, delete-orphan'))
+
+    __table_args__ = (
+        db.Index('ix_ats_connections_recruiter', 'recruiter_id'),
+    )
+
+
+class WebhookSubscription(db.Model):
+    """Inbound webhook subscriptions for ATS events.
+
+    When an ATS fires an event (candidate applied, job updated, etc.), the
+    webhook hits our endpoint and we verify the signature using ``secret``.
+    """
+    __tablename__ = 'webhook_subscriptions'
+    subscription_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    connection_id = db.Column(UUID(as_uuid=True), db.ForeignKey('ats_connections.connection_id', ondelete='CASCADE'), nullable=False)
+    event_type = db.Column(db.String(100), nullable=False)  # 'candidate.created', 'job.updated', etc.
+    target_url = db.Column(db.Text, nullable=False)  # our internal webhook URL
+    secret = db.Column(db.String(255), nullable=False)  # HMAC secret for signature verification
+    is_active = db.Column(db.Boolean, default=True)
+    last_triggered_at = db.Column(db.DateTime, nullable=True)
+    failure_count = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    connection = db.relationship('ATSConnection', backref=db.backref('webhook_subscriptions', cascade='all, delete-orphan'))
+
+    __table_args__ = (
+        db.Index('ix_webhook_subscriptions_connection', 'connection_id'),
+    )
+
+
+class OAuthToken(db.Model):
+    """OAuth tokens for calendar integrations (Google Calendar, Outlook).
+
+    Stores encrypted refresh/access tokens and handles token lifecycle.
+    """
+    __tablename__ = 'oauth_tokens'
+    token_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    provider = db.Column(db.String(50), nullable=False)  # 'google', 'microsoft'
+    scopes = db.Column(db.Text, nullable=False)  # comma-separated OAuth scopes
+    access_token_encrypted = db.Column(db.Text, nullable=False)
+    refresh_token_encrypted = db.Column(db.Text, nullable=True)
+    token_expiry = db.Column(db.DateTime, nullable=False)
+    calendar_id = db.Column(db.String(255), nullable=True)  # default calendar ID
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('oauth_tokens', cascade='all, delete-orphan'))
+
+    __table_args__ = (
+        db.Index('ix_oauth_tokens_user_provider', 'user_id', 'provider'),
+    )
+
+
+class CalendarEvent(db.Model):
+    """Scheduled interview calendar events synced via OAuth.
+
+    Maps internal interview records to external calendar events for
+    bi-directional sync.
+    """
+    __tablename__ = 'calendar_events'
+    event_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    interview_id = db.Column(UUID(as_uuid=True), db.ForeignKey('interviews.interview_id', ondelete='CASCADE'), nullable=False)
+    oauth_token_id = db.Column(UUID(as_uuid=True), db.ForeignKey('oauth_tokens.token_id', ondelete='CASCADE'), nullable=False)
+    external_event_id = db.Column(db.String(255), nullable=True)  # Google/Outlook event ID
+    provider = db.Column(db.String(50), nullable=False)
+    sync_status = db.Column(db.String(20), default='pending')  # pending, synced, error
+    last_synced_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    interview = db.relationship('Interview', backref=db.backref('calendar_events', cascade='all, delete-orphan'))
+    oauth_token = db.relationship('OAuthToken', backref=db.backref('calendar_events', cascade='all, delete-orphan'))
+
+    __table_args__ = (
+        db.Index('ix_calendar_events_interview', 'interview_id'),
+    )
+
+
+class CommunicationChannel(db.Model):
+    """Slack / Microsoft Teams notification channel configuration.
+
+    Stores webhook URLs and channel mappings for recruiter notifications.
+    """
+    __tablename__ = 'communication_channels'
+    channel_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    recruiter_id = db.Column(UUID(as_uuid=True), db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    provider = db.Column(db.String(50), nullable=False)  # 'slack', 'teams'
+    webhook_url = db.Column(db.Text, nullable=False)  # Slack/Teams incoming webhook URL
+    channel_name = db.Column(db.String(255), nullable=True)  # display name
+    channel_id_external = db.Column(db.String(255), nullable=True)  # Slack channel ID
+    events_subscribed = db.Column(db.Text, default='application.received,application.shortlisted')  # comma-separated event types
+    is_active = db.Column(db.Boolean, default=True)
+    last_notified_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    recruiter = db.relationship('User', backref=db.backref('communication_channels', cascade='all, delete-orphan'))
+
+    __table_args__ = (
+        db.Index('ix_communication_channels_recruiter', 'recruiter_id'),
+    )
+
+
+class SSOProvider(db.Model):
+    """SSO provider configuration (SAML / OIDC).
+
+    Each organization can have one or more SSO providers for enterprise
+    single sign-on.
+    """
+    __tablename__ = 'sso_providers'
+    provider_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id = db.Column(UUID(as_uuid=True), db.ForeignKey('organizations.org_id', ondelete='CASCADE'), nullable=True)
+    name = db.Column(db.String(255), nullable=False)  # display name
+    protocol = db.Column(db.String(20), nullable=False)  # 'saml' or 'oidc'
+    issuer = db.Column(db.Text, nullable=False)  # IdP issuer URL
+    client_id = db.Column(db.String(255), nullable=True)  # OIDC client ID
+    client_secret_encrypted = db.Column(db.Text, nullable=True)  # OIDC client secret
+    metadata_url = db.Column(db.Text, nullable=True)  # SAML metadata XML URL
+    metadata_xml = db.Column(db.Text, nullable=True)  # cached SAML metadata XML
+    certificate = db.Column(db.Text, nullable=True)  # SAML signing certificate
+    redirect_url = db.Column(db.Text, nullable=False)  # callback URL
+    auto_provision = db.Column(db.Boolean, default=True)  # auto-create users on first SSO login
+    default_role = db.Column(db.String(50), default='viewer')  # role for auto-provisioned users
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    organization = db.relationship('Organization', backref=db.backref('sso_providers', cascade='all, delete-orphan'))
+
+    __table_args__ = (
+        db.Index('ix_sso_providers_organization', 'organization_id'),
+    )
+
