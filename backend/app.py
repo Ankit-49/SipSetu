@@ -153,6 +153,11 @@ def create_app():
     app.register_blueprint(phase6, url_prefix=f'/api/{settings.API_VERSION}')
     app.register_blueprint(phase6, url_prefix='/api', name='phase6_legacy')
 
+    # Phase 6.3 — Integrations: ATS sync, Calendar, Communication, SSO
+    from routes_integrations import phase63
+    app.register_blueprint(phase63, url_prefix=f'/api/{settings.API_VERSION}')
+    app.register_blueprint(phase63, url_prefix='/api', name='phase63_legacy')
+
     # Phase 5.3 — Initialize WebSocket (Flask-SocketIO) for real-time notifications.
     # init_socketio() is a no-op when flask-socketio is not installed.
     from websocket import init_socketio
@@ -198,6 +203,104 @@ def create_app():
             db.session.execute(db.text("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS organization_id UUID"))
             db.session.execute(db.text("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS embedding TEXT"))
             db.session.execute(db.text("ALTER TABLE resumes ADD COLUMN IF NOT EXISTS embedding TEXT"))
+            # Phase 6.3 — integration tables created via migration 009;
+            # on SQLite (dev/tests) we create them inline since Alembic is
+            # not invoked at startup.
+            try:
+                db.session.execute(db.text("""
+                    CREATE TABLE IF NOT EXISTS ats_connections (
+                        connection_id VARCHAR(36) PRIMARY KEY,
+                        recruiter_id VARCHAR(36) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                        provider VARCHAR(50) NOT NULL,
+                        api_key_encrypted TEXT NOT NULL,
+                        webhook_secret VARCHAR(128),
+                        ats_org_id VARCHAR(255),
+                        sync_status VARCHAR(20) DEFAULT 'idle',
+                        last_synced_at DATETIME,
+                        sync_cursor TEXT,
+                        config TEXT,
+                        is_active BOOLEAN DEFAULT 1,
+                        created_at DATETIME,
+                        updated_at DATETIME
+                    )
+                """))
+                db.session.execute(db.text("""
+                    CREATE TABLE IF NOT EXISTS webhook_subscriptions (
+                        subscription_id VARCHAR(36) PRIMARY KEY,
+                        connection_id VARCHAR(36) NOT NULL REFERENCES ats_connections(connection_id) ON DELETE CASCADE,
+                        event_type VARCHAR(100) NOT NULL,
+                        target_url TEXT NOT NULL,
+                        secret VARCHAR(255) NOT NULL,
+                        is_active BOOLEAN DEFAULT 1,
+                        last_triggered_at DATETIME,
+                        failure_count INTEGER DEFAULT 0,
+                        created_at DATETIME
+                    )
+                """))
+                db.session.execute(db.text("""
+                    CREATE TABLE IF NOT EXISTS oauth_tokens (
+                        token_id VARCHAR(36) PRIMARY KEY,
+                        user_id VARCHAR(36) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                        provider VARCHAR(50) NOT NULL,
+                        scopes TEXT NOT NULL,
+                        access_token_encrypted TEXT NOT NULL,
+                        refresh_token_encrypted TEXT,
+                        token_expiry DATETIME NOT NULL,
+                        calendar_id VARCHAR(255),
+                        is_active BOOLEAN DEFAULT 1,
+                        created_at DATETIME,
+                        updated_at DATETIME
+                    )
+                """))
+                db.session.execute(db.text("""
+                    CREATE TABLE IF NOT EXISTS calendar_events (
+                        event_id VARCHAR(36) PRIMARY KEY,
+                        interview_id VARCHAR(36) NOT NULL REFERENCES interviews(interview_id) ON DELETE CASCADE,
+                        oauth_token_id VARCHAR(36) NOT NULL REFERENCES oauth_tokens(token_id) ON DELETE CASCADE,
+                        external_event_id VARCHAR(255),
+                        provider VARCHAR(50) NOT NULL,
+                        sync_status VARCHAR(20) DEFAULT 'pending',
+                        last_synced_at DATETIME,
+                        created_at DATETIME
+                    )
+                """))
+                db.session.execute(db.text("""
+                    CREATE TABLE IF NOT EXISTS communication_channels (
+                        channel_id VARCHAR(36) PRIMARY KEY,
+                        recruiter_id VARCHAR(36) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                        provider VARCHAR(50) NOT NULL,
+                        webhook_url TEXT NOT NULL,
+                        channel_name VARCHAR(255),
+                        channel_id_external VARCHAR(255),
+                        events_subscribed TEXT DEFAULT 'application.received,application.shortlisted',
+                        is_active BOOLEAN DEFAULT 1,
+                        last_notified_at DATETIME,
+                        created_at DATETIME,
+                        updated_at DATETIME
+                    )
+                """))
+                db.session.execute(db.text("""
+                    CREATE TABLE IF NOT EXISTS sso_providers (
+                        provider_id VARCHAR(36) PRIMARY KEY,
+                        organization_id VARCHAR(36) REFERENCES organizations(org_id) ON DELETE CASCADE,
+                        name VARCHAR(255) NOT NULL,
+                        protocol VARCHAR(20) NOT NULL,
+                        issuer TEXT NOT NULL,
+                        client_id VARCHAR(255),
+                        client_secret_encrypted TEXT,
+                        metadata_url TEXT,
+                        metadata_xml TEXT,
+                        certificate TEXT,
+                        redirect_url TEXT NOT NULL,
+                        auto_provision BOOLEAN DEFAULT 1,
+                        default_role VARCHAR(50) DEFAULT 'viewer',
+                        is_active BOOLEAN DEFAULT 1,
+                        created_at DATETIME,
+                        updated_at DATETIME
+                    )
+                """))
+            except Exception:
+                pass  # tables already exist
             db.session.commit()
         except Exception as e:
             db.session.rollback()
