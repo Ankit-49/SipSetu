@@ -201,10 +201,15 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 - [x] **Market intelligence** — Skill demand trends, salary benchmarks (p25/p50/p75), hiring velocity, applicant-to-job ratios, skill competitiveness metrics (`market_intelligence.py`); 7 market routes
 
 ### 6.3 Integrations
-- [ ] **ATS sync** — Greenhouse, Lever, Workday webhook receivers
-- [ ] **Calendar** — Google/Outlook OAuth, auto-schedule interviews
-- [ ] **Communication** — Slack/Teams notifications, email threading
-- [ ] **SSO** — SAML/OIDC for enterprise customers
+> **Status: DONE** — ATS sync (Greenhouse/Lever/Workday), calendar OAuth (Google/Outlook),
+> communication channels (Slack/Teams webhooks), and SSO (SAML/OIDC) with auto-provisioning.
+
+- [x] **ATS sync** — Greenhouse, Lever, Workday webhook receivers + HMAC verification (`routes_integrations.py`); 10 endpoints: connection CRUD, manual sync, inbound webhook, webhook subscriptions
+- [x] **Calendar** — Google/Outlook OAuth token storage, interview-to-calendar event mapping, sync to external calendar (`CalendarEvent`, `OAuthToken` models); 7 endpoints
+- [x] **Communication** — Slack/Teams incoming webhook channels with event subscriptions, test notifications, 10 configurable event types (`CommunicationChannel` model); 5 endpoints
+- [x] **SSO** — SAML/OIDC provider configuration, metadata refresh, login initiation redirect, callback with auto-provisioning (`SSOProvider` model); 7 endpoints
+
+6 tables: `ats_connections`, `webhook_subscriptions`, `oauth_tokens`, `calendar_events`, `communication_channels`, `sso_providers` (migration 009)
 
 ### 6.4 Internationalization
 - [ ] **i18n framework** — `react-i18next` + Flask-Babel
