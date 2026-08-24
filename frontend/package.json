@@ -97,12 +97,12 @@
     "tailwindcss": "4.3.3",
     "typescript": "^5.4.0",
     "typescript-eslint": "^8.66.0",
-    "vite": "6.3.5",
+    "vite": "8.2.2",
     "vitest": "^1.4.0"
   },
   "pnpm": {
     "overrides": {
-      "vite": "6.3.5"
+      "vite": "8.2.2"
     }
   }
 }
