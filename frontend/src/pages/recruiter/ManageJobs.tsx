@@ -41,6 +41,7 @@ import {
   Eye,
   Search,
   TrendingUp,
+  Sparkles,
 } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect, useMemo } from "react";
@@ -48,6 +49,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import { useAuth } from "@/app/context/AuthContext";
+import { SimilarResumesPanel, SimilarResumesTrigger } from "@/components/SimilarResumesPanel";
 
 const EXPERIENCE_MAP: Record<string, string> = {
   fresher: "Fresher",
@@ -74,6 +76,10 @@ export default function RecruiterManageJobs() {
   // Delete state
   const [deleteJobId, setDeleteJobId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Similar resumes dialog state
+  const [similarJobId, setSimilarJobId] = useState<string | null>(null);
+  const [similarJobTitle, setSimilarJobTitle] = useState("");
 
   const fetchJobs = async () => {
     if (!user) return;
@@ -535,6 +541,14 @@ export default function RecruiterManageJobs() {
                             <Eye className="h-3.5 w-3.5" /> Candidates
                           </Button>
                         </Link>
+                        <SimilarResumesTrigger
+                          jobId={job.job_id}
+                          jobTitle={job.title}
+                          onOpen={(id, title) => {
+                            setSimilarJobId(id);
+                            setSimilarJobTitle(title);
+                          }}
+                        />
                         <Button
                           variant="ghost"
                           size="sm"
@@ -564,6 +578,25 @@ export default function RecruiterManageJobs() {
       {/* Modals */}
       {renderEditModal()}
       {renderDeleteDialog()}
+
+      {/* Similar Resumes Dialog */}
+      <Dialog open={!!similarJobId} onOpenChange={() => setSimilarJobId(null)}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-500" /> Similar Resumes
+            </DialogTitle>
+            <DialogDescription>
+              Semantically similar resumes for <span className="font-semibold">{similarJobTitle}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            {similarJobId && (
+              <SimilarResumesPanel jobId={similarJobId} jobTitle={similarJobTitle} />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

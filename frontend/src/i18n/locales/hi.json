@@ -155,7 +155,10 @@
     "viewDetails": "विवरण देखें",
     "postedDate": "{{date}} को पोस्ट किया",
     "matchScore": "मैच स्कोर",
-    "similarResumes": "समान रिज़्यूमे"
+    "similarResumes": "समान रिज़्यूमे",
+    "similarity": "समानता",
+    "noSimilarResumes": "कोई समान रिज़्यूमे नहीं मिले",
+    "findSimilar": "समान रिज़्यूमे खोजे जा रहे हैं..."
   },
   "candidates": {
     "title": "उम्मीदवार",

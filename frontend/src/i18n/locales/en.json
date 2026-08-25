@@ -155,7 +155,10 @@
     "viewDetails": "View Details",
     "postedDate": "Posted {{date}}",
     "matchScore": "Match Score",
-    "similarResumes": "Similar Resumes"
+    "similarResumes": "Similar Resumes",
+    "similarity": "Similarity",
+    "noSimilarResumes": "No similar resumes found",
+    "findSimilar": "Finding similar resumes..."
   },
   "candidates": {
     "title": "Candidates",
