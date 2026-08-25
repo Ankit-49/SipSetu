@@ -1,7 +1,8 @@
-import "./styles/index.css"; 
+import "./styles/index.css";
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import * as Sentry from "@sentry/react";
+import "@/i18n"; // initialise i18n before rendering
 import App from "./app/App";
 import { AuthProvider } from './app/context/AuthContext'; 
 
