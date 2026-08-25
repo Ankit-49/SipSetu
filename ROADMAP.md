@@ -212,9 +212,13 @@ Based on comprehensive analysis of the codebase, this roadmap organizes improvem
 6 tables: `ats_connections`, `webhook_subscriptions`, `oauth_tokens`, `calendar_events`, `communication_channels`, `sso_providers` (migration 009)
 
 ### 6.4 Internationalization
-- [ ] **i18n framework** — `react-i18next` + Flask-Babel
+- [x] **i18n framework** — `react-i18next` + Flask-Babel (`i18n.py`, `routes_i18n.py`); 4 endpoints: list locales, get/set user locale preference, translations bridge
+- [x] **Translation files** — English + Hindi complete translations for all UI strings (`frontend/src/i18n/locales/`); language switcher in both applicant & recruiter sidebars
+- [x] **User locale preference** — `locale` column on users table (migration 011), persisted via `/i18n/preferences` API
 - [ ] **RTL support** — Arabic/Hebrew layouts
 - [ ] **Locale-aware parsing** — Date formats, number formats, skill taxonomies
+
+> **Status: IN PROGRESS** — i18n framework + English/Hindi translations + language switcher done. RTL support and locale-aware parsing pending.
 
 ---
 
