@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
+import { SimilarJobsPanel } from "@/components/SimilarJobsPanel";
 
 // ----- Structured resume types -----
 
@@ -1094,7 +1095,7 @@ export default function ApplicantResume() {
           </Tabs>
         </div>
 
-        {/* Right: live profile summary */}
+        {/* Right: live profile summary + similar jobs */}
         <div className="space-y-6">
           <Card className="lg:sticky lg:top-6">
             <CardHeader>
@@ -1172,6 +1173,11 @@ export default function ApplicantResume() {
               )}
             </CardContent>
           </Card>
+
+          {/* Similar Jobs */}
+          {resume && (
+            <SimilarJobsPanel resumeId={resume.resume_id} />
+          )}
         </div>
       </div>
     </div>

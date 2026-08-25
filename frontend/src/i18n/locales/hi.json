@@ -158,7 +158,12 @@
     "similarResumes": "समान रिज़्यूमे",
     "similarity": "समानता",
     "noSimilarResumes": "कोई समान रिज़्यूमे नहीं मिले",
-    "findSimilar": "समान रिज़्यूमे खोजे जा रहे हैं..."
+    "findSimilar": "समान रिज़्यूमे खोजे जा रहे हैं...",
+    "similarJobs": "समान नौकरियाँ",
+    "similarJobsDesc": "आपके रिज़्यूमे की स्किल से मेल खाती नौकरियाँ।",
+    "noSimilarJobs": "अभी तक कोई मैच नहीं",
+    "noSimilarJobsHint": "मैचिंग में सुधार के लिए और स्किल जोड़ें।",
+    "ofMatches": "{{total}} में से {{count}} मैच"
   },
   "candidates": {
     "title": "उम्मीदवार",

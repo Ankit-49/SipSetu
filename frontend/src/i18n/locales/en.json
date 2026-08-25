@@ -158,7 +158,12 @@
     "similarResumes": "Similar Resumes",
     "similarity": "Similarity",
     "noSimilarResumes": "No similar resumes found",
-    "findSimilar": "Finding similar resumes..."
+    "findSimilar": "Finding similar resumes...",
+    "similarJobs": "Similar Jobs",
+    "similarJobsDesc": "Jobs that match your resume's skills.",
+    "noSimilarJobs": "No matches yet",
+    "noSimilarJobsHint": "Add more skills to improve matching.",
+    "ofMatches": "{{count}} of {{total}} matches"
   },
   "candidates": {
     "title": "Candidates",
