@@ -92,6 +92,13 @@ def create_app():
 
     db.init_app(app)
 
+    # Phase 6.4 — Internationalization (Flask-Babel)
+    try:
+        from i18n import init_babel
+        init_babel(app)
+    except Exception as babel_err:
+        app.logger.warning(f"Flask-Babel init failed (non-fatal): {babel_err}")
+
     # Security headers with Talisman (production only)
     if HAS_TALISMAN and not app.debug and settings.ENVIRONMENT == 'production':
         csp = {
@@ -158,6 +165,11 @@ def create_app():
     app.register_blueprint(phase63, url_prefix=f'/api/{settings.API_VERSION}')
     app.register_blueprint(phase63, url_prefix='/api', name='phase63_legacy')
 
+    # Phase 6.4 — Internationalization
+    from routes_i18n import i18n_bp
+    app.register_blueprint(i18n_bp, url_prefix=f'/api/{settings.API_VERSION}')
+    app.register_blueprint(i18n_bp, url_prefix='/api', name='i18n_legacy')
+
     # Phase 5.3 — Initialize WebSocket (Flask-SocketIO) for real-time notifications.
     # init_socketio() is a no-op when flask-socketio is not installed.
     from websocket import init_socketio
@@ -202,6 +214,7 @@ def create_app():
             db.session.execute(db.text("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS organization_id UUID"))
             db.session.execute(db.text("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS embedding TEXT"))
             db.session.execute(db.text("ALTER TABLE resumes ADD COLUMN IF NOT EXISTS embedding TEXT"))
+            db.session.execute(db.text("ALTER TABLE users ADD COLUMN IF NOT EXISTS locale VARCHAR(10)"))
             # Phase 6.3 — integration tables created via migration 009;
             # on SQLite (dev/tests) we create them inline since Alembic is
             # not invoked at startup.

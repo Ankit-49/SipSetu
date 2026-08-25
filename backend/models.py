@@ -52,6 +52,7 @@ class User(db.Model):
     location = db.Column(db.String(255), nullable=True)
     profile_image = db.Column(db.Text, nullable=True)
     email_verified = db.Column(db.Boolean, default=False)
+    locale = db.Column(db.String(10), nullable=True)  # Phase 6.4 — i18n user preference
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     __mapper_args__ = {
