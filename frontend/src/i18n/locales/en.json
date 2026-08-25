@@ -324,7 +324,26 @@
     "forbidden": "You don't have permission to access this page.",
     "serverError": "Server Error",
     "networkError": "Network error. Please check your connection.",
-    "goHome": "Go Home"
+    "goHome": "Go Home",
+    "search": {
+      "title": "Search",
+      "subtitleApplicant": "Explore job opportunities with keyword and AI-powered semantic matching.",
+      "subtitleRecruiter": "Search job postings and find semantically similar candidates.",
+      "allJobs": "All Jobs",
+      "bestMatches": "Best Matches",
+      "similarResumes": "Similar Resumes",
+      "searchPlaceholder": "Search roles, companies, or skills...",
+      "searchPlaceholderRecruiter": "Search jobs by title, skill, or location...",
+      "noJobsFound": "No jobs found",
+      "noJobsHint": "Try adjusting your search or filters.",
+      "noSemanticMatches": "No semantic matches",
+      "noSemanticHint": "Upload a resume to unlock AI-powered job matching.",
+      "selectJobForResumes": "Select a job to find similar resumes",
+      "noJobsPosted": "No jobs posted yet",
+      "noJobsPostedHint": "Post a job first to find similar candidates.",
+      "jobsFound": "{{count}} jobs found",
+      "semanticRanked": "{{count}} jobs ranked by semantic similarity to your resume"
+    }
   },
   "footer": {
     "copyright": "© 2026 SipSetu. All rights reserved.",

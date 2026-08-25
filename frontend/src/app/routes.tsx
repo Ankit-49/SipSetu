@@ -30,6 +30,9 @@ import RecruiterOrganizations from "../pages/recruiter/Organizations";
 import OrganizationDetailPage from "../pages/recruiter/OrganizationDetail";
 import IntegrationsPage from "../pages/recruiter/Integrations";
 
+// Shared
+import UnifiedSearch from "../pages/UnifiedSearch";
+
 // Admin
 import AdminDashboard from "../pages/admin/Dashboard";
 
@@ -103,6 +106,14 @@ export const router = createBrowserRouter([
     Component: () => (
       <ProtectedRoute requiredRole="applicant">
         <ApplicantLayout><ApplicantProfile /></ApplicantLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/applicant/search",
+    Component: () => (
+      <ProtectedRoute requiredRole="applicant">
+        <ApplicantLayout><UnifiedSearch /></ApplicantLayout>
       </ProtectedRoute>
     ),
   },
@@ -185,6 +196,14 @@ export const router = createBrowserRouter([
     Component: () => (
       <ProtectedRoute requiredRole="recruiter">
         <RecruiterLayout><IntegrationsPage /></RecruiterLayout>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/recruiter/search",
+    Component: () => (
+      <ProtectedRoute requiredRole="recruiter">
+        <RecruiterLayout><UnifiedSearch /></RecruiterLayout>
       </ProtectedRoute>
     ),
   },
