@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sipsetu-backend
+  labels:
+    app.kubernetes.io/name: sipsetu-backend
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sipsetu-backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sipsetu-backend
+        app.kubernetes.io/component: backend
+    spec:
+      containers:
+        - name: backend
+          image: gcr.io/PROJECT_ID/sipsetu-backend:latest  # Replace PROJECT_ID
+          ports:
+            - containerPort: 5000
+              protocol: TCP
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sipsetu-secrets
+                  key: DATABASE_URL
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sipsetu-secrets
+                  key: REDIS_URL
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sipsetu-secrets
+                  key: JWT_SECRET_KEY
+            - name: FLASK_ENV
+              value: "production"
+            - name: ENVIRONMENT
+              value: "production"
+            - name: GUNICORN_WORKERS
+              value: "4"
+            - name: GUNICORN_WORKER_CONNECTIONS
+              value: "1000"
+            - name: LOG_LEVEL
+              value: "info"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 5000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 30
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sipsetu-backend
+  labels:
+    app.kubernetes.io/name: sipsetu-backend
+spec:
+  selector:
+    app.kubernetes.io/name: sipsetu-backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+      protocol: TCP
+      name: http
+  type: ClusterIP

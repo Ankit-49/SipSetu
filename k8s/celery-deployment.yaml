@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sipsetu-celery-worker
+  labels:
+    app.kubernetes.io/name: sipsetu-celery-worker
+    app.kubernetes.io/component: worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sipsetu-celery-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sipsetu-celery-worker
+        app.kubernetes.io/component: worker
+    spec:
+      containers:
+        - name: celery-worker
+          image: gcr.io/PROJECT_ID/sipsetu-backend:latest  # Replace PROJECT_ID
+          command:
+            - celery
+            - -A
+            - celery_app
+            - worker
+            - --loglevel=info
+            - --concurrency=4
+            - -Q
+            - celery,email,bulk_screen
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sipsetu-secrets
+                  key: DATABASE_URL
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sipsetu-secrets
+                  key: REDIS_URL
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sipsetu-secrets
+                  key: JWT_SECRET_KEY
+            - name: LOG_LEVEL
+              value: "info"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"
+      restartPolicy: Always
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sipsetu-celery-beat
+  labels:
+    app.kubernetes.io/name: sipsetu-celery-beat
+    app.kubernetes.io/component: scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sipsetu-celery-beat
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sipsetu-celery-beat
+        app.kubernetes.io/component: scheduler
+    spec:
+      containers:
+        - name: celery-beat
+          image: gcr.io/PROJECT_ID/sipsetu-backend:latest  # Replace PROJECT_ID
+          command:
+            - celery
+            - -A
+            - celery_app
+            - beat
+            - --loglevel=info
+            - --scheduler
+            - celery.beat:PersistentScheduler
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sipsetu-secrets
+                  key: DATABASE_URL
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sipsetu-secrets
+                  key: REDIS_URL
+            - name: LOG_LEVEL
+              value: "info"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+      restartPolicy: Always

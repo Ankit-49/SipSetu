@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sipsetu
+  labels:
+    app.kubernetes.io/name: sipsetu
+    app.kubernetes.io/part-of: sipsetu
