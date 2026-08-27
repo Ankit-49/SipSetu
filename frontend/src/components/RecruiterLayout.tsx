@@ -20,7 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+
 
 const navItems = [
   { name: "Dashboard", href: "/recruiter/dashboard", icon: LayoutDashboard },
@@ -157,10 +157,6 @@ export function RecruiterLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </Link>
-
-        <div className="px-4 py-2 border-t border-white/10">
-          <LanguageSwitcher variant="full" className="bg-white/5 border-white/10 text-white hover:bg-white/10" />
-        </div>
 
         <div className="p-4 border-t border-white/10">
           <AlertDialog>

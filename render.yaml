@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: sipsetu-api
+    name: SipSetu
     runtime: python
     plan: free
     buildCommand: pip install -r backend/requirements.txt
@@ -16,8 +16,6 @@ services:
         fromDatabase:
           name: sipsetu-db
           property: connectionString
-      - key: REDIS_URL
-        sync: false
       - key: FRONTEND_URL
         value: https://sipsetu.pages.dev
       - key: PYTHON_VERSION
