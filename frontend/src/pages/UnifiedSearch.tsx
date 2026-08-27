@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -99,11 +99,12 @@ export default function UnifiedSearch() {
   const [recruiterJobs, setRecruiterJobs] = useState<{ job_id: string; title: string }[]>([]);
 
   // ---- Fetch keyword search results ----
-  const fetchKeywordResults = useCallback(async () => {
+  const fetchKeywordResults = useCallback(async (overrides?: { search?: string }) => {
     setLoading(true);
+    const q = overrides?.search ?? query;
     try {
       const params = new URLSearchParams({ limit: "30" });
-      if (query) params.set("search", query);
+      if (q) params.set("search", q);
       if (jobTypeFilter !== "all") params.set("job_type", jobTypeFilter);
       if (expLevelFilter !== "all") params.set("experience_level", expLevelFilter);
       if (locationFilter !== "all") params.set("location", locationFilter);
@@ -120,7 +121,7 @@ export default function UnifiedSearch() {
     } finally {
       setLoading(false);
     }
-  }, [query, jobTypeFilter, expLevelFilter, locationFilter, salaryMin, salaryMax, skillFilter]);
+  }, [jobTypeFilter, expLevelFilter, locationFilter, salaryMin, salaryMax, skillFilter]);
 
   // ---- Fetch semantic job matches (for applicants) ----
   const fetchSemanticResults = useCallback(async () => {
@@ -179,6 +180,10 @@ export default function UnifiedSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
+  // Ref to track the current search query for the input handler
+  const queryRef = useRef(query);
+  queryRef.current = query;
+
   // ---- Helpers ----
   const activeFilterCount = [
     jobTypeFilter !== "all",
@@ -222,7 +227,7 @@ export default function UnifiedSearch() {
             className="pl-9 bg-slate-50 border-slate-200"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && fetchKeywordResults()}
+            onKeyDown={(e) => e.key === "Enter" && fetchKeywordResults({ search: e.currentTarget.value })}
           />
         </div>
         <Button
@@ -238,7 +243,7 @@ export default function UnifiedSearch() {
             </Badge>
           )}
         </Button>
-        <Button onClick={fetchKeywordResults} className="bg-[#1E3A5F] hover:bg-[#1E3A5F]/90">
+        <Button onClick={() => fetchKeywordResults()} className="bg-[#1E3A5F] hover:bg-[#1E3A5F]/90">
           Search
         </Button>
       </div>
