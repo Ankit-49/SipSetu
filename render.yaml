@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: sipsetu-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && gunicorn -k gevent -w 2 -b 0.0.0.0:$PORT app:create_app()
+    envVars:
+      - key: FLASK_APP
+        value: app.py
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sipsetu-db
+          property: connectionString
+      - key: REDIS_URL
+        sync: false
+      - key: FRONTEND_URL
+        value: https://sipsetu.pages.dev
+      - key: PYTHON_VERSION
+        value: "3.11"
+
+  - type: pgsql
+    name: sipsetu-db
+    plan: free
+    database: sipsetu
+    ipAllowList: []

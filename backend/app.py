@@ -70,12 +70,11 @@ def create_app():
     setup_tracing(app)
 
     # Configure CORS with explicit origins
-    frontend_url = settings.FRONTEND_URL
-    cors_origins = [frontend_url]
-    # Allow Cloudflare Pages and preview deployments
-    for extra in ['https://sipsetu.pages.dev', 'https://*.sipsetu.pages.dev']:
-        if extra not in cors_origins:
-            cors_origins.append(extra)
+    # FRONTEND_URL can be comma-separated for multiple origins
+    frontend_urls = [u.strip() for u in settings.FRONTEND_URL.split(',') if u.strip()]
+    # Always allow Cloudflare Pages and preview deployments
+    extra_origins = ['https://sipsetu.pages.dev', 'https://*.sipsetu.pages.dev']
+    cors_origins = list(dict.fromkeys(frontend_urls + extra_origins))
     CORS(app, origins=cors_origins, supports_credentials=True)
 
     app.config.from_object(Config)
