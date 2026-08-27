@@ -71,7 +71,12 @@ def create_app():
 
     # Configure CORS with explicit origins
     frontend_url = settings.FRONTEND_URL
-    CORS(app, origins=[frontend_url], supports_credentials=True)
+    cors_origins = [frontend_url]
+    # Allow Cloudflare Pages and preview deployments
+    for extra in ['https://sipsetu.pages.dev', 'https://*.sipsetu.pages.dev']:
+        if extra not in cors_origins:
+            cors_origins.append(extra)
+    CORS(app, origins=cors_origins, supports_credentials=True)
 
     app.config.from_object(Config)
 
