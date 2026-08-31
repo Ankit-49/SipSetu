@@ -22,7 +22,7 @@ fpdf2>=2.8.8
 
 # Production Server
 gunicorn>=21.2.0
-gevent>=23.9.0
+gevent>=26.8.0
 
 # Redis & Celery (for background tasks)
 redis>=5.0.0
