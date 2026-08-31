@@ -43,7 +43,7 @@ flasgger>=0.9.7.1
 # Monitoring & Observability
 prometheus-flask-exporter>=0.23.2
 python-json-logger>=2.0.0
-sentry-sdk[flask]>=2.68.0
+sentry-sdk[flask]>=2.68.1
 
 # Tracing (OpenTelemetry, optional — enabled via OTEL_ENABLED=true)
 opentelemetry-sdk>=1.25.0
