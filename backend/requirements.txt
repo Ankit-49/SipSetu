@@ -51,7 +51,7 @@ opentelemetry-api>=1.44.0
 opentelemetry-exporter-otlp>=1.44.0
 opentelemetry-instrumentation-flask>=0.65b0
 opentelemetry-instrumentation-sqlalchemy>=0.65b0
-opentelemetry-instrumentation-requests>=0.50b0
+opentelemetry-instrumentation-requests>=0.65b0
 
 # Security
 flask-talisman>=1.1.0
