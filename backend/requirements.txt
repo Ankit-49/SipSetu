@@ -61,7 +61,7 @@ Flask-Babel>=4.0.0
 
 # Validation
 pydantic>=2.5.0
-pydantic-settings>=2.1.0
+pydantic-settings>=2.15.0
 
 # Storage
 boto3>=1.43.77
