@@ -145,7 +145,7 @@ def _send_via_smtp(to: str, subject: str, html_body: str, text_body: str | None)
     msg.set_content(text_body or html_body)
     msg.add_alternative(html_body, subtype="html")
     try:
-        with smtplib.SMTP(config["host"], config["port"]) as server:
+        with smtplib.SMTP(config["host"], config["port"], timeout=10) as server:
             if config["use_tls"]:
                 server.starttls()
             if config["user"] and config["password"]:
@@ -166,6 +166,14 @@ def send_email(
     kind: str = "generic",
 ) -> bool:
     """Send an email. Tries Resend (HTTPS), then SMTP, then dev fallback."""
+    resend_api_key = os.environ.get("RESEND_API_KEY", "")
+    smtp_host = os.environ.get("SMTP_HOST", "")
+    logger.info(
+        f"[EMAIL] Attempting to send '{kind}' to {to} | "
+        f"RESEND_API_KEY={'set (' + resend_api_key[:6] + '...)' if resend_api_key else 'NOT SET'} | "
+        f"SMTP_HOST={smtp_host or 'NOT SET'}"
+    )
+
     # 1. Try Resend API (works on Render free tier)
     if _send_via_resend(to, subject, html_body, text_body):
         _increment_email_metric(kind)
