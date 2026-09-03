@@ -90,11 +90,12 @@ def _increment_email_metric(kind: str) -> None:
 
 
 def _send_via_resend(to: str, subject: str, html_body: str, text_body: str | None) -> bool:
-    """Send email via Resend REST API directly (avoids SDK/gevent recursion)."""
+    """Send email via Resend REST API using curl (avoids gevent SSL recursion)."""
     api_key = os.environ.get("RESEND_API_KEY")
     if not api_key:
         return False
-    import requests as _requests
+    import json as _json
+    import subprocess as _sp
 
     from_addr = os.environ.get("SMTP_FROM", "noreply@sipsetu.com")
     payload = {
@@ -106,17 +107,29 @@ def _send_via_resend(to: str, subject: str, html_body: str, text_body: str | Non
     if text_body:
         payload["text"] = text_body
     try:
-        resp = _requests.post(
-            RESEND_API,
-            json=payload,
-            headers={"Authorization": f"Bearer {api_key}"},
-            timeout=15,
+        result = _sp.run(
+            [
+                "curl", "-s", "-w", "\n%{http_code}",
+                "-X", "POST", RESEND_API,
+                "-H", f"Authorization: Bearer {api_key}",
+                "-H", "Content-Type: application/json",
+                "-d", _json.dumps(payload),
+                "--max-time", "15",
+            ],
+            capture_output=True, text=True, timeout=20, check=False,
         )
-        if resp.ok:
-            logger.info(f"Email sent via Resend to {to}: {subject} (id={resp.json().get('id')})")
+        lines = result.stdout.strip().rsplit("\n", 1)
+        body = lines[0] if len(lines) > 1 else result.stdout
+        status = lines[-1].strip() if len(lines) > 1 else "0"
+        if status.startswith("2"):
+            try:
+                email_id = _json.loads(body).get("id", "unknown")
+            except Exception:
+                email_id = "unknown"
+            logger.info(f"Email sent via Resend to {to}: {subject} (id={email_id})")
             return True
         logger.error(
-            f"Resend API error {resp.status_code} for {to}: {resp.text[:300]}"
+            f"Resend API error {status} for {to}: {body[:300]}"
         )
         return False
     except Exception as e:
