@@ -1,5 +1,6 @@
 """Unit tests for authentication and utility functions."""
 
+import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -91,18 +92,21 @@ class TestEmailUtils:
         assert result is True
         mock_server.send_message.assert_called_once()
 
-    def test_send_email_dev_fallback(self, capsys):
-        # No SMTP config - should print to stderr
+    def test_send_email_dev_fallback(self, caplog):
+        # No SMTP config - should log a warning (not send)
         import os
         if "SMTP_HOST" in os.environ:
             del os.environ["SMTP_HOST"]
 
+        # Reset the one-time warning flag so the warning fires again
+        import utils.email as email_mod
+        email_mod._smtp_missing_warned = False
+
         result = send_email("to@test.com", "Test", "<p>HTML</p>")
         assert result is True
 
-        captured = capsys.readouterr()
-        assert "EMAIL TO: to@test.com" in captured.err
-        assert "Test" in captured.err
+        warning_msgs = [r.message for r in caplog.records if r.levelno >= logging.WARNING]
+        assert any("to@test.com" in m for m in warning_msgs)
 
 
 class TestParser:
