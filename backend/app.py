@@ -111,7 +111,7 @@ def create_app():
             'style-src': ["'self'", "'unsafe-inline'"],
             'img-src': ["'self'", "data:", "https:"],
             'font-src': ["'self'", "https:", "data:"],
-            'connect-src': ["'self'", frontend_url],
+            'connect-src': ["'self'", *cors_origins],
         }
         Talisman(
             app,
