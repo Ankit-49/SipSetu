@@ -207,6 +207,14 @@ def create_app():
 
     # Initialize database and run migrations
     with app.app_context():
+        # Ensure required PostgreSQL extensions exist (Render free-tier DB doesn't
+        # ship pg_trgm by default, but the model defines GIN trigram indexes).
+        if db.engine.url.database != ':memory:':
+            try:
+                db.session.execute(db.text('CREATE EXTENSION IF NOT EXISTS pg_trgm'))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
         db.create_all()
         # Safe migration check for columns added after initial schema
         try:
