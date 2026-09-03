@@ -358,39 +358,59 @@ def register():
             password_hash=hashed_password, role=role
         )
 
+    # When EMAIL_VERIFICATION_REQUIRED is not set or false, auto-verify
+    # users so the app works without a verified email domain (e.g. on
+    # Render free tier).  Set EMAIL_VERIFICATION_REQUIRED=true once you
+    # have a domain verified on Resend.
+    email_verification_required = os.environ.get(
+        "EMAIL_VERIFICATION_REQUIRED", "false"
+    ).lower() in ("1", "true", "yes")
+
     db.session.add(new_user)
     db.session.flush()
 
-    otp = str(random.randint(100000, 999999))
-    otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
-    verification = EmailVerificationToken(
-        user_id=new_user.user_id,
-        token=otp,
-        expires_at=otp_expires_at,
-    )
-    db.session.add(verification)
-    db.session.commit()
+    if email_verification_required:
+        otp = str(random.randint(100000, 999999))
+        otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
+        verification = EmailVerificationToken(
+            user_id=new_user.user_id,
+            token=otp,
+            expires_at=otp_expires_at,
+        )
+        db.session.add(verification)
+        db.session.commit()
 
-    from metrics import increment
-    increment(
-        current_app._get_current_object(),
-        "sipsetu_registrations_total",
-        "Total user registrations by role",
-        {"role": role},
-    )
+        from metrics import increment
+        increment(
+            current_app._get_current_object(),
+            "sipsetu_registrations_total",
+            "Total user registrations by role",
+            {"role": role},
+        )
 
-    send_verification_otp(to=email, otp=otp, name=name or email.split('@')[0])
+        send_verification_otp(to=email, otp=otp, name=name or email.split('@')[0])
+    else:
+        new_user.email_verified = True
+        db.session.commit()
+
+        from metrics import increment
+        increment(
+            current_app._get_current_object(),
+            "sipsetu_registrations_total",
+            "Total user registrations by role",
+            {"role": role},
+        )
 
     token = create_token(str(new_user.user_id), role)
 
     return jsonify({
-        "message": "User registered successfully. Please check your email to verify your account.",
+        "message": "User registered successfully.",
         "token": token,
         "user_id": str(new_user.user_id),
         "role": role,
         "name": name,
         "email": email,
-        "email_verified": False,
+        "email_verified": not email_verification_required,
     }), 201
 
 
