@@ -9,7 +9,6 @@ for local development.
 import logging
 import os
 import smtplib
-import sys
 from datetime import datetime
 from email.message import EmailMessage
 from pathlib import Path
@@ -34,8 +33,12 @@ def render_email(template_name: str, **context) -> tuple[str, str]:
     return html, text
 
 
+_smtp_missing_warned = False
+
+
 def _smtp_config() -> dict | None:
     """Read SMTP settings from environment."""
+    global _smtp_missing_warned
     host = os.environ.get("SMTP_HOST")
     port = os.environ.get("SMTP_PORT")
     user = os.environ.get("SMTP_USER")
@@ -52,6 +55,14 @@ def _smtp_config() -> dict | None:
             "use_tls": use_tls,
             "from_addr": from_addr,
         }
+    if not _smtp_missing_warned:
+        logger.warning(
+            "SMTP_HOST and SMTP_PORT are not configured - emails are being "
+            "logged to stderr instead of sent. Set SMTP_HOST, SMTP_PORT, "
+            "SMTP_USER, and SMTP_PASSWORD in your environment to enable "
+            "real email delivery."
+        )
+        _smtp_missing_warned = True
     return None
 
 
@@ -85,13 +96,12 @@ def send_email(
     config = _smtp_config()
 
     if not config:
-        # Dev fallback — print to stderr so it's visible in the terminal
-        print("\n" + "=" * 60, file=sys.stderr)
-        print(f"EMAIL TO: {to}", file=sys.stderr)
-        print(f"   SUBJECT: {subject}", file=sys.stderr)
-        print(f"   BODY:\n{html_body}", file=sys.stderr)
-        print("=" * 60 + "\n", file=sys.stderr)
-        sys.stderr.flush()
+        # Dev fallback — print to stderr so it's visible in Render logs
+        logger.warning(
+            f"[DEV EMAIL — NOT SENT] To: {to} | Subject: {subject} | "
+            f"Configure SMTP_HOST/SMTP_PORT to enable real email delivery."
+        )
+        logger.info(f"[DEV EMAIL BODY]\n{text_body or html_body}")
         _increment_email_metric(kind)
         return True
 
