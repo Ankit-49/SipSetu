@@ -1,9 +1,10 @@
 """Email sending utility for SipSetu.
 
 Renders HTML/plain-text bodies from Jinja2 templates in
-``backend/templates/emails/``, then sends via SMTP when configured (via
-.env), otherwise falls back to logging the email content to the console
-for local development.
+``backend/templates/emails/``, then sends via:
+  1. Resend API (HTTPS, works on Render free tier) if RESEND_API_KEY is set
+  2. SMTP if SMTP_HOST/SMTP_PORT are set
+  3. Falls back to logging the email content for local development
 """
 
 import logging
@@ -23,6 +24,30 @@ _env = Environment(
     loader=FileSystemLoader(str(_TEMPLATE_DIR)),
     autoescape=select_autoescape(["html", "xml"]),
 )
+
+
+# Lazy import: only load the resend SDK when actually needed
+_resend = None
+_resend_checked = False
+
+
+def _get_resend():
+    """Import and return the resend module, or None if not installed/configured."""
+    global _resend, _resend_checked
+    if _resend_checked:
+        return _resend
+    _resend_checked = True
+    api_key = os.environ.get("RESEND_API_KEY")
+    if not api_key:
+        return None
+    try:
+        import resend
+        resend.api_key = api_key
+        _resend = resend
+        return _resend
+    except ImportError:
+        logger.warning("RESEND_API_KEY is set but the 'resend' package is not installed")
+        return None
 
 
 def render_email(template_name: str, **context) -> tuple[str, str]:
@@ -85,33 +110,40 @@ def _increment_email_metric(kind: str) -> None:
         pass
 
 
-def send_email(
-    to: str,
-    subject: str,
-    html_body: str,
-    text_body: str | None = None,
-    kind: str = "generic",
-) -> bool:
-    """Send an email. Falls back to console logging in development."""
-    config = _smtp_config()
-
-    if not config:
-        # Dev fallback — print to stderr so it's visible in Render logs
-        logger.warning(
-            f"[DEV EMAIL — NOT SENT] To: {to} | Subject: {subject} | "
-            f"Configure SMTP_HOST/SMTP_PORT to enable real email delivery."
-        )
-        logger.info(f"[DEV EMAIL BODY]\n{text_body or html_body}")
-        _increment_email_metric(kind)
+def _send_via_resend(to: str, subject: str, html_body: str, text_body: str | None) -> bool:
+    """Send email via Resend HTTPS API (works on Render free tier)."""
+    resend_mod = _get_resend()
+    if not resend_mod:
+        return False
+    from_addr = os.environ.get("SMTP_FROM", "noreply@sipsetu.com")
+    try:
+        params: resend_mod.Emails.SendParams = {
+            "from": f"SipSetu <{from_addr}>",
+            "to": [to],
+            "subject": subject,
+            "html": html_body,
+        }
+        if text_body:
+            params["text"] = text_body
+        result = resend_mod.Emails.send(params)
+        logger.info(f"Email sent via Resend to {to}: {subject} (id={result})")
         return True
+    except Exception as e:
+        logger.error(f"Failed to send email via Resend to {to}: {e}")
+        return False
 
+
+def _send_via_smtp(to: str, subject: str, html_body: str, text_body: str | None) -> bool:
+    """Send email via SMTP."""
+    config = _smtp_config()
+    if not config:
+        return False
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = config["from_addr"]
     msg["To"] = to
     msg.set_content(text_body or html_body)
     msg.add_alternative(html_body, subtype="html")
-
     try:
         with smtplib.SMTP(config["host"], config["port"]) as server:
             if config["use_tls"]:
@@ -119,12 +151,39 @@ def send_email(
             if config["user"] and config["password"]:
                 server.login(config["user"], config["password"])
             server.send_message(msg)
-        logger.info(f"Email sent to {to}: {subject}")
-        _increment_email_metric(kind)
+        logger.info(f"Email sent via SMTP to {to}: {subject}")
         return True
     except Exception as e:
-        logger.error(f"Failed to send email to {to}: {e}")
+        logger.error(f"Failed to send email via SMTP to {to}: {e}")
         return False
+
+
+def send_email(
+    to: str,
+    subject: str,
+    html_body: str,
+    text_body: str | None = None,
+    kind: str = "generic",
+) -> bool:
+    """Send an email. Tries Resend (HTTPS), then SMTP, then dev fallback."""
+    # 1. Try Resend API (works on Render free tier)
+    if _send_via_resend(to, subject, html_body, text_body):
+        _increment_email_metric(kind)
+        return True
+
+    # 2. Try SMTP (works locally, blocked on some free-tier hosts)
+    if _send_via_smtp(to, subject, html_body, text_body):
+        _increment_email_metric(kind)
+        return True
+
+    # 3. Dev fallback - log to console
+    logger.warning(
+        f"[DEV EMAIL - NOT SENT] To: {to} | Subject: {subject} | "
+        f"Set RESEND_API_KEY or SMTP_HOST/SMTP_PORT to enable email delivery."
+    )
+    logger.info(f"[DEV EMAIL BODY]\n{text_body or html_body}")
+    _increment_email_metric(kind)
+    return True
 
 
 def send_password_reset_otp(to: str, otp: str, name: str = "User") -> bool:
