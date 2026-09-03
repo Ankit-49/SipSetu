@@ -20,9 +20,6 @@ pymupdf>=1.22.0
 python-docx>=1.0.0
 fpdf2>=2.8.8
 
-# Email API (works on Render free tier where SMTP is blocked)
-resend>=2.0.0
-
 # Production Server
 gunicorn>=21.2.0
 gevent>=23.9.0

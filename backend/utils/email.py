@@ -26,28 +26,7 @@ _env = Environment(
 )
 
 
-# Lazy import: only load the resend SDK when actually needed
-_resend = None
-_resend_checked = False
-
-
-def _get_resend():
-    """Import and return the resend module, or None if not installed/configured."""
-    global _resend, _resend_checked
-    if _resend_checked:
-        return _resend
-    _resend_checked = True
-    api_key = os.environ.get("RESEND_API_KEY")
-    if not api_key:
-        return None
-    try:
-        import resend
-        resend.api_key = api_key
-        _resend = resend
-        return _resend
-    except ImportError:
-        logger.warning("RESEND_API_KEY is set but the 'resend' package is not installed")
-        return None
+RESEND_API = "https://api.resend.com/emails"
 
 
 def render_email(template_name: str, **context) -> tuple[str, str]:
@@ -111,23 +90,35 @@ def _increment_email_metric(kind: str) -> None:
 
 
 def _send_via_resend(to: str, subject: str, html_body: str, text_body: str | None) -> bool:
-    """Send email via Resend HTTPS API (works on Render free tier)."""
-    resend_mod = _get_resend()
-    if not resend_mod:
+    """Send email via Resend REST API directly (avoids SDK/gevent recursion)."""
+    api_key = os.environ.get("RESEND_API_KEY")
+    if not api_key:
         return False
+    import requests as _requests
+
     from_addr = os.environ.get("SMTP_FROM", "noreply@sipsetu.com")
+    payload = {
+        "from": f"SipSetu <{from_addr}>",
+        "to": [to],
+        "subject": subject,
+        "html": html_body,
+    }
+    if text_body:
+        payload["text"] = text_body
     try:
-        params: resend_mod.Emails.SendParams = {
-            "from": f"SipSetu <{from_addr}>",
-            "to": [to],
-            "subject": subject,
-            "html": html_body,
-        }
-        if text_body:
-            params["text"] = text_body
-        result = resend_mod.Emails.send(params)
-        logger.info(f"Email sent via Resend to {to}: {subject} (id={result})")
-        return True
+        resp = _requests.post(
+            RESEND_API,
+            json=payload,
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=15,
+        )
+        if resp.ok:
+            logger.info(f"Email sent via Resend to {to}: {subject} (id={resp.json().get('id')})")
+            return True
+        logger.error(
+            f"Resend API error {resp.status_code} for {to}: {resp.text[:300]}"
+        )
+        return False
     except Exception as e:
         logger.error(f"Failed to send email via Resend to {to}: {e}")
         return False
