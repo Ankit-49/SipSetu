@@ -18,7 +18,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, role: "applicant" | "recruiter") => Promise<void>;
+  register: (name: string, email: string, password: string, role: "applicant" | "recruiter") => Promise<{ email_verified?: boolean; [key: string]: unknown }>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   markEmailVerified: () => void;
