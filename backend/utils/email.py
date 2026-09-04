@@ -2,9 +2,10 @@
 
 Renders HTML/plain-text bodies from Jinja2 templates in
 ``backend/templates/emails/``, then sends via:
-  1. Resend API (HTTPS, works on Render free tier) if RESEND_API_KEY is set
-  2. SMTP if SMTP_HOST/SMTP_PORT are set
-  3. Falls back to logging the email content for local development
+  1. Brevo API (HTTPS, free 300/day, no domain needed) if BREVO_API_KEY is set
+  2. Resend API (HTTPS) if RESEND_API_KEY is set
+  3. SMTP if SMTP_HOST/SMTP_PORT are set
+  4. Falls back to logging the email content for local development
 """
 
 import logging
@@ -27,6 +28,7 @@ _env = Environment(
 
 
 RESEND_API = "https://api.resend.com/emails"
+BREVO_API = "https://api.brevo.com/v3/smtp/email"
 
 
 def render_email(template_name: str, **context) -> tuple[str, str]:
@@ -89,14 +91,67 @@ def _increment_email_metric(kind: str) -> None:
         pass
 
 
-def _send_via_resend(to: str, subject: str, html_body: str, text_body: str | None) -> bool:
-    """Send email via Resend REST API using curl (avoids gevent SSL recursion)."""
-    api_key = os.environ.get("RESEND_API_KEY")
-    if not api_key:
-        return False
+def _curl_post_json(url: str, headers: dict, payload: dict, label: str, to: str) -> bool:
+    """Shared curl-based HTTPS POST (bypasses gevent SSL monkey-patching)."""
     import json as _json
     import subprocess as _sp
 
+    try:
+        curl_args = [
+            "curl", "-s", "-w", "\n%{http_code}",
+            "-X", "POST", url,
+            "-H", "Content-Type: application/json",
+            "--max-time", "15",
+        ]
+        for k, v in headers.items():
+            curl_args.extend(["-H", f"{k}: {v}"])
+        curl_args.extend(["-d", _json.dumps(payload)])
+
+        result = _sp.run(
+            curl_args, capture_output=True, text=True, timeout=20, check=False,
+        )
+        lines = result.stdout.strip().rsplit("\n", 1)
+        body = lines[0] if len(lines) > 1 else result.stdout
+        status = lines[-1].strip() if len(lines) > 1 else "0"
+        if status.startswith("2"):
+            logger.info(f"Email sent via {label} to {to}")
+            return True
+        logger.error(f"{label} API error {status} for {to}: {body[:300]}")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to send email via {label} to {to}: {e}")
+        return False
+
+
+def _send_via_brevo(to: str, subject: str, html_body: str, text_body: str | None) -> bool:
+    """Send email via Brevo (Sendinblue) REST API."""
+    api_key = os.environ.get("BREVO_API_KEY")
+    if not api_key:
+        return False
+    from_addr = os.environ.get("SMTP_FROM", "noreply@sipsetu.com")
+    sender = {"email": from_addr, "name": "SipSetu"}
+    payload = {
+        "sender": sender,
+        "to": [{"email": to}],
+        "subject": subject,
+        "htmlContent": html_body,
+    }
+    if text_body:
+        payload["textContent"] = text_body
+    return _curl_post_json(
+        BREVO_API,
+        {"api-key": api_key},
+        payload,
+        label="Brevo",
+        to=to,
+    )
+
+
+def _send_via_resend(to: str, subject: str, html_body: str, text_body: str | None) -> bool:
+    """Send email via Resend REST API."""
+    api_key = os.environ.get("RESEND_API_KEY")
+    if not api_key:
+        return False
     from_addr = os.environ.get("SMTP_FROM", "noreply@sipsetu.com")
     payload = {
         "from": f"SipSetu <{from_addr}>",
@@ -106,35 +161,13 @@ def _send_via_resend(to: str, subject: str, html_body: str, text_body: str | Non
     }
     if text_body:
         payload["text"] = text_body
-    try:
-        result = _sp.run(
-            [
-                "curl", "-s", "-w", "\n%{http_code}",
-                "-X", "POST", RESEND_API,
-                "-H", f"Authorization: Bearer {api_key}",
-                "-H", "Content-Type: application/json",
-                "-d", _json.dumps(payload),
-                "--max-time", "15",
-            ],
-            capture_output=True, text=True, timeout=20, check=False,
-        )
-        lines = result.stdout.strip().rsplit("\n", 1)
-        body = lines[0] if len(lines) > 1 else result.stdout
-        status = lines[-1].strip() if len(lines) > 1 else "0"
-        if status.startswith("2"):
-            try:
-                email_id = _json.loads(body).get("id", "unknown")
-            except Exception:
-                email_id = "unknown"
-            logger.info(f"Email sent via Resend to {to}: {subject} (id={email_id})")
-            return True
-        logger.error(
-            f"Resend API error {status} for {to}: {body[:300]}"
-        )
-        return False
-    except Exception as e:
-        logger.error(f"Failed to send email via Resend to {to}: {e}")
-        return False
+    return _curl_post_json(
+        RESEND_API,
+        {"Authorization": f"Bearer {api_key}"},
+        payload,
+        label="Resend",
+        to=to,
+    )
 
 
 def _send_via_smtp(to: str, subject: str, html_body: str, text_body: str | None) -> bool:
@@ -169,29 +202,36 @@ def send_email(
     text_body: str | None = None,
     kind: str = "generic",
 ) -> bool:
-    """Send an email. Tries Resend (HTTPS), then SMTP, then dev fallback."""
-    resend_api_key = os.environ.get("RESEND_API_KEY", "")
+    """Send an email. Tries Brevo, Resend, SMTP, then dev fallback."""
+    brevo_key = os.environ.get("BREVO_API_KEY", "")
+    resend_key = os.environ.get("RESEND_API_KEY", "")
     smtp_host = os.environ.get("SMTP_HOST", "")
     logger.info(
         f"[EMAIL] Attempting to send '{kind}' to {to} | "
-        f"RESEND_API_KEY={'set (' + resend_api_key[:6] + '...)' if resend_api_key else 'NOT SET'} | "
-        f"SMTP_HOST={smtp_host or 'NOT SET'}"
+        f"BREVO={'set' if brevo_key else 'NOT SET'} | "
+        f"RESEND={'set' if resend_key else 'NOT SET'} | "
+        f"SMTP={smtp_host or 'NOT SET'}"
     )
 
-    # 1. Try Resend API (works on Render free tier)
+    # 1. Try Brevo API (free 300/day, no domain verification needed)
+    if _send_via_brevo(to, subject, html_body, text_body):
+        _increment_email_metric(kind)
+        return True
+
+    # 2. Try Resend API (needs verified domain for non-sandbox recipients)
     if _send_via_resend(to, subject, html_body, text_body):
         _increment_email_metric(kind)
         return True
 
-    # 2. Try SMTP (works locally, blocked on some free-tier hosts)
+    # 3. Try SMTP (works locally, blocked on some free-tier hosts)
     if _send_via_smtp(to, subject, html_body, text_body):
         _increment_email_metric(kind)
         return True
 
-    # 3. Dev fallback - log to console
+    # 4. Dev fallback - log to console
     logger.warning(
         f"[DEV EMAIL - NOT SENT] To: {to} | Subject: {subject} | "
-        f"Set RESEND_API_KEY or SMTP_HOST/SMTP_PORT to enable email delivery."
+        f"Set BREVO_API_KEY, RESEND_API_KEY, or SMTP_HOST to enable email delivery."
     )
     logger.info(f"[DEV EMAIL BODY]\n{text_body or html_body}")
     _increment_email_metric(kind)
