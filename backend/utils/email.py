@@ -28,6 +28,7 @@ _env = Environment(
 
 RESEND_API = "https://api.resend.com/emails"
 BREVO_API = "https://api.brevo.com/v3/smtp/email"
+MAILJET_API = "https://api.mailjet.com/v3.1/send"
 
 
 def render_email(template_name: str, **context) -> tuple[str, str]:
@@ -121,6 +122,54 @@ def _curl_post_json(url: str, headers: dict, payload: dict, label: str, to: str)
         logger.error(f"Failed to send email via {label} to {to}: {e}")
         return False
 
+
+def _send_via_mailjet(to: str, subject: str, html_body: str, text_body: str | None) -> bool:
+    """Send email via Mailjet REST API using curl (bypasses gevent SSL)."""
+    import base64 as _b64
+    import json as _json
+    import subprocess as _sp
+
+    api_key = os.environ.get("MAILJET_API_KEY")
+    secret_key = os.environ.get("MAILJET_SECRET_KEY")
+    if not api_key or not secret_key:
+        return False
+    from_addr = os.environ.get("SMTP_FROM", "noreply@sipsetu.com")
+    payload = {
+        "Messages": [{
+            "From": {"Email": from_addr, "Name": "SipSetu"},
+            "To": [{"Email": to}],
+            "Subject": subject,
+            "HTMLPart": html_body,
+        }]
+    }
+    if text_body:
+        payload["Messages"][0]["TextPart"] = text_body
+    auth = _b64.b64encode(f"{api_key}:{secret_key}".encode()).decode()
+    try:
+        curl_args = [
+            "curl", "-s", "-w", chr(10) + "%{http_code}",
+            "-X", "POST", MAILJET_API,
+            "-H", "Content-Type: application/json",
+            "-H", f"Authorization: Basic {auth}",
+            "-d", _json.dumps(payload),
+            "--max-time", "15",
+        ]
+        logger.info(f"[MAILJET] Sending to {to}")
+        result = _sp.run(
+            curl_args, capture_output=True, text=True, timeout=20, check=False,
+        )
+        output = result.stdout.strip()
+        parts = output.rsplit(chr(10), 1)
+        body = parts[0] if len(parts) > 1 else output
+        status = parts[-1].strip() if len(parts) > 1 else "0"
+        if status.startswith("2"):
+            logger.info(f"Email sent via Mailjet to {to}: {subject}")
+            return True
+        logger.error(f"Mailjet API error {status} for {to}: {body[:300]}")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to send email via Mailjet to {to}: {e}")
+        return False
 
 def _send_via_brevo(to: str, subject: str, html_body: str, text_body: str | None) -> bool:
     """Send email via Brevo (Sendinblue) REST API."""
@@ -239,32 +288,38 @@ def send_email(
     kind: str = "generic",
 ) -> bool:
     """Send an email. Tries Brevo, Resend, SMTP, then dev fallback."""
+    mj_key = os.environ.get("MAILJET_API_KEY", "")
     brevo_key = os.environ.get("BREVO_API_KEY", "")
     resend_key = os.environ.get("RESEND_API_KEY", "")
     smtp_host = os.environ.get("SMTP_HOST", "")
     logger.info(
         f"[EMAIL] Attempting to send '{kind}' to {to} | "
-        f"BREVO={'set' if brevo_key else 'NOT SET'} | "
+        f"MAILJET={'set' if mj_key else 'NOT SET'} | BREVO={'set' if brevo_key else 'NOT SET'} | "
         f"RESEND={'set' if resend_key else 'NOT SET'} | "
         f"SMTP={smtp_host or 'NOT SET'}"
     )
 
-    # 1. Try SMTP via curl (bypasses gevent, works with Brevo relay)
+    # 1. Try Mailjet API (HTTPS, handles freemail DMARC better)
+    if _send_via_mailjet(to, subject, html_body, text_body):
+        _increment_email_metric(kind)
+        return True
+
+    # 2. Try SMTP via curl (bypasses gevent, works with Brevo relay)
     if _send_via_smtp(to, subject, html_body, text_body):
         _increment_email_metric(kind)
         return True
 
-    # 2. Try Brevo API (needs valid API key, not SMTP key)
+    # 3. Try Brevo API (needs valid API key, not SMTP key)
     if _send_via_brevo(to, subject, html_body, text_body):
         _increment_email_metric(kind)
         return True
 
-    # 3. Try Resend API (needs verified domain for non-sandbox recipients)
+    # 4. Try Resend API (needs verified domain for non-sandbox recipients)
     if _send_via_resend(to, subject, html_body, text_body):
         _increment_email_metric(kind)
         return True
 
-    # 4. Dev fallback - log to console
+    # 5. Dev fallback - log to console
     logger.warning(
         f"[DEV EMAIL - NOT SENT] To: {to} | Subject: {subject} | "
         f"Set BREVO_API_KEY, RESEND_API_KEY, or SMTP_HOST to enable email delivery."
