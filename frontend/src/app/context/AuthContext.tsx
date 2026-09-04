@@ -119,6 +119,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile_image: null,
       emailVerified: data.email_verified ?? false,
     });
+
+    return data;
   }, []);
 
   const markEmailVerified = useCallback(() => {

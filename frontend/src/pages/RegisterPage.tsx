@@ -39,9 +39,13 @@ export default function RegisterPage() {
     }
     setSubmitting(true);
     try {
-      await register(name, email, password, role as "applicant" | "recruiter");
-      // A verification OTP was just emailed — send the user to enter it now
-      navigate(`/verify-email?email=${encodeURIComponent(email)}`, { replace: true });
+      const regResult = await register(name, email, password, role as "applicant" | "recruiter");
+      if (regResult?.email_verified === false) {
+        navigate(`/verify-email?email=${encodeURIComponent(email)}`, { replace: true });
+      } else {
+        const dashPath = role === "recruiter" ? "/recruiter/dashboard" : "/applicant/dashboard";
+        navigate(dashPath, { replace: true });
+      }
     } catch (err: any) {
       console.error("Registration error:", err);
       const message = err.response?.data?.error || err.message || "Registration failed. Please check if the backend is running.";
