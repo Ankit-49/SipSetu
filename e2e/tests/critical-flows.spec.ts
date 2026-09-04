@@ -17,7 +17,7 @@ const recruiterPassword = "TestPass123!";
 test.describe("Landing Page", () => {
   test("loads and shows key content", async ({ page }) => {
     await page.goto("/");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
     // Should render without crashing
     const body = page.locator("body");
     await expect(body).toBeVisible();
@@ -34,7 +34,7 @@ test.describe("Applicant Registration", () => {
   test("register → verify email → login", async ({ page }) => {
     // Step 1: Navigate to registration
     await page.goto("/register?role=applicant");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // Step 2: Fill out registration form
     const nameInput = page.locator('input[name="name"], input[placeholder*="name" i]').first();
@@ -70,7 +70,7 @@ test.describe("Applicant Registration", () => {
 test.describe("Login", () => {
   test("shows login form and accepts credentials", async ({ page }) => {
     await page.goto("/login");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // Verify page rendered with a form or login-related content
     const body = page.locator("body");
@@ -130,7 +130,7 @@ test.describe("Applicant Dashboard (Authenticated)", () => {
 
     // Navigate to dashboard
     await page.goto("/applicant/dashboard");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // Should see dashboard content (not redirected to login)
     const bodyText = await page.locator("body").textContent();
@@ -161,7 +161,7 @@ test.describe("Resume Page (Authenticated)", () => {
     );
 
     await page.goto("/applicant/resume");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // Should see resume-related content
     const bodyText = await page.locator("body").textContent();
@@ -190,7 +190,7 @@ test.describe("Job Matches Page", () => {
     );
 
     await page.goto("/applicant/matches");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // Should show an upload prompt or empty state
     const bodyText = await page.locator("body").textContent();
@@ -229,7 +229,7 @@ test.describe("Recruiter Flow", () => {
     );
 
     await page.goto("/recruiter/post-job");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // Should see job posting form
     const bodyText = await page.locator("body").textContent();
@@ -243,7 +243,7 @@ test.describe("Recruiter Flow", () => {
 test.describe("Public Jobs", () => {
   test("jobs page is accessible without auth", async ({ page }) => {
     await page.goto("/");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // Landing page should render
     const body = page.locator("body");
