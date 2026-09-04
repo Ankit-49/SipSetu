@@ -10,7 +10,6 @@ Renders HTML/plain-text bodies from Jinja2 templates in
 
 import logging
 import os
-import smtplib
 from datetime import datetime
 from email.message import EmailMessage
 from pathlib import Path
@@ -171,29 +170,66 @@ def _send_via_resend(to: str, subject: str, html_body: str, text_body: str | Non
 
 
 def _send_via_smtp(to: str, subject: str, html_body: str, text_body: str | None) -> bool:
-    """Send email via SMTP."""
+    """Send email via SMTP using curl (bypasses gevent SSL monkey-patching)."""
+    import subprocess as _sp
+
     config = _smtp_config()
     if not config:
         return False
+    # Build RFC 822 message
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = config["from_addr"]
     msg["To"] = to
     msg.set_content(text_body or html_body)
     msg.add_alternative(html_body, subtype="html")
-    try:
-        with smtplib.SMTP(config["host"], config["port"], timeout=10) as server:
-            if config["use_tls"]:
-                server.starttls()
-            if config["user"] and config["password"]:
-                server.login(config["user"], config["password"])
-            server.send_message(msg)
-        logger.info(f"Email sent via SMTP to {to}: {subject}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to send email via SMTP to {to}: {e}")
-        return False
+    raw_msg = msg.as_string()
 
+    # Use curl SMTP to avoid gevent SSL recursion
+    host = config["host"]
+    port = config["port"]
+    use_tls = config["use_tls"]
+    user = config["user"] or ""
+    password = config["password"] or ""
+
+    if use_tls and port == 465:
+        smtp_url = f"smtps://{host}:{port}"
+    elif use_tls:
+        smtp_url = f"smtp://{host}:{port}"
+    else:
+        smtp_url = f"smtp://{host}:{port}"
+
+    try:
+        newline_escaped = chr(10)  # literal backslash-n in the string
+        curl_args = [
+            "curl", "-s", "-w", newline_escaped + "%{http_code}",
+            "--url", smtp_url,
+            "--ssl-reqd",
+            "--mail-from", config["from_addr"],
+            "--mail-rcpt", to,
+            "-T", "-",  # read from stdin
+            "--max-time", "30",
+        ]
+        if user and password:
+            curl_args.extend(["--user", f"{user}:{password}"])
+        logger.info(f"[SMTP] Sending via curl to {to} via {host}:{port}")
+        result = _sp.run(
+            curl_args, input=raw_msg, capture_output=True,
+            text=True, timeout=35, check=False,
+        )
+        output = result.stdout.strip()
+        # Split on actual newline to get last line (status code)
+        parts = output.rsplit(chr(10), 1)
+        body = parts[0] if len(parts) > 1 else output
+        status = parts[-1].strip() if len(parts) > 1 else "0"
+        if status.startswith("2") or status == "0":
+            logger.info(f"Email sent via SMTP (curl) to {to}: {subject}")
+            return True
+        logger.error(f"SMTP curl error {status} for {to}: {body[:300]} | stderr: {result.stderr[:300]}")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to send email via SMTP (curl) to {to}: {e}")
+        return False
 
 def send_email(
     to: str,
@@ -213,18 +249,18 @@ def send_email(
         f"SMTP={smtp_host or 'NOT SET'}"
     )
 
-    # 1. Try Brevo API (free 300/day, no domain verification needed)
+    # 1. Try SMTP via curl (bypasses gevent, works with Brevo relay)
+    if _send_via_smtp(to, subject, html_body, text_body):
+        _increment_email_metric(kind)
+        return True
+
+    # 2. Try Brevo API (needs valid API key, not SMTP key)
     if _send_via_brevo(to, subject, html_body, text_body):
         _increment_email_metric(kind)
         return True
 
-    # 2. Try Resend API (needs verified domain for non-sandbox recipients)
+    # 3. Try Resend API (needs verified domain for non-sandbox recipients)
     if _send_via_resend(to, subject, html_body, text_body):
-        _increment_email_metric(kind)
-        return True
-
-    # 3. Try SMTP (works locally, blocked on some free-tier hosts)
-    if _send_via_smtp(to, subject, html_body, text_body):
         _increment_email_metric(kind)
         return True
 

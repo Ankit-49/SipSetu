@@ -77,10 +77,14 @@ class TestRateLimiter:
 class TestEmailUtils:
     """Tests for email utility functions."""
 
-    @patch("utils.email.smtplib.SMTP")
-    def test_send_email_with_smtp(self, mock_smtp):
-        mock_server = MagicMock()
-        mock_smtp.return_value.__enter__.return_value = mock_server
+    @patch("subprocess.run")
+    def test_send_email_with_smtp(self, mock_run):
+        # Simulate curl returning success (last line starts with 2xx)
+        mock_run.return_value = MagicMock(
+            stdout="250 OK" + chr(10) + "250 2.0.0 OK",
+            stderr="",
+            returncode=0,
+        )
 
         import os
         os.environ["SMTP_HOST"] = "smtp.test.com"
@@ -90,7 +94,7 @@ class TestEmailUtils:
 
         result = send_email("to@test.com", "Test Subject", "<p>HTML</p>", "Text")
         assert result is True
-        mock_server.send_message.assert_called_once()
+        mock_run.assert_called_once()
 
     def test_send_email_dev_fallback(self, caplog):
         # No SMTP config - should log a warning (not send)
