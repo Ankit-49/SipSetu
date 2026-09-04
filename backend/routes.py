@@ -1,4 +1,5 @@
 import json
+import logging as _retry_logging
 import os
 import random
 import secrets
@@ -9,6 +10,7 @@ from functools import wraps
 import fitz  # PyMuPDF
 from flask import Blueprint, current_app, g, jsonify, request
 from sqlalchemy import func, or_
+from sqlalchemy.exc import OperationalError as _OpError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from auth_middleware import create_token, require_auth, require_role
@@ -68,6 +70,40 @@ from utils.storage import get_storage
 
 api = Blueprint('api', __name__)
 
+
+# ---------------------------------------------------------------------------
+# Retry helper for transient gevent/SSL database errors
+# ---------------------------------------------------------------------------
+
+_retry_logger = _retry_logging.getLogger(__name__)
+
+
+def retry_on_db_error(max_retries=1):
+    """Decorator that retries a route function on transient DB errors (gevent SSL corruption).
+
+    When gevent monkey-patches ssl after psycopg2 has already imported it, mid-request
+    SSL handshakes can fail with "decryption failed or bad record mac".  The pool_pre_ping
+    only tests connections at *checkout*; this catches the corruption that happens *during*
+    query execution and retries once with a fresh connection.
+    """
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_retries + 1):
+                try:
+                    return fn(*args, **kwargs)
+                except _OpError as exc:
+                    if "SSL" not in str(exc) or attempt >= max_retries:
+                        raise
+                    _retry_logger.warning(
+                        "Transient DB SSL error on %s (attempt %d/%d), retrying",
+                        fn.__name__, attempt + 1, max_retries + 1,
+                    )
+                    db.session.rollback()
+                    db.session.remove()
+            return fn(*args, **kwargs)  # pragma: no cover
+        return wrapper
+    return decorator
 
 # ---------------------------------------------------------------------------
 # WebSocket helper (Phase 5.3)
@@ -2444,6 +2480,7 @@ def update_ranking(ranking_id):
 
 @api.route('/notifications/<user_id>', methods=['GET'])
 @_ownership_required
+@retry_on_db_error()
 def get_notifications(user_id):
     """Get notifications for a user."""
     query = Notification.query.filter_by(user_id=user_id)\

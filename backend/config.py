@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     )
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
-    DB_POOL_RECYCLE: int = 300
+    DB_POOL_RECYCLE: int = 180
     
     # Redis
     REDIS_URL: str | None = os.environ.get('REDIS_URL')

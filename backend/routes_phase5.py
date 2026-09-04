@@ -12,6 +12,7 @@ from functools import wraps
 
 from flask import Blueprint, g, jsonify, request
 from sqlalchemy import func
+from sqlalchemy.exc import OperationalError as _OpError
 
 from auth_middleware import require_auth, require_role
 from config import settings
@@ -32,6 +33,33 @@ from models import (
 logger = logging.getLogger(__name__)
 
 phase5 = Blueprint('phase5', __name__)
+
+
+# ---------------------------------------------------------------------------
+# Retry helper for transient gevent/SSL database errors
+# ---------------------------------------------------------------------------
+
+
+def retry_on_db_error(max_retries=1):
+    """Retry a route on transient DB SSL errors (gevent SSL corruption)."""
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_retries + 1):
+                try:
+                    return fn(*args, **kwargs)
+                except _OpError as exc:
+                    if "SSL" not in str(exc) or attempt >= max_retries:
+                        raise
+                    logger.warning(
+                        "Transient DB SSL error on %s (attempt %d/%d), retrying",
+                        fn.__name__, attempt + 1, max_retries + 1,
+                    )
+                    db.session.rollback()
+                    db.session.remove()
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # ---------------------------------------------------------------------------
@@ -225,6 +253,7 @@ def feedback_summary(job_id):
 
 @phase5.route('/notifications/<user_id>/unread-count', methods=['GET'])
 @require_auth
+@retry_on_db_error()
 def unread_count(user_id):
     """Return the count of unread notifications (for badge/real-time updates)."""
     if g.current_user_id != user_id:
