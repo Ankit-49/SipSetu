@@ -1,6 +1,6 @@
 # SipSetu — Complete Project Documentation
 
-**Tagline:** No skill left behind.
+**Tagline:**  No skill left behind.
 
 [![Backend CI](https://github.com/Ankit-49/SipSetu/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/Ankit-49/SipSetu/actions/workflows/backend-ci.yml)
 [![Frontend CI](https://github.com/Ankit-49/SipSetu/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/Ankit-49/SipSetu/actions/workflows/frontend-ci.yml)
