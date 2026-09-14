@@ -72,4 +72,4 @@ pytest-cov>=7.1.0
 pytest-mock>=3.12.0
 factory-boy>=3.3.0
 faker>=20.0.0
-alembic>=1.19.1
+alembic>=1.19.2
